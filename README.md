@@ -135,7 +135,10 @@ of **what to include**: sections (overview, quick summary, two-ended and
 incidents, event details, SER, settings), what goes in each event (CHECK lines,
 notes, weather, element sequence), waveform pictures (none, compact or large,
 with or without your graph notes), paper size (Letter or A4), or, for the
-spreadsheet, which columns. Your choices are remembered.
+spreadsheet, which columns. Your choices are remembered. Files are named after
+what's in them, for example *FEEDER 12 trip summary 2026-10-11 to 2026-10-27 (5
+events).docx* or *FEEDER 3 2026-10-21 14-22-05 CG waveform analysis.docx*, and you
+can change the name before saving.
 
 ### Event notes
 
