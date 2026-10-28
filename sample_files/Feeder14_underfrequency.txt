@@ -1,0 +1,7 @@
+=>SUM
+FEEDER 14                                Date: 10/23/26    Time: 17:52:31.604
+WEST SUB
+
+Event: TRIP      Location: $$$$$    Shot:  0  Frequency: 58.85
+Targets: 81
+Currents (A Pri), ABCNGQ:   182  176  185   9   8   3

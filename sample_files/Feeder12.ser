@@ -1,0 +1,15 @@
+FEEDER 12                                Date: 10/28/26    Time: 07:31:10.002
+APEX SUB
+
+FID=SEL-351-5-R514-V0-Z105104-D20111020
+
+#     DATE       TIME             ELEMENT          STATE
+9   10/27/26   14:03:22.417     51G              Asserted
+8   10/27/26   14:03:22.417     Z2G              Asserted
+7   10/27/26   14:03:22.421     Z1G              Asserted
+6   10/27/26   14:03:22.421     TRIP             Asserted
+5   10/27/26   14:03:22.421     OUT101           Asserted
+4   10/27/26   14:03:22.475     52A              Deasserted
+3   10/27/26   14:03:22.479     Z1G              Deasserted
+2   10/27/26   14:03:22.488     TRIP             Deasserted
+1   10/27/26   14:03:22.900     79CY             Asserted

@@ -1,0 +1,8 @@
+FEEDER 12                                Date: 10/28/26    Time: 07:30:02.551
+APEX SUB
+
+#    DATE      TIME          EVENT    LOCAT   CURR   FREQ  GRP  SHOT  TARGETS
+1  10/27/26  14:03:22.417   AG T      4.21   2541  60.00   1    0   INST ZONE1 A G
+2  10/19/26  03:12:47.090   ABC T    12.80   4120  59.99   1    0   INST ZONE2 A B C
+3  10/11/26  16:45:09.334   CG T     -1.30   1890  60.01   1    1   TIME 51 C G
+4  09/30/26  11:02:15.870   ER      $$$$$      95  60.00   1    0

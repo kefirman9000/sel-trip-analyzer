@@ -1,0 +1,10 @@
+LINE 5                                   Date: 10/25/2026  Time: 18:16:40.233
+RIVER SUB                                Serial Number: 1182730042
+
+FID=SEL-421-5-R325-V0-Z024016-D20220318
+
+Event: ABC T        Location: 1.90      Time Source: IRIG
+Event Number: 10045    Shot 1P: 0    Shot 3P: 0    Freq: 59.96    Group: 1
+Targets: TRIP Z1 INST A B C
+Breaker 1: CLOSED to OPEN    Trip Time: 18:16:40.249
+Currents (A Pri), ABCNGQ:  6120  6085  6142    40    52    61
