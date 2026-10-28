@@ -16,7 +16,7 @@ const LIGHT = { bg: "#ffffff", ink: "#1b1b1b", muted: "#616161", grid: "#e6e6e6"
                 trip: "#c42b1c", warn: "#9a5800", shade: "rgba(0,95,184,0.06)", zoom: "rgba(0,95,184,0.14)", pin: "#9a5800" };
 const DARK = { bg: "#252525", ink: "#e9e9e9", muted: "#9e9e9e", grid: "#333333", axis: "#474747", accent: "#4cc2ff",
                trip: "#ff8f85", warn: "#ffb74d", shade: "rgba(76,194,255,0.07)", zoom: "rgba(76,194,255,0.18)", pin: "#ffb74d" };
-const FONT = '"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Arial,sans-serif';
+const FONT = '"Segoe UI Variable Text","Segoe UI",Inter,system-ui,-apple-system,Arial,sans-serif';
 
 // Plain-English meaning of each fault type, for the verdict card
 const MEANS = {
@@ -1029,7 +1029,7 @@ function create(ctx) {
     const fig = currentFigure(v);
     fig.canvas.toBlob((b) => { ctx.download(`${(v && v.fileName) || fileNameFor("png")}.png`, b); ctx.setStatus("Saved the graph picture (with your notes)"); }, "image/png");
   }
-  const fileSafe = (s) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80);
+  const fileSafe = (s) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 120);
   /** e.g. "FEEDER 3 2026-10-21 14-22-05 CG" or "Reference - CT saturation during a ground fault" */
   function baseName() {
     const rec = st.rec;
@@ -1041,7 +1041,9 @@ function create(ctx) {
       when = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}-${p2(d.getUTCMinutes())}-${p2(d.getUTCSeconds())}`;
     }
     const code = st.an.cls.code === "NONE" ? "no fault" : st.an.cls.code;
-    return fileSafe(`${rec.relay || rec.station || rec.source} ${when} ${code}`);
+    const loc = (ctx.store.get("locations", {})[String(rec.relay || "").toUpperCase()] || null);
+    const at = loc ? ` (${loc.label.split(",").slice(0, 2).map((x) => x.trim()).join(", ")})` : "";
+    return fileSafe(`${rec.relay || rec.station || rec.source}${at} ${when} ${code}`);
   }
   const fileNameFor = (f) => `${baseName()} ${f === "docx" ? "waveform analysis" : f === "png" ? "graph" : "samples"}`;
   function exportCsv(v) {

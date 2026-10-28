@@ -199,6 +199,7 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   const [dW] = await Promise.all([page.waitForEvent("download"), page.click("#expGo")]);
   const wdoc = fs.readFileSync(await dW.path()).toString("latin1");
   ok("waveform Word report has the graph, phasors and the note", wdoc.startsWith("PK") && wdoc.includes("Arc restrikes here") && wdoc.includes("word/media/image2.png"), dW.suggestedFilename());
+  ok("file name includes the station location once it's set", dW.suggestedFilename().startsWith("FEEDER 3 (Ocala, Florida) 2026-10-21"), dW.suggestedFilename());
   await shot(page, "web_wave_light.png", { fullPage: true });
   await page.click("#wSimple");
   await page.click("#tabSummary");
