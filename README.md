@@ -255,6 +255,49 @@ Your choices are remembered. Files are named after what's in them, for example
 place is added once you've set the station's location), and you can change the
 name before saving.
 
+## Trip History (many stations, many dates)
+
+**`SEL_Trip_History.html`** is a companion page for looking across *everything*
+you've downloaded, not one event at a time. It reads the same files with the
+same analysis, keeps them in your browser, and answers: *what keeps happening,
+where, and is it getting worse?*
+
+- **Add as you go.** Drop whole folders (one per station or relay, any dates),
+  zips, or this month's downloads on top of last month's. Every file is kept in
+  the browser (IndexedDB), and one event read from a `.CEV`, a `.SUM` and a
+  `.HIS` counts once. Already-added files are skipped.
+- **Locations.** Each relay is a location; its station comes from the files
+  (TID / settings), a folder named like `… Sub`, or what you set.
+- **Issue counts per location**, from the event types, targets and the
+  analyzer's CHECK lines: ground / phase / 3-phase faults, trips with no fault,
+  transfer trips, frequency trips, recloser lockouts, slow breaker clearing,
+  breaker status problems, unexplained trips, Zone 1 overreach, faults beyond
+  the line or behind the relay, records that disagree with themselves, low
+  fault current.
+- **Recurring issues**: faults 3+ times in 90 days, anything else 3+ times in
+  365 days, at one location (a reclose sequence counts once). Slow-breaker
+  issues show the clearing time getting worse (e.g. 5.5 → 7.75 cycles).
+- **Fault hot spots**: several faults at the same distance on one line, drawn
+  along the line.
+- **Trends**: the last 90 days against the 90 before, and the last year
+  against the year before; ▲ increasing / ▼ decreasing / steady.
+- **Ranked problem locations** with a score you can open up ("why this score").
+- **Evidence one click away**: every count, chart bar, heat-map cell and dot
+  opens the events behind it, with the cause, CHECK lines, element sequence,
+  currents, the source files (downloadable) and your note. Step through a
+  recurring issue's events with ◀ ▶.
+- **Work log**: note tree trimming, breaker tests, setting changes; they're
+  marked on the location's chart so you can see whether it helped.
+- **Exports**: historical report as **Word** (with charts) or **PDF**, **text**,
+  **events CSV** and **ranked locations CSV**, for everything, one station or
+  one relay. **Back up / restore** the whole history as one `.json` to move it
+  or share it.
+
+Try it with **Try samples**: two years of made-up files from five substations
+(`sample_history/`, described in its README). From the command line:
+`node web/history_cli.js sample_history` (`--format events-csv|locations-csv|json`,
+`--as-of`, `--from`, `--to`, `--station`, `--relay`).
+
 ## Web page or Windows program?
 
 They're the same program and give the same results. Use whichever suits you.

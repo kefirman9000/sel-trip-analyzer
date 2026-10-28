@@ -1,0 +1,5 @@
+RID     =LINE 5 HILL                   TID     =HILL SUB
+CTR     =400       PTR     =600.00    LL      =10.50
+Z1MAG   =4.62      Z1ANG   =78.40     Z1P     =3.70      Z1MG    =3.70
+51GP    =1.20      51GC    =U3        51GTD   =3.00      51PP    =2.50
+TR      =M1P OR Z1G OR M2PT OR Z2GT
