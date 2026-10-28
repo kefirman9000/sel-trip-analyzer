@@ -1,0 +1,1916 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEL Trip Analyzer</title>
+<meta name="description" content="Drop SEL relay event files and get an editable summary of what tripped and why. Runs entirely in your browser.">
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAA2XUlEQVR42u29ebQl51Uf+tv7+6rqnHPnqQeppW7NsgZbnrBxDC0/G0LMi8HgFnZwQrIyODhkxbFNDEaL7oaEt1gGIuIgCLHhvayQQLf9CH4PHEIcqQELkC3LA5Ilq7vVo1q6re47n6GGb+ePr6pOVZ0659S5gy0SnbWu1LduVZ2qb+9v79+egZc/L39e/vzv+6Fv7dcLvUyClAzyvzADCOHQcT64uEAnAODehw2OHjUvEz7zOXyYD+JeBoATT14WHD9kAJK/wgxgiQ4AOH5fVHbG7vf+4Zg30XCxsrKzbzmV+cdK9vdv7WcKU/A7q+HTv/HmtdITDh1TwCHgOHaMGWhHCH/wYYUTbwmTI/sOPVJ33I27iKLXCck9YuRmguwlwhSI6oAIgSh9HBr0pNT3GFHJBX3vRYOXJPc/Kjl9hGMc/zOReUyxxCdA4IOwLOAXSNEpEfoKK37MCH315MffuJrc5eDhh/QJbL/kpG2918GHUsLfceiYu+FMvZWU/CCJeSuxOsC6bk+UyK6GRN2FyBGwjHj9CZ9fd6rMMBjKMP2YaHSGyP5Jcn8nECuAkh+CCTuQKLgkRCcI+rhjNv7bkw++Zd0KBVHH79s+ibA9DHDomErE/I3v/fQukfH3guQfsHJeQUpBIh8wgRAQEQGg+L/JCvUjDA15RMrs0FGIPIBBaMsM0keCFBkgfTeBCAkIIiCxfxRFyiHSNQgEJvDPGOD/iaLwN888+NfOFtf8W8sABx/SOPGW8Obv+WUvmL/l/Qz+F8qp7xHTAaLAgGAYxETgrpSn7vtTPyIM3s1E1YlahVhURXWMKAGo7DyimMYlxwCISMIkIoCBAKQcRU4dxm+tCvBA1F79pdO//l0rlgm2BhZpS7r+8BHC0aPmwHs+c5BU7QF2avcgakJMGDIxExETpZKuR9QTUeniUUoEqx4kt6CS/l1y5w3f9cnXSQlmoOR7KLNNKXM/KdyEkq+l1JjNMlH33l0VJ1S+/JKTDskxgSQPJDAGMESk2ZtA5LdORyb64KmPv/H3Egtis9iANmuyJF944L1/cJhJHyFmSNQOmUgRMWUJT+mCZyQ+DdjNJQQcfceX7Urqv4GH7XAquaJwjErP6y8tRAoeESnBCBlmEECMICLlamIHUej/ipjLHzr58bd3NqsSaLP6/uYf/oPJEPSftTf2duOvG4KAmblI+JToVNzdg4hKhR3ff+f2LLD0LrhkoUa80In0kexupgID5o5JznclRNknSokv2f1MNHzJM+K/R8ZKlxkk87sxYoQgqjatonbz0ch/8V2nfvV7zuOQKBynaOcYICb+/kPH9pA3+YfKrb9S/LWQiTWTNXeyhE+ZISsWcxKgfIG6KmIzu36YnqdN6/TKen7QMZECCOyvEiRWHwnh7f8FMWKEMSZkb1yb0L9gwuZfP/nx73xyVCagUcX+9e/89F4eb/x3pet3SLARKCYnIbb94Ryhk51GOTO/XNSPTPhhaLxEN2PophwB7VOF5eyrEmQgFsiKfyQMEOMUEYkRIlkmcBraROHzJtx4q2WC6uqARgF8t51/9VjH9z6vnfrdEqyHzEoTW+ImxO4yQone70H/BUNpCIP0iOcsEaggstNjw86Rot2ZRXwgBpgIxiT7Mdbf/YgsmZfJgcfe5aYe5pAMCCxXB+n/k38LEImJyGkoicJLYdh84+l/8x3ncFgYR2koMORqDp6HFY4eNZ22c0y7Y3dLsB4qpbQleEx8touVHiMCc9e/l6qErJqISc2UP9bLICXHYpWTMyU5cx5lvHDZa6l4TvGE7ncyA0FosLIRwIiAC1IsVXWZOxB31V/q7MgeSx6d878T2efPH0P6j/T65F5IfgeUUgpBO1Ta26u195n9h5+tVQ22cQW9zzjxlvDA3/rMYV2f+h4J1gJWrK0HK34ZRYgNfXuMKWfq5X7ipcovBMWqgzKLFf8w0u8ZeCxH11GOoYcQxASlCc1OhLv3T+BH/8Z+NDwVMwG638+91/Xcq8AgTHat8vydSEnqWS9O+ZRAzOCEz9muHcfnsCJt/PVQ1aZf5S6/8CCOkjl4+GG1NRWQgL73fPbbtasfgYQhA8rSK+FAtg8ZvwiV6f6C2KMtALnBjz6Crh7itiUIOqHBb33wHty9fwLv+vnH8PULG2jUlDXfiPLSaciyUgUz0pqGVBowz1oEFhR08YARiw+MCIxByLVJbTor9z39S284PgwP8EDmuOOQ3HHomEsq+gSxQoLxoDK7NnmPWFcWuTgrBZip3OanfsGarE1Jw1UCZd6ICmqieAwZRs1ZMIBWhKWNAP/k7ftx9/4JPL/UwaWrLbhKIMbEhMjJ6QyQzfs30vfu2fFUwgxUEP+ZVUg1HIHAGWuKM+qFQAyWsG0E6ldu/eAX53HHE9LDVZUY4OBDCkfJNN2xH3Vq03dI2AqJoZCIekoAUiye4lslOKC446kfsbILkp7IJYRHbkVyYj0rilEQxehzrLuiMf3t0moFrDUDvOHmSfz9t10HEWBxuY2V9TYUCUQEBVbMYxwUVVvm0UuwgMVOBUmY0fupekg2UQEzcG6NCUzMEvlG1acWRKL7cfSoOXS8P525L+o/cW+079B/nSXm+yVsinXyZMFIRjche6y763t2fBlw6yf7yw7nNv4AsIgSZutzjLJWBwRhJHAU8NPvvhVa2ec/88I6Wu0OCBFgDCCm68ajMt9Oye4ecqyLnfLMYDEDF5YsI1FyWChlPmU6q4aU86O3f/Avbj1+HwwOC1dmgIMHH1YAieOZH9G1iXkxYUSxgZ9yLQpotODy7Uv4gXKf+gHyDKH6EXU0ZsjdLya+YsLKRoAPvOMG3LZvHH5orainLyzDhAHERBCJbMCmxJbPqr3cbq7CDOhVHTmvKWesgWTjZS0EZK0EJogYVZtwDdGPASSH7izHe2UMQCdO3Bvd/D1/4IHwfgl9YeIu8XO6Kn8MQGbXb5HwGLbjUZ0ZqCzYlP8yxYzVZoA3v2Iaf/et1yEyliEA4NSFZRBCmCiMvXOSEj+7Dr2E3wQzZMzjnkBpDndmmIHy0sNKAVESrAuI//atH/zi/PH7KCrDAlxq9oEkXKB72W3cjKgjxDaU27V9CyI8VqdcRMZbIXzWdUuji/Z+UUYq8cUTAUFk0HAJP/3uW9OnU2wdQOdeWIYmAyORFf+pk4hLffvlhB/CDMWnS0V9QRJkpUwiGTJutoxHlhCZSNenpkXRDwDAwSO9ZmEPAxxcXIhJKz/ErARMBhkd311njjktuQnlgym0OcLnffZbIXw/PV8kloAZWN3w8YF33IAbdjcQGUlfZXG5hUsvrkGzQIzkrJqBu5kqMkNKepSsXZ/revBW5ljMNEwEYiGYSCByHwCcwL1mGAPQiRNvCff/yEM1QL5LosBibOqKdSqYKzlKUv+XRF8x3k/PDxbjoxGeSs6hWPQTltcDvO1Vc3jvvftS0R/TGmeeX8HSahOKRwR4FQiPwu5Gv/UsYZncEc54L2NnXCwtWMI2MdGbbv/oF/fiKBkcPsz9GeDQMQaAKGzdzaq2D8YX4liyZ8Q/5zx7qYtrcAiUaHOEx3YRHr1YgAA/NJgeU7j/vlviMEHG8wLg9MVl+EGQLEKegTYjBfqJe9BQxxgVsqnsjud4xyOnmlNqSRSp2kQ96tC3AwDuPEJ9GSAR/w7j9ezWYO2eEgdF0QjOBnm2m/C0XYTv9ScwE9aaPj78/Tfi2rkajJGUjyU+/5kLVwGRrl8+9QVnt2cFKTBAz/dKi36AknokRV5jUIppMpaDEGuwpjcAwMEnHs49lC73Aap7coTnfISvNIxbkYt7EiWHummHu3epcigWOdG/tNbB975uAe96094c6kdGoJ2+uASlGBKDvjRmUTFLqBDf7J/s2tcVTiUpBdYBJEmwUwopZ3HCi4iAiEgkhAjuKcMBOQY4ce+9BicAEG4mRKD4TbNRuqLZVxbaHZ5zsdkEjD4JGSOmdBEJOoHBwpTGR991M0SQEfEJAxA6QYRnn1uG62hI7PrOuPB2hvDoAwKL98tIXhP7JeJ8k5j46HKLiQDgQFx+YbJZjpz72jh+TJDdsbkTO8l7xXNeJbxETLpB98oEUpiA9ZaPn3jnTdg15cGI5E4xsf5//so6FpebcBwdvzOD4tz9nvjCVkV9H7RfFPc9ahdZXixYCgkOMBGIafbmI89MZPFNgQEkLdciohmIKcY2Kurqb6FJN+xeBCgFLK37+P437Mb/+frdPaI/uz7nXljBetOH1gpgZW1eoj5xilFMuiGER4me72cl5MFYzn+QJp/CQASTzvraDADgSPeLejCA05nw4KzVrSIp5NQNZYYqen5z4n8zer4HRpCg7RtcO+Pioz9YLvq7ufmEUxeWEUQCVire/Yw0ID9I3FcJdw9UCVTy54LZJyURVSFQnDeYu04AZnYjV9WLj9DDAOxEkqa7mm6YtGq1zciVNTtJ+NylAgbQ6gT46N+5EzPjTunuz17y9LkrKfBLJUAumkV9XrMKwBtC+CFYIL9c1JXq1Ft5T2SZmlRvArLunyfSJUQ2F25Qcia9JAkfv6giXF31cd+b9uBtr5rvS/wkngEAJy9cheM6sM6QrAVQ5lLeCuHLAV6lTGhBb/FKxkOYxKwI5ennurSUuhMnSwr1SX0ui9rRt8ykG7zoBEWCVifCDbs8fOSdN8H0Ef3IoOhWO8CFF9fhuU6Sf5XufupTxzCqSVdddQzKfpLS6hJKC08oNRdHzAji3gTLDLCivih7e6N0pfcvdbyUx+UTvveDEPcfuhnjdR3bx30yIeLzL11Zx5WVtrUAiMGkuhIgyQquiuxRjuyptEaS+gPIPv5hKVhm/SVIZQbIyZNMDV6VuPw306QbQPj4PM2EF1c7ePeb9+LNr5gdKPqzxZmnLi5hrR1AK50CQGKCgBAJ4Do2STQ1Ibdo0gFVA2m9vhcqbshsnWPfew3AAJLR+4KSlK5+YnzH9DwNSRotD9QwA+vtEK+/dRof/r4bY1fv4DzYBEw9c2EJxpC1ANiqAAHB0Qp33TKP+dk6llY6+NrJKwiCqOAl3QSyH7nwJQPwioUklLESpGc/V5UA1JuQkRU7SRkzbXewhobY94N3fDdWT4gig4kxB//qh29Dw1NdPzmGp0mfvGBdwMQMkGUCEcIrb53DdXsnQES4ZmEMd98y1601GRAFHGjLjxQ6p0I6AeUkdPZeUqEygAfRH9L9AslVqIyi97dC+MHivn9cHlAELG34eM9f240b5z1EmUDPwAWJ475nnl+B41gLgFjBGGB8zMHcTB3tTgQC0PYjLMzUMTnuITQo9fz1BGu2QPh83KUL8Ciz2Xtr1WP69eF87l+Wmg0wSA5sFIksPeXOO0v4Ehdl7jomwXo7xN3Xj+PvveXablXPkE+S6re24ePC5dgCAIOZEYGwMDcGR3PumZQi7JqtwxhBpkCiJ4lzJMKj3Nvas+szIFCkUEeQqYrumovuCCqghNMsl0ll9L9ThC/Pv8s5vgAY/MwP3YIxT/WP1fSxAM5fXsGLKy04ro5TnhiKGbNTtfyixnGDuekalGLrieuhL/W3CPoRvnBeNpYig/wssTdQMvST9K1GkABCSeEhZdIfe+1Kkax0QCoFaKdMugqJl5oJV9d8/MO37sPd+ydi0V+tBjZJ+TpzaQWtwEBpnebBsWJ4rkpNyOSrjQHqnobrqP7Iu6pJV0b4rE4nyUjaRLR3fQGSiQenEkEGt7zhKq3SukxABVBRvuNlh0y6/ilX9l5MwForwGtuGMf7vvu6SqgfJd27Tl5Yss4itiBQiOG4Gp5rjabICILAWCYXwHMUap6KmX9rJl0Z4UtVQk51FXd9r5oYCQSmOzzX0oq6teqZEmVIwYmzGb/AKITvm3cvMEagFfAz774FruZyLTXIAojPPXlxCUpZ3z+xgoBQczVcl1Mv4tKqn7681oyxmkYkKHeejQDwSs3tgqmX/53yHUQks1HTgsL+XUi431ZIbiZx2xPJOIWkVxbHDNOtlhEqMUE2ZdJVSbmStJ7v/d+9D7ddMzaS6EemNkAEOHlxGa7nQBCbfyA06g60UoAQNDOurLQRhpIy2VjDSVJxtoHw+fOkuDklv+ZSuC7ZmAmtZFMSIOWi4s0k6ynqubmUwaotmXTDpYBShJVmiG+7aQJ/7//YtyniJzpzaa2F56824TlO3MTR1oGP1V1wXA8XicHKho8gMmC21zbqeoATZ/OEl561pe4Gk674l0JkSAoEkZFBYFyCbNLWJJLvapX2rpEeh4RIfsdLVoaMaNINO0YAwlDQcICf+aGbobnEUqjwSWp+L15ex9J6x8YAWIHiGECjrtPdHoQGG80QndgDKCJoeBpKUSEiV82kG0b47tpSoS4pv5aWJt1zTOZciWN8lRjAZNE+usyAbJ+ajOiRnp1EOds0y5VZX8FQk24oMwgUA8sbPv7Z26/HTXsalR0+fV4ap55bQju2ACjuAsGK0ag5ELHJpJ3AoBMatDsWCBoBaq6CjpNH+/r/i+lxBeAmpR7bBOkX/lboIJZlHNtDqFcljGQFSKZBETI7W0QyDYso96VlnTBlAAKWHKAsYRrqb0ZKUtSxEeI7b5/CD3/HNUMDPVUsgKfPXY3bwyiwUgAxtFbwXJUGftp+hMgI2p0wTbZwtIKr82ZisQtJjkgk9iffWK5n13cbRJTsfhCMUE8bOUnxQUZN0EjBICvuKb7QgsEuxM3amyauRunp4UTUE1fkYTH9FFcU0E/JOQQgCAUTHuH+d92Uq07ezCdJAnn6/BUYEIJIQBFAoUHdtX/3wwiOZqxu+PDDCKtNH0EYwQ8FShGIBZ0wglbdrNxsYatmHlIv2evsEaGckwpZgBfnA3SxQKZ0VfI9EkWk9Pv6ZwQlqcVx5yojlIpWAwHnTJACIqSuYrCZyJkYekF/D8/lK9P7sehf9/Fz77kRN+yqb2n3J8xpjGBl3cfe2XGMj3tgzwGUwuSkwoRntarDgDYB5sYYLhl4bKC0gaMYuyYVTAA4upfIAsJSM4SjlcU8ghKTLkv4rHqVgs3fVc0J8U1MhaRdDLrdRdNzyvhN9w0FSC+izOpvk3RaEQs2OK6mkEySCmXkXi6Hkai0JSqkLN1J8gwjAmbB0nqAt941jXe9cc+WiZ+1RH7zJ9+ehsBTIc529yZRvyiai9UBQSfvTEB0cM7GBIrwwti//9afLeLjf3QJ02NeCjqzWlhyAbhewue9tFJQwVlVKl0QKBgYFdT9zSLK9iMCRGDAcVcVSbkuKQk3ACiuqrVl00jFoH1UQjdULYUdLwMaKRVy4Engh4KZhsL9P3Bjvp5vywwATI55w090Nnf/c4sbIIlgTARju+1kfAdZYJdvPJHE5lJHj2SbRtp4hIC6qD/nxpfuPqLK4WDqfmFM7KwpaDL6xUi2mXGCESQFi3lQ2Qv4slJFCmaLUMHTFRN7rRngo++8oaeebzs+In1+0NugceDx+G9hZF/wtz9/Af/5T89izBGEke0z0PO+Je5dk931BbRvBKmZnux25CSDdNXzSCDQji5ICWog4FgimLihkpGYZEQZ/SIwQtnWd0h0AgmVN0bOHCMp4APJ27uKgavrPt7+mln8zdctbJvoH1rhVbW5HhUtS+uhPP38Gv7lb38Fk56HMApBxNbLiF7TLttaXormXlm30Iyot/isaMFx1m9X3RPYsyMyzh8jXfCB3O/JA1nQaCQBJclDSvrT8wXZGHas40x8nYn/2vYjzI8r/NQ7b+xb1PFS+aRtXI3gw7/+CNY2mmAYRKHtMeSHgnZgEBnJ7XihjO4eQvx0fQUZAJiNB1BPzGZ0P0BGxBhIvmlx4h2URBzFKiEldExAoVR1JOI///CUk6NJR+zi02+0Q/z0D96IXVPuwMzel8LHiJVOD3z6S/jjr13ARF0jiGxdph8CCzMebt8/ibqnEYSICS/5zZSMDRF0N1SyKYoMIXmJYXLNJftHBQcmhWbTEBJzrlt0ilQlpDm9RuIq2u6xpFQpbWCUkUeUyWXKWQkZyCoEaLIx/kNvWMDfePX8joj+7fwkz/eFpy7hF37ni5iZGEcQEbSjEAhwYPcYXn3bPLSjcWDPOP7s61ex1gzAcTAKKNn5yeaTLtJHYcdbekgukJcdQlFJBawUHDmZiGKGIxPxnOxkSZFoFpmm5wmlu93YUsXS8/L3l1T0Nzsh9k5r/MT3H7DY4yUt+i1yWt3o4J/+8udsK12tQUpBmOE6Dm7ZNwUBoeVHqNcUbr1uAmFEGYmZ+cnu5gwY70ZsE7CYkR65iG1XavtVGGAKBfBBZHdkAe2nPucsqqeivuqqhC6R44CF5FGs5F46n4ja7ET42ftuwuy4A5HtRf3bLvqNgJlw+Df+FE+eX8b4xBgMOyDtIhIHczNjaDRcRAIoUvBDYHbcRb2mEJqu2hRkmYHsZkNXtebokKNLPhIooxaGrPSZYJHNCBKx3dKyuigytvyq5UcI4syILkciQ/SYGRJiGyBKGaQrCdpBhCAMcWmpjfe+eTfeevfsXw3Rrxj/3yMn8cnPPoGFuUlE0CDlAboGo1zMTNahlOoCPiOoeQqzEy78UHLgrrtBeglvKMsQ+bhMGsInlATlhmCAKQDtxIaLdXrWUUFpIMNKBmJCx48wVte46boJeK7GhRfWsbzWgetwwaPXHdwjkuvUlriKEMUA8tqFBuo1jdskxEfesX9gPd9LBfQx2ZKyDz34EMbHGxB2QI4HODWIckCkMT7m5YZCJGJ8esKFeaGZbqoei0y6NRiSlcaZ4FsuXyAbvicqcTAN8wRmXbax21OyEz0EANt6++v3jOPb7tqN8YZNirj9hmk8cWoJTz27DEcXBjOJ9eZlGSEpPo0igesovO4V87h2oY6mH+D93zGHyYaOdf9LV/SLEbBi3P+JP8alpQ4WFmYh2gPpGkR7EHLB2kW97lqrKM3gtcwzUdcgItuKuJCmnor1AuFRcBBlXci9xB/FFUxdb2BugFbmQZgJfmCwf+84vvO111ix3YnSyNprbp8HE/C1U0vwXE5fJjtvL40WkqSjXN5w1y5cu1DHC8stfNdtY7h1wYt3P17yov8zn38an3/iIqanJ2HYAesaSHsg5cKwQs1VqDkqdqLZjWAEiAzQ8BQczTYKmU3wyORdJ3MKpITw2YhhNvAjo04MWSm4tCRnEcRfwTZcOjnm4ttfadusBJGB4zCcWOy3/Qh33TyLPXMNdHyTRhG7SNfq/SgW/21fcNfNs9g7X8eVtQ6umVR4xyun43Ltl769f+riVTz4e49hYX4SRjmA4wHaA5QHYY1IGK7WcLRKLaKNdjehxHEsA0QmE8hJLCaxYXchyjl+ssm6WZ9NzoWCbONpr3pSaDEbRzJ+0sTD9arb5uA6GiYS1F2Nr59ewqN/eRlKEcLI+rpf84p5KK0soTPewW7YEugEEfYu1HHLdRNo+SFEDN792ml4mvrary8lb18QRvj5//QIDBjj42MgXQN03Yp+5UBIw0DBczWYKQV6zy91YqAsUAS4mvMOnkwyRzHi17Prsyl5JXmWo2UFE+fRI2V0CQF+EGHvQgP7906g40cIQsHFxQ18+RtX8dSZZTxxagmREXT8CDOTLm65fhJt33RNm6w3MPYT7Ns9DibCajPEd98+gdv31F/yoj/Z/Z/8/S/jL89ewfT0BLx6DcqrQZQLKBdCNrfQAKh5Ki4xt8Rc3vARxC3pmRk1VyGMrFS0P7YUPTLWWupunkR62tiLlATMKOvHkRGDQcWpm1QQDqwYd900a336DDjMeOypFxHFouzrZ1awMFvHzISHIBDcfv0UTl9cgx8Y270yViVEhCAULEzXcGDPGFZbAW6a1/jeOycRmrhNUZU8rkGBGulTWbRN3r6HHj+PX/rUl3D3LbtA2kW91oDyfITkQlhD2Jam2Z4C3f0WGIOVZgROmlASMDnmQGu2qWUluX9dvd7NzjIisdnd6yCTCuJzIAjMivyktWoYCvbM1bF3vmFfLBJcWFzH1dWOnbDBhPV2hPMvbGDvXB3NToRG3cEt103hy9+4Cs+lfD27CG7fPwnPYay2Arzpxgm4uiKlaJvO2ay3r+nj/b/8OYh24NRq4FodXqMBx2P4oQaxBoEhYAhMprSMEETASjNEJzAYr2n4ocEtexu4YXe9zzRR6cnXcDTw/LKPP3lqBQ5TIUmUKr27Hrpq2YSMWCQHkcHXTi1hbsrDRMPB188spRjBGIGjCScvrOKW66cwXtMIQ8GBvRP4+tkV24o95vggFOyarmHfrjG02hEmaxr/4fOX8cB/OQmHQkjoQ6IOQr+DhUmNPTMuOn4IzcALS21cXrJM183UEeydq2N6wgaL/MDg/OUWltfaOHTwVrzv++5BZAwU85Z3v1aMj/y7E3jqwgruvm0vlFuD9urwag14NWBtQ6BJ5XIj646KYyo2lb3ZidAODKYaQBDYDeYy9U0SLe5uR3O3WrlI/LIYt4yqAijfukVgs32urPhYXLJgr+bq1AxKHBjMhFbH4OmzK/i2O+eteUiCvXMNnLm0Dtex3GkEuHX/NBQzAhgoBr7wjSWcOr8MDR8maEPCNiK/A1cZvO7WSajYZGx2Qnzp6aVcl88wAu6+cQoL0x5EBGvNEF89vYLmShPvftsdxSaZmyN+ZKAV49jDT+MTn30SC/PT6BgNx6tDuXW4ngfPCyHNMNe7l5nguQwTa+x2GCE0wMlLG9g15aLm8gi5y5ZJHM3QivJJosNyKquqgGLiYvYfWhG0tpf6YcY3T0mqMqAdxqnn1nDTvklMjjkYdzTuuGEK5xc3IACCwGDPXB3XzNfRCSI4ivHci00sLnUwN+XBRASEDIk0YGrodHw0TQ237htHuxNhl2a0pI7zi004mlPLZO/eWcxMuLaD/XIHY1PA2OQ43nTXtbns3017+xTj/OIqPvjgCUxMjAHaRcgu2K1Bux6U46JW8yGI4v4tNpTOTHA1QYwdtNnq2KqiM4strLcN9ky73frLAZkpWXDHDKy1orh8rUI7OreqK3hQmzLKxO8LPWqoMO2q5RtcerGF+SkPzU6E2SkPtx+YwleeWYLrKrzy5hnr/AgtkPna6WUbVxCGiLY7iAEhBfYcnF8i3HBdHY1JK22uv87Dc2tXEEm3w3djcgq6rqGZYJobaMsGDizUcGD3xIDm0tUDPYqBH/s3/wOLaz7m52cQsIuQPJD2oB0XSmvUXSfptZcifkex9QHAhrdbvrGFJoqxuOrj0nJnYHu9XGZ81pHGBEdV60+0SRA4mBlKp1/HaWGOIjx1bgU3XDsO12FEkeDum2ZwfrGJa+Yb2DvXQLMToeYpnH1+HS+stOFqDREDUXFzBtEgMdCOoB1GOLsEvPKmKYSRwTWTjIUXgUtXWtDK6sPxqSm4DsNRDHMVaNM67rhhAQ1PV+4UUvYJY9H/8d99HJ/58zPYs3sOITtgt46QXUTsQDkOiBi1ms4VZVpHD6eSSmCzgZJztCIrylHWNi9fXFFW8i1SMaV+UyBw1M6V8WNLXF+/2gzwxLMreOMd89johHA0422vvyYtsVKKEIQGXz21YosvmQBhO4hSkkGNAiKBYsGVDYb26uBI4LkKu+YDXFoRQDPcmkajMQYQwdGMkNqI2MFrb55LCbEZDZCAvq+dvoz7f/MRzM1OImIH5NTBrgdDDiJRUNo2oqq5qttSn63V4DoMzWRTwARoB6br8i363PsUeJaCubJS+34gcOTh0UUpQKM0PrSOJNdReOrsCs48v46GpxGEYmv3YybxNOPxbyzhxZUOtOLYsRF35YwbNIE1hBwo7WIjILRDhnZdQGnMTo+BtQtDGjXPg+N5YO2CtIN2SHAcF68+MLVpizABjW0/xPv+9efgi4L2aoDjgRwPrGsw5MI3DGYFA4LnqDR7SuK6gJqjrECLGbHlm9i5Rj0ZxZtvqVPepYwGvDsPVAFb6niZBy5/8tUXcW6xibGaraL1HBsc+fKpZTx5diWuvSvOC05GdMfNGhSjEwJrLQPtaBhhTIx5cFyNSBRqNRc6KeoEYa1tMDfh4s59Y/1L04bufgPFhF/4nUfxZ08tYnpqHBG7YF0H6RpI20BPO0Sc0kXwHO6Wh8UgsOaqdFlCYwdTU6FcqtrgSaDqrCIqbUO7ST9AP/FfpfEhs13Ihx9/AXccmMKe2TqMCM6+sIFnLq7D0SqfH1DaHDHxfBksbwTYt6sBI4K6p1H3HDQ7HdRrOl0MI4LVVohbdtewZ8qDYPSgkolF/2NPP4f/8EdPYmZmwhLfqYMcC/zAGmQUOoEloBEr4RzF6IRdzOE5yfgGC3j9hAFKS+Qqgrm+pXP9zhkhH2AYCKzc8ZKSSl5rqnzl1DL+8sxKKu5ch0siftT3XiBgeT1IcZHnMCYaGovLHdRdlQoOExlstALcddeMdRKNmE2UZB2vrLfxsd/5c5B2QVqDHQ9wvTjM64CULRNqh3FOpAgczXAdhVYQIO5RBq3S6YowRmwXUkLFWQfVjg1tYl1ZAvA2tTotaTPnuQxI7/i2/s2N88xggWUYV9zYAYlTDQcCoFFT6eO3ggh+YPDaGycqxcXLAz2MBz71KC4tteDWG5CQQE4diEU/2FoqZAStjkmfUyuC5yQVwgyQgecyImPPCUOrBog2M/iCBpbOlUvt/hKAh/rRN9Pxsu94k27NWrWOWZTvnCEExYSNdohWxyBpyDExpqGIUHPZJo0CaPoRXA3cc/34yPa/lRaMz/7FSXz2C89ifm4KHdFgp9YV/cqxADWeJtYOTTpriMmCPsl0A3FU0jSJ0pDvKG1w+gO8AbOJaKvBINnkEIMhKoGGzQ8YcIwJaAeC9U6Ies1DaAwmGw5cx4ZTEw/ZykaI3RMObt1TLxVqw0K8z11ZwwOf/iJmZsZBjouQGezaJA9SOjNDiOMpZJLWAYKAusdp9pRiQiM2DXUsnSKxTDGwIcZmd3w/ekmlTqFTfTqdUSWLoGrHy8rDIkuGJUYiaLZDG30UYLym0ahp6/yJG0StNAPcureGMU9VzidMaxWM4Kc+8SdohQb1egPs1BCxZyWAcizwY5XmSDAR/NDYdK5YF9diPIJ493txe3lioBUYGFMeeR1u0lWZRtY7RGqkTqGlEyvLmGEUwtNWCJ9vX0tid3icuAzPYUyPO9apFNlFXmv6ePX1Y7kxcFUCPYoJHzv2RTz01YvYNT8F7dVATi02/Vwr+pXKrQ0xITAW2XOMThueSuf3OSqOA8Rr0fJN/+miVU26qlPKh+gA7l8iy0Dp+LPBCH3kjpcjMEPac4cZKxthWmSqmDA/5UExQ2uCGEEQGrz2wMTI3r4vPbOIn/mPj+La3dNQjodao4GIPUTkWksg1vvZRkAUX28DYzZO0fAYii2Duq6CoylN6WoHprJ9v2nCV8QCFUDgkB1Oo3W83BThC9PIbBQshB9209WvnavZCd8C+GGEmkZlB1AiIJqdEP/4gc/BsMbk5BiUV4NbryNix1b3xE2j7Pwgyu0XY2yAh+N+PDVHQSlGJEDd5bSTCITQDjIWQB9zm2gbCF9Q1+7I8wK2TPjBswWrMAOVdMFUTGj6EZq+ASuLqmcmHDDbZ2h2Iuye0Ng341YCgIm37+d+68/xhWdexNzMJLRnEzzcWh0doyEU6/0e4id9DwQt3/YNNLF/wtUWk9RdmwtIIETGPh8P8PLRMEfciMxAA5xgPGTrVxD/VQnfX6f3I3y/yeJEhE4oWG0GUNRtbZsQe60V4pZdtZQAVbx9j379Ij71x09jZmYSol149bplAteFb+LJocQZ9dY7paTZMWmxhqutS9iA0PB0uoShEXQi6c23qGzSbYLwmweBw6UAbUGnl80nqDpSXkRwZTXIEUHiaF+rE+GuaxtDHUCJB3JprY2f/+0/w+zMOMjx4NRqGJ8Yg3ZrYG0DPQmX92tpS0RodqIUl2hm6wsQwVhsEjIBfmTgB2Kzg1NXcAVxj+rM0Lc7vTeKHyApzqdy+77SNNERZgbSiLMGiRlX1v0Mwu+2RoMY3HlNvbLN/4vH/hyLaz5mp6dAyz7cegNerQ7SLpi1HQfD3J3KXWK3MwPNwCAySDuL1T17TaOmUuZsBwZBWS/jqrY8qk8Wr5IYO3xyKO0Q4Tc1Ur6LA+xgiBDr7QgNV8X5iLZCqaYEN++qDwSASWzgM488g//++Dns3T0L9mpwahqNRgNuzcb5wQqdkGyuQh+HTZLi3g4EQdSdMd1wLRBsuJwmo7R8yyRKZUu3t8YMmxs8OSII3HaTblMj5fOdPZt+hOeX/DiPwOYmNjshJlzC7ITTt6zMxMT/xoVl/OQnP4/52Qmw42JsfAy1eh2NsTocx4VSOkX36bv32bmJMyjxBQisBHA1oebEcwYY2OjYVLDsfKHNmXSjzB/c1MQQKpmSvs0m3WYHT8a/MxHOvNC0+pUJjiYsrnRw7aSOnUTStwlmFBm874HP4fJ6iMZYA7pWg+PV0BhrYGKsDmYHrDht5sRliZcZwhADgQHaYaaFvMu26DPj8t3omG0x6UYaQzdKRpDxmahr3eyoSbe5iaOUEtLVjOeXfTx+egWArQN48twaXhnb/31NPsX42PHH8PBXnsP4xAREuXBrDTheA41GHeP1WjooqhUKOhFKIne9I2siA6y3I3CMFWouY2ZMg1XS/Yuw3jEZH8AWTLqR3PFxuZ/q5QRdbMLckuXApXonCQaVEmHoNHAq+d/mpoij38TRTELlE+fWcf5yC2EUodUK8Or9Y6WlUom379GnnsfP/qcvYG5+Eh3oOJ+/Dq9Ww/S4QqPuQIjAzNjoBBYv6JJZSAX9KgKstaO0SMXTjLkJnZalhZFgoxNZV8KIen+zYfhujwATQlSnvwSIF+vKb7x5TQRLRAr5+U87ZNJtZvBkwf7WirHRiXB1PcCN8x6um/V6HECpCG4HeN8D/wOkHGi3DsMeyKnBrdUhysH8TB1jdZ2i9tVWmKuM7r9LrSm42opSl6/nMK6Z8RCEcTFIYNAKDJi4ZK4E7UwYHgJiBRJepfX2EgDgSPfrOQdmD0uctkKXYQMeMppjp2Tc7AjXVSJ8CRZIrIIwMrjr2jpUkn1b4u37qd94BF85u4zJyQmIdhGxBx8OHM+DkMKu6Rrqrk7zE9fbZnBkLXHiiO1kutExiOJOZsyEiZpKvZct39h4AVdJsB1h8OSgY0QCpQHC0tknv7DWY77mBcLDsXCS08RO3ON11GDNCOPjsUnC90HjRgSvicW/lIj+3/+LZ/Hg7z+BhbkpRHFOv9EeWkZDO45t6UZdp08YAWvtMCOy+0fpEiDa8g06oeQyuAmWOdbathxsUJR1YILtMDBebiUI27S1czh+XxRvchliBfCXS2a5bL9JR/3z22lEiyAygpoGXn1dI7dWafOmqxv4J//2BBqNOkg7ILcGdmsgXcNy204ISSN9IKg4cWO1bdJ8xmFROiZCKzBYb0dQJUWeS82ohIk2MVKeqjEDJQ1ElAMwvlpG8zwDPHk5qfL6goTt+O87bNIVdjOlAZbq1xGsi3VhwsEtu/MOIGOs3/2f/9qf4OJSB42xBkTX4tw+D9p1sdQCQunufoGdRHZ1I0wjfN1s9cH++tAASxthmheQHo+AF9ciKN6qSTfcMsv5bIQIYkDCfzHcDDx2yABA6DtfkaC9CO0ySGRHTToqEn7Y+Pjee3FcZXTrLg/TDZ06gMLIiv5P/uGTOPanz2J+bhKRckGuze2DtsWcK23B1Y0ISnGuCOe5q37aE6mw5/sCNwJhcTXMjWzRzLiyEeJqM4BS3QlgmzPpRgrDC5hV1Fnzid1H0gFpfRmASHBM1OUH71oH0UPs1ATCUWVkT9uF7AclS/aeQ7AJIK+Kxb+RZIoo4RsXl/GR33wUszMTMMoFOTWb2hWndbNSiAzhwpIP16HUY9cOBJdWfDhx2lkVz5wIoDVhcS1Ay49L5o2NDF5aDhBGVjJtifCjRGMhht0xIZEvnvnx2bM4fJhxlMxgT+ATD9tLmY6lfWJ32qSjzZZBdXtnMAleu7+R65UTGcGP/srn0QwAx6vZhE63DjjdtG47F1jh9GIH517soO4ymAhfPruBjbbp6vKKUToLBAWPn9sAIKi7hOeWA5xc7MBNJMxWCE8jhOGJBI5LAH3aHjjCw4NBR++N4qbef2g6q8+xdvdKGKbDwUZzCPVx4lR1AFXIlbdJFgZTdYW7r2mkTRu1Zvzc8a/g4ScXsXsuruhx63bn53L7GBRPCfvjp1exZ8pFJzB4cS1Iu48Mzdal/HgXRxFOv9jBcsug4TIWV4M0+CTbkVldKSgnAlbKtFaaoQmOlYn/PlYACQ4/pF74xXs2CPzr5I4RSMyOm3SbkALW1gY6gcH+WQf75zxExlbmfP6py/i//t8nMT9riU9OQnwvzuxVuR2t2BLv/JUOLsfEH9U/n52b7CjG8kaICzGOUMyDib/9CbYR1yZJjDl+8Seuu4Bjoorif4AZeK8BhJQK/r3prG2ANaedgnfcpKtGeMpYAJ3Q4BV763GNPbDaDPBjn/wS2HGh4kIOiqt5E9GfFJCicC9X29Jy2UKULmmlqxXFncGoj+dvNJNutMxqZglaQsy/3H9mWD8GOEoGx8DnP/ba5ySKfpFrkwxB9M0w6aoSPntZJIJ7rmuko13vP/51PPFcExPjdQv8XJvabTt36nggNIGIe0y6sv6Io0bpuuNgi/faoklX/bqQx6Y5Ctr/8eyHdz2OY2DcR9FoKWGHYHBY2FfuL0Sd1fPkeMp2c99Zk64S4TNK0AjgKsJd19RBBPyXxxbxiRPPYdfMeCz6a2kZNymb2EnEsQTYhoxb+qaZdNXC8BCBcsi0N9Yd17sfIoQn+mfGDcgJJMGToCsfe8UaSfB+0h6B2OyYSYcRCJ9zAAn2Trl44w3jWFzz8aFjpzDeiDt1Jjo/bhhBysmI/n62PL55hMeOZFZHXJ9SiIKPnP7A7DkcB5fp/mp1AccpwjFRz33snv8/6qz+KjemNYyEO2LSUXXCZ4lg4rz7y+sBPvypc3hhXVCrWwbI6n1ipyuVmMp9+5tOvPwmmHRVMqtFQh6b1Wbjyu+f/fHdD+KYqH6ivxoDAMB9MDgkaqbBHzCt5ceoPqkBCUcP1lTX81VboUgM2i6tRTj4wEn81yfXMT1eR0hO3L7FA6tE9HO348gIKVc7FqUr+uy3lFlNgEhEXkObzvq5wA9+xIr+I0Nr4ip0JyTBHZAnj97lc+B/n4Sdi+w2NIlEO4XsR2uPYjN32iHB8xxAabC2dXyknBj0JTn9PLJJt1NRum2tmYQx5HgKxjTJbLzjuY/uu4L7jjOOHjXb10n30DGF4/dFez70l3coz/scKb1H/GYIYl16pyoND/rOC67WCqXbTTnuri+SCV1QXLrNXUKnzDla+vUo3VCGdjnZ7pR6MRFrT4G4afzm95798b0PVxH9m2ulHN94z4e+dIeqTf4Rafcaaa+FYNajevQ2T/jiMen2IMmMu0/btPXrebjjaVi9y0xbZqLCMTEhu2NaRNbF3/ibZ39878M4LBpHKaxK0tHbZqVM8Nh+VZv6XfbGXm2aSxEA7unDulnCjygFuru+2B+d+qigbxXhh/Q/qkx4EQIiHpvR4rfOmGDtB85+eN/joxK/IgYogkKKcOiYev4XX3s2bJ/6DuOvf5Ib04ocjyAS2gjo6Cbd5tqjdBNEuyXtyc6Pm05WvNdL1KTrPSYSstLE4/NagubvkX/5DWc/vO/x2NUbjkrOzTfOPSypfbn3p55+D7PzC+yNXWNayxCRkAAFItreHV+1Pcomdvw2tsGhLZbJ9Z4jAhFDxMyNGTJ+c4Ukuv/ZD8z+26xU3gwZtzhOQQiHwDhO0e4PfXmXMzbxkyL0j9lr1KSzATFhGG/UxPe6JWbYVF+cLdXS7USUruoxSWZ2C5HSXJ+E+E0I+P82UfNnz31wz2kcFsaRuI/uJj/bM08jw4G773/mTof1PwLkb7E3Ng8TwQQtwERRJkeS0qkRaUollTQ1pEL/uz7n5SothhMsTePsyXssu1fJsRzWoNRxWjyGKse6I/MkntFtqzGYFbsNQHswnfU1EH+KAv/Xnv3Q/KNb3fU7M1BFhHC8G3TY9ZOndtdc/X0G5l0Q8+3sNsbBGpAIEoWAsdPBIKawwJJz9fZuLeqOMMVox6g7tLCXCD3gUUp67fUey881SzNxSu6PklItyfVDJqWt70IMovZ6h4i/IFp/mij43TM/Nns2JfwTR6SKjf/NZYAsNrgTlOXOaw+f30csrxeJ3gjIK8nIAUAWBDROBBfZRq5U0tNvG0Q0jWCn76ieR7a7PkGAkCDrYL5C4LMAfU00P+oIHj35z6ZP5aTsE5BBfv2XBgNkJcKRhxVwr+l5aBHaf+TMVEfLFItbg+/nplm4QOmo8/yneJY78EwAtkFCZ3DDhNE/yU06w2+YfUQfgOvCKONjg5bP3TS12iPSRejgEagTgNluwqPq2LjNsxYJAGuWHD7MuPMI4Yl4EhyROQssw/68/MlIz4MAn8DDAO41IDInkjXcKTJ9i17VZkocOULAkZcJfyRJQCJ5eTFe/rz8efnzzfv8T69ehWa8QVbeAAAAAElFTkSuQmCC">
+<style>
+:root {
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f3f3f3; --text: #1b1b1b; --muted: #616161;
+  --border: #d9d9d9; --accent: #005fb8; --accent-hover: #0a6cc7; --on-accent: #ffffff;
+  --drop: #f4f8fd; --drop-hover: #e3eefb; --drop-line: #9fb9d9; --sel: #cce4f7;
+  --trip: #c42b1c; --ok: #0f7b0f; --warn: #9a5800; --rule: #c9c9c9; --shadow: 0 8px 28px rgba(0,0,0,.14);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1c1c; --surface: #252525; --surface-2: #2c2c2c; --text: #e9e9e9; --muted: #9e9e9e;
+    --border: #3a3a3a; --accent: #4cc2ff; --accent-hover: #6dccff; --on-accent: #000000;
+    --drop: #20262d; --drop-hover: #22344a; --drop-line: #4d6a8b; --sel: #264f78;
+    --trip: #ff8f85; --ok: #6ccb5f; --warn: #ffb74d; --rule: #474747; --shadow: 0 8px 28px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1c1c1c; --surface: #252525; --surface-2: #2c2c2c; --text: #e9e9e9; --muted: #9e9e9e;
+  --border: #3a3a3a; --accent: #4cc2ff; --accent-hover: #6dccff; --on-accent: #000000;
+  --drop: #20262d; --drop-hover: #22344a; --drop-line: #4d6a8b; --sel: #264f78;
+  --trip: #ff8f85; --ok: #6ccb5f; --warn: #ffb74d; --rule: #474747; --shadow: 0 8px 28px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+.no-anim, .no-anim * { transition: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--sel); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 18px 22px 12px; }
+.mono { font-family: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* header */
+header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+header img { width: 42px; height: 42px; flex: none; }
+.titles { flex: 1 1 260px; min-width: 0; }
+h1 { font: 600 22px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -.01em; }
+.sub { color: var(--muted); margin-top: 2px; }
+.head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* controls */
+button, .btn {
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 13px; min-height: 32px; cursor: pointer; white-space: nowrap;
+  transition: background .12s, border-color .12s;
+}
+button:hover { background: var(--surface-2); }
+button:active { transform: translateY(.5px); }
+button:focus-visible, .drop:focus-visible, [contenteditable]:focus-visible, textarea:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+button.accent { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+button.accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button:disabled { opacity: .55; cursor: default; }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.switch input { appearance: none; -webkit-appearance: none; width: 40px; height: 20px; border-radius: 10px; margin: 0;
+  border: 1px solid var(--muted); background: transparent; position: relative; cursor: pointer; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--muted); transition: transform .15s, background .15s; }
+.switch input:checked { background: var(--accent); border-color: var(--accent); }
+.switch input:checked::after { transform: translateX(20px); background: var(--on-accent); }
+label.check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+label.check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+
+/* drop zone */
+.drop {
+  border: 1.6px dashed var(--drop-line); background: var(--drop); border-radius: 14px; padding: 20px 16px 18px;
+  text-align: center; cursor: pointer; transition: background .12s, border-color .12s; user-select: none;
+}
+.drop:hover, .drop.over { background: var(--drop-hover); border-color: var(--accent); }
+.drop svg { width: 34px; height: 34px; color: var(--accent); display: block; margin: 0 auto 6px; }
+.drop .big { font: 600 16px/1.3 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
+.drop .formats { color: var(--muted); font-size: 12px; margin-top: 5px; word-spacing: 2px; }
+
+/* sections */
+.cap { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); }
+.bar { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+.box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.files { height: 150px; overflow: auto; padding: 4px 0; margin: 0; list-style: none; }
+.files li { display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 12px; }
+.files li:hover { background: var(--surface-2); }
+.files .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files .fsize { color: var(--muted); font-size: 12px; }
+.files .x { border: 0; background: transparent; min-height: 24px; padding: 0 7px; color: var(--muted); font-size: 16px; line-height: 1; }
+.files .x:hover { color: var(--trip); background: transparent; }
+.files .empty { color: var(--muted); padding: 10px 12px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+textarea {
+  width: 100%; resize: vertical; font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px;
+}
+textarea::placeholder { color: var(--muted); }
+#comments { height: 150px; }
+.actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 16px 0 10px; }
+.actions .grow { flex: 1; }
+
+/* summary */
+.summary-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.summary-head .grow { flex: 1; }
+#out {
+  min-height: 52vh; padding: 16px 20px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5;
+  tab-size: 4; outline: none;
+}
+#out:empty::before { content: attr(data-placeholder); color: var(--muted); white-space: pre-wrap;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 14px; }
+#out .h1 { font-weight: 700; font-size: 15px; }
+#out .h2 { font-weight: 700; color: var(--accent); }
+#out .rule { color: var(--rule); }
+#out .lbl { color: var(--muted); }
+#out .b { font-weight: 700; }
+#out .trip { font-weight: 700; color: var(--trip); }
+#out .ok { font-weight: 700; color: var(--ok); }
+#out .warn { color: var(--warn); }
+#out .warnb { color: var(--warn); font-weight: 700; }
+
+.menu-wrap { position: relative; }
+.menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 230px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); display: none; }
+.menu.open { display: block; }
+.menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 5px; }
+.menu button:hover { background: var(--surface-2); }
+.menu small { color: var(--muted); display: block; font-size: 11.5px; }
+
+/* feedback + status */
+.feedback { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-top: 16px; align-items: stretch; }
+.feedback .side { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+#feedback { height: 70px; }
+footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0 6px; }
+#status { min-height: 1.4em; }
+
+.banner { display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; padding: 9px 14px;
+  border-radius: 8px; border: 1px solid var(--accent); background: var(--drop-hover); }
+.banner.show { display: flex; }
+.banner .grow { flex: 1; }
+
+/* help dialog */
+dialog { max-width: min(760px, calc(100vw - 32px)); width: 100%; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); color: var(--text); padding: 0; box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+.dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.dlg-head h2 { margin: 0; font-size: 17px; }
+.dlg-body { padding: 6px 22px 18px; max-height: 70vh; overflow: auto; }
+.dlg-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin: 18px 0 6px; }
+.dlg-body table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.dlg-body td { padding: 3px 10px 3px 0; vertical-align: top; border-bottom: 1px solid var(--border); }
+.dlg-body td:first-child { white-space: nowrap; font-weight: 600; }
+.dlg-body p, .dlg-body li { font-size: 13.5px; }
+.dlg-body kbd { font-family: inherit; font-size: 12px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface-2); }
+
+#print-root { display: none; }
+@media (max-width: 760px) {
+  .wrap { padding: 14px 16px 10px; }
+  .grid, .feedback { grid-template-columns: 1fr; }
+  .feedback .side { flex-direction: row; align-items: center; }
+  #out { padding: 12px; font-size: 12px; }
+}
+@media print {
+  body { background: #fff; color: #000; }
+  .wrap, dialog { display: none !important; }
+  #print-root { display: block; }
+  @page { margin: 0.7in 0.8in; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="data:image/png;base64,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" alt="">
+    <div class="titles">
+      <h1>SEL Trip Event Analyzer</h1>
+      <div class="sub">Trip-cause summaries from SEL relay event reports and QuickSet settings</div>
+    </div>
+    <div class="head-actions">
+      <button id="helpBtn" title="Help (F1)">Help</button>
+      <label class="switch" title="Dark mode (Ctrl+D)"><input type="checkbox" id="dark"> Dark mode</label>
+      <button id="updBtn">Check for updates</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" role="status">
+    <div class="grow" id="bannerText"></div>
+    <button class="accent" id="bannerGet">Download</button>
+    <button id="bannerClose" aria-label="Dismiss">Later</button>
+  </div>
+
+  <div class="drop" id="drop" role="button" tabindex="0" aria-label="Add SEL event files: drop them here or press Enter to browse">
+    <svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M17 4v16M11 14.5 17 20.5 23 14.5"/><path d="M5 20v7h24v-7"/>
+    </svg>
+    <div class="big">Drop SEL event files or folders here</div>
+    <div class="formats">CEV · EVE · TXT · SUM · HIS · SER · HDR · RDB &nbsp;&nbsp; or click to browse</div>
+  </div>
+  <input type="file" id="pickFiles" multiple hidden>
+  <input type="file" id="pickFolder" webkitdirectory directory multiple hidden>
+
+  <div class="grid">
+    <section>
+      <div class="bar"><span class="cap">Files</span><span class="hint" id="count">none loaded</span></div>
+      <ul class="files box" id="files" aria-label="Loaded files"></ul>
+      <div class="row">
+        <button id="addFiles" title="Ctrl+O">Add files</button>
+        <button id="addFolder">Add folder</button>
+        <button id="clear">Clear</button>
+        <button id="samples">Try samples</button>
+      </div>
+    </section>
+    <section>
+      <div class="bar"><label class="cap" for="comments">Comments &amp; suggestions</label><span class="hint">added to the top of the summary</span></div>
+      <textarea id="comments" placeholder="Notes to include at the top of the summary, e.g.&#10;Crew found a cracked insulator at pole 47. Recommend checking Z1 reach."></textarea>
+    </section>
+  </div>
+
+  <div class="actions">
+    <span class="hint">Include:</span>
+    <label class="check"><input type="checkbox" id="optSeq" checked> Element timeline</label>
+    <label class="check"><input type="checkbox" id="optSet" checked> Settings context</label>
+    <label class="check"><input type="checkbox" id="optSer" checked> SER lines</label>
+    <span class="grow"></span>
+    <button class="accent" id="generate" title="F5 or Ctrl+Enter">Generate summary</button>
+  </div>
+
+  <div class="summary-head">
+    <span class="cap">Trip summary</span><span class="hint">editable</span>
+    <span class="grow"></span>
+    <button id="copy" title="Ctrl+Shift+C">Copy all</button>
+    <div class="menu-wrap">
+      <button id="exportBtn" aria-haspopup="true" aria-expanded="false">Export ▾</button>
+      <div class="menu" id="exportMenu" role="menu">
+        <button role="menuitem" data-exp="doc">Word document (.doc)<small>Formatted report, opens in Word · Ctrl+S</small></button>
+        <button role="menuitem" data-exp="pdf">PDF / Print<small>Choose "Save as PDF" in the print window · Ctrl+P</small></button>
+        <button role="menuitem" data-exp="txt">Plain text (.txt)</button>
+      </div>
+    </div>
+  </div>
+  <div id="out" class="box mono" spellcheck="false" aria-label="Trip summary, editable"
+       data-placeholder="Drop SEL event files or a folder above and the trip summary will appear here.&#10;New here? Click &quot;Try samples&quot; (under the file list) to load example files.&#10;&#10;Everything in this box is editable before you copy or export it."></div>
+
+  <div class="feedback">
+    <div>
+      <div class="bar"><label class="cap" for="feedback">Feedback on this output</label><span class="hint">what was wrong, missing, or should be added?</span></div>
+      <textarea id="feedback" placeholder="e.g. Event 3 was a DTT from the remote end, not a local fault. Would be nice to show the breaker number in the quick summary."></textarea>
+    </div>
+    <div class="side">
+      <label class="check"><input type="checkbox" id="attach"> Attach summary</label>
+      <button id="send">Send feedback</button>
+    </div>
+  </div>
+
+  <footer>
+    <span class="hint" id="status" aria-live="polite">Ready</span>
+    <span class="hint">v1.2.0 · runs in your browser, files never leave your computer</span>
+  </footer>
+</div>
+
+<dialog id="help" aria-labelledby="helpTitle">
+  <div class="dlg-head"><h2 id="helpTitle">How to use</h2><button id="helpClose">Close</button></div>
+  <div class="dlg-body">
+    <h3>Quick start</h3>
+    <ol>
+      <li>Drag your relay's event files (or a whole folder) onto the drop zone. Best: the <b>.CEV</b> event report plus the relay's <b>.RDB</b> settings file.</li>
+      <li>Read the summary. Lines marked <b style="color:var(--warn)">CHECK</b> are things the program is unsure about.</li>
+      <li>Edit the text if needed, then <b>Copy all</b> or <b>Export</b> to Word or PDF.</li>
+    </ol>
+    <p>Your files are read inside this browser tab and are never uploaded. Nothing is installed.</p>
+    <h3>Which files to use</h3>
+    <table>
+      <tr><td>.CEV</td><td>Compressed event report: the most complete (elements, currents, usually the settings)</td></tr>
+      <tr><td>.RDB</td><td>QuickSet settings database: adds the trip equation (TR) and line length (LL)</td></tr>
+      <tr><td>.EVE .TXT</td><td>Text event report or a saved terminal capture</td></tr>
+      <tr><td>.SUM .HDR</td><td>Event summary / COMTRADE header written by the relay</td></tr>
+      <tr><td>.HIS</td><td>Event history list: one line per event, least detail</td></tr>
+      <tr><td>.SER</td><td>Sequential events recorder: element on/off times</td></tr>
+    </table>
+    <p>To get a CEV, download the event from the relay with AcSELerator QuickSet and choose the compressed (CEV) format, or save the output of the <code>CEV</code> command from a terminal session.</p>
+    <h3>Event types</h3>
+    <table>
+      <tr><td>AG BG CG</td><td>Single phase-to-ground fault</td></tr>
+      <tr><td>AB BC CA</td><td>Phase-to-phase fault</td></tr>
+      <tr><td>ABG BCG CAG</td><td>Two phases to ground</td></tr>
+      <tr><td>ABC</td><td>Three-phase fault</td></tr>
+      <tr><td>TRIP</td><td>Tripped, but no fault type found (transfer trip, manual/SCADA, external input)</td></tr>
+      <tr><td>ER</td><td>Event recorded by the ER trigger; no trip</td></tr>
+      <tr><td>TRIG</td><td>Manually triggered event</td></tr>
+      <tr><td>… T</td><td>A trailing T (for example "AG T") means the relay tripped</td></tr>
+    </table>
+    <h3>Common targets</h3>
+    <p>INST instantaneous · TIME time-delayed · COMM communications-assisted · ZONE1/2/3 distance zones ·
+       50 instantaneous overcurrent · 51 time-overcurrent · 81 frequency · SOTF switch-onto-fault ·
+       A B C G N faulted phases / ground · RS recloser reset (ready) · CY recloser cycling · LO recloser locked out</p>
+    <h3>Confidence and checks</h3>
+    <table>
+      <tr><td>High</td><td>Element data and settings, and nothing looked wrong</td></tr>
+      <tr><td>Medium</td><td>Some data missing, or one item to check</td></tr>
+      <tr><td>Low</td><td>History row only, very little data, or several items to check</td></tr>
+    </table>
+    <p>CHECK lines say exactly what to confirm: missing data (such as no settings), disagreements (targets vs. event type vs.
+       currents), or unusual results (reverse or beyond-line location, slow breaker, off-nominal frequency).</p>
+    <h3>Fault location</h3>
+    <p>Shown in the relay's line-length units. With settings loaded it's also shown as a percentage of the line.
+       Negative means behind the relay; $$$$$ means the relay couldn't calculate it.</p>
+    <h3>Shortcuts</h3>
+    <p><kbd>Ctrl</kbd>+<kbd>O</kbd> add files · <kbd>F5</kbd> generate · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> copy ·
+       <kbd>Ctrl</kbd>+<kbd>S</kbd> Word · <kbd>Ctrl</kbd>+<kbd>P</kbd> PDF · <kbd>Ctrl</kbd>+<kbd>D</kbd> dark mode · <kbd>F1</kbd> help</p>
+    <p class="hint">The analysis is automated. Always confirm against the oscillography and settings.
+       <a href="https://github.com/kefirman9000/sel-trip-analyzer#readme" target="_blank" rel="noopener">Full guide on GitHub</a></p>
+  </div>
+</dialog>
+
+<div id="print-root"></div>
+
+<script id="sample-data" type="application/json">[{"name": "Feeder12.ser", "b64": "RkVFREVSIDEyICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBEYXRlOiAxMC8yOC8yNiAgICBUaW1lOiAwNzozMToxMC4wMDINCkFQRVggU1VCDQoNCkZJRD1TRUwtMzUxLTUtUjUxNC1WMC1aMTA1MTA0LUQyMDExMTAyMA0KDQojICAgICBEQVRFICAgICAgIFRJTUUgICAgICAgICAgICAgRUxFTUVOVCAgICAgICAgICBTVEFURQ0KOSAgIDEwLzI3LzI2ICAgMTQ6MDM6MjIuNDE3ICAgICA1MUcgICAgICAgICAgICAgIEFzc2VydGVkDQo4ICAgMTAvMjcvMjYgICAxNDowMzoyMi40MTcgICAgIFoyRyAgICAgICAgICAgICAgQXNzZXJ0ZWQNCjcgICAxMC8yNy8yNiAgIDE0OjAzOjIyLjQyMSAgICAgWjFHICAgICAgICAgICAgICBBc3NlcnRlZA0KNiAgIDEwLzI3LzI2ICAgMTQ6MDM6MjIuNDIxICAgICBUUklQICAgICAgICAgICAgIEFzc2VydGVkDQo1ICAgMTAvMjcvMjYgICAxNDowMzoyMi40MjEgICAgIE9VVDEwMSAgICAgICAgICAgQXNzZXJ0ZWQNCjQgICAxMC8yNy8yNiAgIDE0OjAzOjIyLjQ3NSAgICAgNTJBICAgICAgICAgICAgICBEZWFzc2VydGVkDQozICAgMTAvMjcvMjYgICAxNDowMzoyMi40NzkgICAgIFoxRyAgICAgICAgICAgICAgRGVhc3NlcnRlZA0KMiAgIDEwLzI3LzI2ICAgMTQ6MDM6MjIuNDg4ICAgICBUUklQICAgICAgICAgICAgIERlYXNzZXJ0ZWQNCjEgICAxMC8yNy8yNiAgIDE0OjAzOjIyLjkwMCAgICAgNzlDWSAgICAgICAgICAgICBBc3NlcnRlZA0K"}, {"name": "Feeder12_AG_Zone1.cev", "b64": "IkZJRCIsIkZJRD1TRUwtMzUxLTUtUjUxNC1WMC1aMTA1MTA0LUQyMDExMTAyMCIsIjBBNDUiDQoiTU9OVEgiLCJEQVkiLCJZRUFSIiwiSE9VUiIsIk1JTiIsIlNFQyIsIk1TRUMiLCIwQUNBIg0KMTAsMjcsMjAyNiwxNCwzLDIyLDQxNywiMDQ2MCINCiJGUkVRIiwiU0FNL0NZQ19BIiwiU0FNL0NZQ19EIiwiTlVNX09GX0NZQyIsIkVWRU5UIiwiTE9DQVRJT04iLCJTSE9UIiwiVEFSR0VUUyIsIjE0MjQiDQo2MC4wMCw0LDQsMTUsIkFHIFQiLDQuMjEsMCwiSU5TVCBaT05FMSBBIEciLCIwOTJFIg0KIklBIiwiSUIiLCJJQyIsIklHIiwiVkEoa1YpIiwiVkIoa1YpIiwiVkMoa1YpIiwiVFJJRyIsIloxRyBaMkcgTTFQIE0yUCA1MFAxIDUxRyA1MUdUIFRSSVAgT1VUMTAxIDUyQSBJTjEwMSA3OVJTIiwiMTkzQSINCjI4Mi44LC0xNDEuNCwtMTQxLjQsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwNyIsIjA5RUUiDQowLjAsMjQ0LjksLTI0NC45LDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDA3IiwiMDhERCINCi0yODIuOCwxNDEuNCwxNDEuNCwtMC4wLC05NC43NSw0Ny4zOCw0Ny4zOCwiIiwiMDA3IiwiMDlDMSINCi0wLjAsLTI0NC45LDI0NC45LDAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwNyIsIjA5MzciDQoyODIuOCwtMTQxLjQsLTE0MS40LDAuMCw5NC43NSwtNDcuMzgsLTQ3LjM4LCIiLCIwMDciLCIwOUVFIg0KMC4wLDI0NC45LC0yNDQuOSwwLjAsMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAwNyIsIjA4REQiDQotMjgyLjgsMTQxLjQsMTQxLjQsLTAuMCwtOTQuNzUsNDcuMzgsNDcuMzgsIiIsIjAwNyIsIjA5QzEiDQotMC4wLC0yNDQuOSwyNDQuOSwtMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDA3IiwiMDk2NCINCjI4Mi44LC0xNDEuNCwtMTQxLjQsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwNyIsIjA5RUUiDQowLjAsMjQ0LjksLTI0NC45LDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDA3IiwiMDhERCINCi0yODIuOCwxNDEuNCwxNDEuNCwwLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDciLCIwOTk0Ig0KLTAuMCwtMjQ0LjksMjQ0LjksLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwNyIsIjA5NjQiDQoyODIuOCwtMTQxLjQsLTE0MS40LC0wLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDA3IiwiMEExQiINCi0wLjAsMjQ0LjksLTI0NC45LC0wLjAsLTAuMDAsODIuMDYsLTgyLjA2LCIiLCIwMDciLCIwOTY0Ig0KLTI4Mi44LDE0MS40LDE0MS40LDAuMCwtOTQuNzUsNDcuMzgsNDcuMzgsIiIsIjAwNyIsIjA5OTQiDQotMC4wLC0yNDQuOSwyNDQuOSwwLjAsLTAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMDciLCIwOTM3Ig0KOTg4LjUsLTE0MS40LC0xNDEuNCw3MDUuNywyNi4wMiwtNDYuNzQsLTQ2LjUzLCI+IiwiNDQ3IiwiMEE5RCINCjMzMTkuOSwyNDQuOSwtMjQ0LjksMzMxOS45LC0wLjAwLDgwLjk2LC04MC41OSwiIiwiQzVFIiwiMEE4RiINCi05ODguNSwxNDEuNCwxNDEuNCwtNzA1LjcsLTI2LjAyLDQ2Ljc0LDQ2LjUzLCIiLCJDNUUiLCIwQTUwIg0KLTMzMTkuOSwtMjQ0LjksMjQ0LjksLTMzMTkuOSwtMC4wMCwtODAuOTYsODAuNTksIiIsIkM1RSIsIjBBRTkiDQo5ODguNSwtMTQxLjQsLTE0MS40LDcwNS43LDI2LjAyLC00Ni43NCwtNDYuNTMsIiIsIkM1RSIsIjBBN0QiDQozMzE5LjksMjQ0LjksLTI0NC45LDMzMTkuOSwtMC4wMCw4MC45NiwtODAuNTksIiIsIkM1RSIsIjBBOEYiDQotOTg4LjUsMTQxLjQsMTQxLjQsLTcwNS43LC0yNi4wMiw0Ni43NCw0Ni41MywiIiwiQzVFIiwiMEE1MCINCi0zMzE5LjksLTI0NC45LDI0NC45LC0zMzE5LjksLTAuMDAsLTgwLjk2LDgwLjU5LCIiLCJDNUUiLCIwQUU5Ig0KOTg4LjUsLTE0MS40LC0xNDEuNCw3MDUuNywyNi4wMiwtNDYuNzQsLTQ2LjUzLCIiLCJDNUUiLCIwQTdEIg0KMzMxOS45LDI0NC45LC0yNDQuOSwzMzE5LjksLTAuMDAsODAuOTYsLTgwLjU5LCIiLCJDNUUiLCIwQThGIg0KLTk4OC41LDE0MS40LDE0MS40LC03MDUuNywtMjYuMDIsNDYuNzQsNDYuNTMsIiIsIkM1RSIsIjBBNTAiDQotMzMxOS45LC0yNDQuOSwyNDQuOSwtMzMxOS45LC0wLjAwLC04MC45Niw4MC41OSwiIiwiQzVFIiwiMEFFOSINCjk4OC41LC0xNDEuNCwtMTQxLjQsNzA1LjcsMjYuMDIsLTQ2Ljc0LC00Ni41MywiIiwiQzVFIiwiMEE3RCINCjMzMTkuOSwyNDQuOSwtMjQ0LjksMzMxOS45LC0wLjAwLDgwLjk2LC04MC41OSwiIiwiQzVFIiwiMEE4RiINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCJDNTgiLCIwOEVDIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAxOCIsIjA4QUQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDE4IiwiMDg0RSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwMCIsIjA4QTQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDAwIiwiMDg0NSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwMCIsIjA4QTQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDAwIiwiMDg0NSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwMCIsIjA4QTQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDAwIiwiMDg0NSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KMC4wLDAuMCwwLjAsMC4wLDAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMDAiLCIwN0MzIg0KMC4wLDAuMCwwLjAsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwMCIsIjA4NDUiDQowLjAsMC4wLDAuMCwwLjAsMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAwMCIsIjA3QzMiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC05NC43NSw0Ny4zOCw0Ny4zOCwiIiwiMDAwIiwiMDhDQyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMDAiLCIwOEE0Ig0KMC4wLDAuMCwwLjAsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwMCIsIjA4NDUiDQowLjAsMC4wLDAuMCwwLjAsMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAwMCIsIjA3QzMiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC05NC43NSw0Ny4zOCw0Ny4zOCwiIiwiMDAwIiwiMDhDQyINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDAwIiwiMDdDMyINCjAuMCwwLjAsMC4wLDAuMCw5NC43NSwtNDcuMzgsLTQ3LjM4LCIiLCIwMDAiLCIwODQ1Ig0KMC4wLDAuMCwwLjAsMC4wLDAuMDAsODIuMDYsLTgyLjA2LCIiLCIwMDAiLCIwN0MzIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtOTQuNzUsNDcuMzgsNDcuMzgsIiIsIjAwMCIsIjA4Q0MiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDAwIiwiMDhBNCINCiJTRVRUSU5HUyIsIjAyRTEiDQoiUklEICAgICA9RkVFREVSIDEyICAgICAgICAgICAgICAgICAgICAgIFRJRCAgICAgPUFQRVggU1VCIiwiMEIxMCINCiJDVFIgICAgID0yNDAgICAgICAgUFRSICAgICA9NjAwLjAwICAgIExMICAgICAgPTEwLjAwIiwiMDlBNyINCiJaMU1BRyAgID00LjYyICAgICAgWjFBTkcgICA9NzguNDAgICAgIFoxUCAgICAgPTMuNzAgICAgICBaMU1HICAgID0zLjcwIiwiMEQ3QSINCiI1MFAxUCAgID0xMi4wMCAgICAgNTBHMVAgICA9Ni4wMCAgICAgIDUxR1AgICAgPTEuMjAgICAgICA1MUdDICAgID1VMyIsIjBDOTIiDQoiVFIgICAgICA9TTFQICsgWjFHICsgTTJQVCArIFoyR1QgKyA1MUdUICsgNTBQMSIsIjA5RkIiDQoiRVIgICAgICA9LzUxRyArIC81MVAgKyAvTTJQICsgL1oyRyIsIjA3MDYiDQo="}, {"name": "Feeder12_history.his", "b64": "RkVFREVSIDEyICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBEYXRlOiAxMC8yOC8yNiAgICBUaW1lOiAwNzozMDowMi41NTENCkFQRVggU1VCDQoNCiMgICAgREFURSAgICAgIFRJTUUgICAgICAgICAgRVZFTlQgICAgTE9DQVQgICBDVVJSICAgRlJFUSAgR1JQICBTSE9UICBUQVJHRVRTDQoxICAxMC8yNy8yNiAgMTQ6MDM6MjIuNDE3ICAgQUcgVCAgICAgIDQuMjEgICAyNTQxICA2MC4wMCAgIDEgICAgMCAgIElOU1QgWk9ORTEgQSBHDQoyICAxMC8xOS8yNiAgMDM6MTI6NDcuMDkwICAgQUJDIFQgICAgMTIuODAgICA0MTIwICA1OS45OSAgIDEgICAgMCAgIElOU1QgWk9ORTIgQSBCIEMNCjMgIDEwLzExLzI2ICAxNjo0NTowOS4zMzQgICBDRyBUICAgICAtMS4zMCAgIDE4OTAgIDYwLjAxICAgMSAgICAxICAgVElNRSA1MSBDIEcNCjQgIDA5LzMwLzI2ICAxMTowMjoxNS44NzAgICBFUiAgICAgICQkJCQkICAgICAgOTUgIDYwLjAwICAgMSAgICAwDQo="}, {"name": "Feeder12_settings.rdb", "b64": "0M8R4KGxGuEAAAAAAAAAAAAAAAAAAAAAPgADAP7/CQAGAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAEAAA/v///wAAAAD+////AAAAAAAAAAD////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/////v///wMAAAAEAAAABQAAAAYAAAAHAAAACAAAAAkAAAD+////CwAAAAwAAAANAAAADgAAAA8AAAAQAAAAEQAAAP7//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////1IAbwBvAHQAIABFAG4AdAByAHkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWAAUB//////////8BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/v///wAAAAAAAAAARgBFAEUARABFAFIAIAAxADIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAQH//////////wIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD+////AAAAAAAAAABHAGwAbwBiAGEAbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADgACAf////8DAAAA/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAEAAAAAAAAEcAcgBvAHUAcAAgADEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAIB////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgAAAAAQAAAAAAAAU0lEICAgICA9QVBFWCBTVUINClJJRCAgICAgPUZFRURFUiAxMg0KVElEICAgICA9QVBFWCBTVUINCgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFJJRCAgICAgPUZFRURFUiAxMiAgICAgICAgICAgICAgICAgICAgICBUSUQgICAgID1BUEVYIFNVQg0KQ1RSICAgICA9MjQwICAgICAgIFBUUiAgICAgPTYwMC4wMCAgICBMTCAgICAgID0xMC4wMA0KWjFNQUcgICA9NC42MiAgICAgIFoxQU5HICAgPTc4LjQwICAgICBaMVAgICAgID0zLjcwICAgICAgWjFNRyAgICA9My43MA0KNTBQMVAgICA9MTIuMDAgICAgIDUwRzFQICAgPTYuMDAgICAgICA1MUdQICAgID0xLjIwICAgICAgNTFHQyAgICA9VTMNClRSICAgICAgPU0xUCArIFoxRyArIE0yUFQgKyBaMkdUICsgNTFHVCArIDUwUDENCkVSICAgICAgPS81MUcgKyAvNTFQICsgL00yUCArIC9aMkcNCgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}, {"name": "Feeder14_underfrequency.txt", "b64": "PT5TVU0NCkZFRURFUiAxNCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgRGF0ZTogMTAvMjMvMjYgICAgVGltZTogMTc6NTI6MzEuNjA0DQpXRVNUIFNVQg0KDQpFdmVudDogVFJJUCAgICAgIExvY2F0aW9uOiAkJCQkJCAgICBTaG90OiAgMCAgRnJlcXVlbmN5OiA1OC44NQ0KVGFyZ2V0czogODENCkN1cnJlbnRzIChBIFByaSksIEFCQ05HUTogICAxODIgIDE3NiAgMTg1ICAgOSAgIDggICAzDQo="}, {"name": "Feeder3_CG_51G.eve", "b64": "RkVFREVSIDMgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBEYXRlOiAxMC8yMS8yNiAgICBUaW1lOiAxNDoyMjowNS4xMTgNCk9BSyBISUxMIFNVQg0KDQpGSUQ9U0VMLTM1MS01LVI1MTQtVjAtWjEwNTEwNC1EMjAxMTEwMjAgICAgICAgICAgICAgICAgICAgICAgIENJRD0weEE2MUYNCg0KICAgICAgICAgICAgICAgIEN1cnJlbnRzIChBbXBzIFByaSkgICAgICAgICAgICAgICAgICAgICBWb2x0YWdlcyAoa1YgUHJpKQ0KICAgICAgSUEgICAgICBJQiAgICAgIElDICAgICAgSU4gICAgICBJRyAgICAgM0kyICAgICBWQSAgICAgIFZCICAgICAgVkMNClsxXQ0KICAgICAyMTIgICAgLTEwNSAgICAtMTA4ICAgICAgIDQgICAgICAtMSAgICAgICAyICAgIDkzLjkgICAtNDYuOCAgIC00Ny4xDQogICAgIC0xNiAgICAtMTgyICAgICAxOTggICAgICAgNCAgICAgICAwICAgICAgIDMgICAgLTQuNyAgIC04MS42ICAgIDg2LjMNCiAgICAtMjEwICAgICAxMDQgICAgIDExMCAgICAgICA0ICAgICAgIDQgICAgICAgMiAgIC05NC4wICAgIDQ2LjYgICAgNDcuNA0KICAgICAgMTUgICAgIDE4NCAgICAtMTk2ICAgICAgIDQgICAgICAgMyAgICAgICAzICAgICA0LjUgICAgODEuOCAgIC04Ni4xDQpbMl0+DQogICAgIDIwOCAgICAtMTAxICAgIDE0ODggICAgICAgNSAgICAxNTk1ICAgIDEwMjIgICAgOTIuOCAgIC00Ni4wICAgIDIxLjQNCiAgICAgLTE5ICAgIC0xODcgICAgLTIzOTEgICAgICA2ICAgLTI1OTcgICAgMTYwMSAgICAtNC4zICAgLTgwLjkgICAtMzguMA0KICAgIC0yMDUgICAgIDEwMCAgICAtMTQ5MCAgICAgIDUgICAtMTU5NSAgICAxMDIwICAgLTkyLjkgICAgNDUuOCAgIC0yMS41DQogICAgICAxOCAgICAgMTg2ICAgIDIzOTAgICAgICAgNSAgICAyNTk0ICAgIDE1OTkgICAgIDQuMiAgICA4MS4wICAgIDM4LjENCg0KRXZlbnQ6IENHIFQgICAgTG9jYXRpb246IDIuODUgICAgU2hvdDogIDAgICBGcmVxdWVuY3k6IDYwLjAxDQpUYXJnZXRzOiBUSU1FIDUxIEMgRw0KQ3VycmVudHMgKEEgUHJpKSwgQUJDTkdROiAgIDIxNCAgIDIxOSAgMTg3MiAgICAgNiAgMTg1OSAgIDEyNDYNCg=="}, {"name": "Feeder7_transfer_trip.sum", "b64": "RkVFREVSIDcgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBEYXRlOiAxMC8yNi8yNiAgICBUaW1lOiAwODoxNDowMi4xMTMNCkFQRVggU1VCDQoNCkV2ZW50OiBUUklQICAgICAgTG9jYXRpb246ICQkJCQkICAgIFNob3Q6ICAxICBGcmVxdWVuY3k6IDU5Ljk4DQpUYXJnZXRzOiBDT01NDQpDdXJyZW50cyAoQSBQcmkpLCBBQkNOR1E6ICAgMjEwICAyMDUgIDE5OCAgMTIgIDEwICA0DQo="}, {"name": "Feeder9_AG_needs_review.cev", "b64": "IkZJRCIsIkZJRD1TRUwtMzUxLTUtUjUxNC1WMC1aMTA1MTA0LUQyMDExMTAyMCIsIjBBNDUiDQoiTU9OVEgiLCJEQVkiLCJZRUFSIiwiSE9VUiIsIk1JTiIsIlNFQyIsIk1TRUMiLCIwQUNBIg0KMTAsMTgsMjAyNiwyMiw3LDUxLDkwLCIwNDMyIg0KIkZSRVEiLCJTQU0vQ1lDX0EiLCJTQU0vQ1lDX0QiLCJOVU1fT0ZfQ1lDIiwiRVZFTlQiLCJMT0NBVElPTiIsIlNIT1QiLCJUQVJHRVRTIiwiMTQyNCINCjYwLjAxLDQsNCwxNSwiQUcgVCIsMTEuNjAsMCwiSU5TVCA1MCBCIiwiMDdGMiINCiJJQSIsIklCIiwiSUMiLCJJRyIsIlZBKGtWKSIsIlZCKGtWKSIsIlZDKGtWKSIsIlRSSUciLCJaMUcgTTFQIDUwUDEgNTFHIDUxR1QgVFJJUCBPVVQxMDEgNTJBIiwiMTREQSINCjQyNC4zLC0yMTIuMSwtMjEyLjEsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAxIiwiMDlBOSINCjAuMCwzNjcuNCwtMzY3LjQsLTAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDEiLCIwOEQ2Ig0KLTQyNC4zLDIxMi4xLDIxMi4xLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMSIsIjA5N0MiDQotMC4wLC0zNjcuNCwzNjcuNCwwLjAsLTAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMSIsIjA5MDMiDQo0MjQuMywtMjEyLjEsLTIxMi4xLDAuMCw5NC43NSwtNDcuMzgsLTQ3LjM4LCIiLCIwMSIsIjA5QTkiDQowLjAsMzY3LjQsLTM2Ny40LDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDEiLCIwOEE5Ig0KLTQyNC4zLDIxMi4xLDIxMi4xLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMSIsIjA5N0MiDQotMC4wLC0zNjcuNCwzNjcuNCwtMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDEiLCIwOTMwIg0KNDI0LjMsLTIxMi4xLC0yMTIuMSwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDEiLCIwOUE5Ig0KMC4wLDM2Ny40LC0zNjcuNCwwLjAsMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAxIiwiMDhBOSINCi00MjQuMywyMTIuMSwyMTIuMSwwLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMSIsIjA5NEYiDQotMC4wLC0zNjcuNCwzNjcuNCwtMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDEiLCIwOTMwIg0KNDI0LjMsLTIxMi4xLC0yMTIuMSwtMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAxIiwiMDlENiINCi0wLjAsMzY3LjQsLTM2Ny40LDAuMCwtMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAxIiwiMDkwMyINCi00MjQuMywyMTIuMSwyMTIuMSwwLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMSIsIjA5NEYiDQotMC4wLC0zNjcuNCwzNjcuNCwwLjAsLTAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMSIsIjA5MDMiDQo0MjQuMywtNTEyOS44LC0yMTIuMSwtNDkxNy43LDkwLjUxLC0xNS41NiwtNDQuNTUsIj4iLCIzMSIsIjBBRjMiDQotMC4wLC05NTAuMywtMzY3LjQsLTEzMTcuNywtMC4wMCwyNi45NCwtNzcuMTYsIiIsIjM3IiwiMEExMCINCi00MjQuMyw1MTI5LjgsMjEyLjEsNDkxNy43LC05MC41MSwxNS41Niw0NC41NSwiIiwiMzciLCIwQTM0Ig0KLTAuMCw5NTAuMywzNjcuNCwxMzE3LjcsLTAuMDAsLTI2Ljk0LDc3LjE2LCIiLCIzNyIsIjA5ODkiDQo0MjQuMywtNTEyOS44LC0yMTIuMSwtNDkxNy43LDkwLjUxLC0xNS41NiwtNDQuNTUsIiIsIjM3IiwiMEFCQiINCi0wLjAsLTk1MC4zLC0zNjcuNCwtMTMxNy43LC0wLjAwLDI2Ljk0LC03Ny4xNiwiIiwiMzciLCIwQTEwIg0KLTQyNC4zLDUxMjkuOCwyMTIuMSw0OTE3LjcsLTkwLjUxLDE1LjU2LDQ0LjU1LCIiLCIzNyIsIjBBMzQiDQotMC4wLDk1MC4zLDM2Ny40LDEzMTcuNywtMC4wMCwtMjYuOTQsNzcuMTYsIiIsIjM3IiwiMDk4OSINCjQyNC4zLC01MTI5LjgsLTIxMi4xLC00OTE3LjcsOTAuNTEsLTE1LjU2LC00NC41NSwiIiwiMzciLCIwQUJCIg0KLTAuMCwtOTUwLjMsLTM2Ny40LC0xMzE3LjcsLTAuMDAsMjYuOTQsLTc3LjE2LCIiLCIzNyIsIjBBMTAiDQotNDI0LjMsNTEyOS44LDIxMi4xLDQ5MTcuNywtOTAuNTEsMTUuNTYsNDQuNTUsIiIsIjM3IiwiMEEzNCINCi0wLjAsOTUwLjMsMzY3LjQsMTMxNy43LC0wLjAwLC0yNi45NCw3Ny4xNiwiIiwiMzciLCIwOTg5Ig0KNDI0LjMsLTUxMjkuOCwtMjEyLjEsLTQ5MTcuNyw5MC41MSwtMTUuNTYsLTQ0LjU1LCIiLCIzNyIsIjBBQkIiDQotMC4wLC05NTAuMywtMzY3LjQsLTEzMTcuNywtMC4wMCwyNi45NCwtNzcuMTYsIiIsIjM3IiwiMEExMCINCi00MjQuMyw1MTI5LjgsMjEyLjEsNDkxNy43LC05MC41MSwxNS41Niw0NC41NSwiIiwiMzciLCIwQTM0Ig0KLTAuMCw5NTAuMywzNjcuNCwxMzE3LjcsLTAuMDAsLTI2Ljk0LDc3LjE2LCIiLCIzNyIsIjA5ODkiDQo0MjQuMywtNTEyOS44LC0yMTIuMSwtNDkxNy43LDkwLjUxLC0xNS41NiwtNDQuNTUsIiIsIjM3IiwiMEFCQiINCjAuMCwtOTUwLjMsLTM2Ny40LC0xMzE3LjcsMC4wMCwyNi45NCwtNzcuMTYsIiIsIjM3IiwiMDlCNiINCi00MjQuMyw1MTI5LjgsMjEyLjEsNDkxNy43LC05MC41MSwxNS41Niw0NC41NSwiIiwiMzciLCIwQTM0Ig0KLTAuMCw5NTAuMywzNjcuNCwxMzE3LjcsLTAuMDAsLTI2Ljk0LDc3LjE2LCIiLCIzNyIsIjA5ODkiDQo0MjQuMywtNTEyOS44LC0yMTIuMSwtNDkxNy43LDkwLjUxLC0xNS41NiwtNDQuNTUsIiIsIjM3IiwiMEFCQiINCjAuMCwtOTUwLjMsLTM2Ny40LC0xMzE3LjcsMC4wMCwyNi45NCwtNzcuMTYsIiIsIjM3IiwiMDlCNiINCi00MjQuMyw1MTI5LjgsMjEyLjEsNDkxNy43LC05MC41MSwxNS41Niw0NC41NSwiIiwiMzciLCIwQTM0Ig0KLTAuMCw5NTAuMywzNjcuNCwxMzE3LjcsLTAuMDAsLTI2Ljk0LDc3LjE2LCIiLCIzNyIsIjA5ODkiDQo0MjQuMywtNTEyOS44LC0yMTIuMSwtNDkxNy43LDkwLjUxLC0xNS41NiwtNDQuNTUsIiIsIjM3IiwiMEFCQiINCjAuMCwtOTUwLjMsLTM2Ny40LC0xMzE3LjcsMC4wMCwyNi45NCwtNzcuMTYsIiIsIjM3IiwiMDlCNiINCi00MjQuMyw1MTI5LjgsMjEyLjEsNDkxNy43LC05MC41MSwxNS41Niw0NC41NSwiIiwiMzciLCIwQTM0Ig0KLTAuMCw5NTAuMywzNjcuNCwxMzE3LjcsLTAuMDAsLTI2Ljk0LDc3LjE2LCIiLCIzNyIsIjA5ODkiDQo0MjQuMywtNTEyOS44LC0yMTIuMSwtNDkxNy43LDkwLjUxLC0xNS41NiwtNDQuNTUsIiIsIjM3IiwiMEFCQiINCjAuMCwtOTUwLjMsLTM2Ny40LC0xMzE3LjcsMC4wMCwyNi45NCwtNzcuMTYsIiIsIjM3IiwiMDlCNiINCi00MjQuMyw1MTI5LjgsMjEyLjEsNDkxNy43LC05MC41MSwxNS41Niw0NC41NSwiIiwiMzciLCIwQTM0Ig0KMC4wLDk1MC4zLDM2Ny40LDEzMTcuNywwLjAwLC0yNi45NCw3Ny4xNiwiIiwiMzciLCIwOTJGIg0KNDI0LjMsLTUxMjkuOCwtMjEyLjEsLTQ5MTcuNyw5MC41MSwtMTUuNTYsLTQ0LjU1LCIiLCIzNyIsIjBBQkIiDQowLjAsMC4wLDAuMCwwLjAsMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjM2IiwiMDc5QyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwNiIsIjA4QTIiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDYiLCIwODdBIg0KMC4wLDAuMCwwLjAsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwIiwiMDgxNSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAiLCIwNzkzIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtOTQuNzUsNDcuMzgsNDcuMzgsIiIsIjAwIiwiMDg5QyINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDAiLCIwNzkzIg0KMC4wLDAuMCwwLjAsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwIiwiMDgxNSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAiLCIwNzkzIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtOTQuNzUsNDcuMzgsNDcuMzgsIiIsIjAwIiwiMDg5QyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMCIsIjA4NzQiDQoiU0VUVElOR1MiLCIwMkUxIg0KIlJJRCAgICAgPUZFRURFUiA5ICAgICAgICAgICAgICAgICAgICAgICBUSUQgICAgID1NSUxMIFJPQUQgU1VCIiwiMEM0QyINCiJDVFIgICAgID0yNDAgICAgICAgUFRSICAgICA9NjAwLjAwICAgIExMICAgICAgPTEwLjAwIiwiMDlBNyINCiJUUiAgICAgID1NMVAgKyBaMUcgKyA1MUdUICsgNTBQMSIsIjA2REIiDQo="}, {"name": "Line5_ABC_Zone1.hdr", "b64": "TElORSA1ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBEYXRlOiAxMC8yNS8yMDI2ICBUaW1lOiAxODoxNjo0MC4yMzMNClJJVkVSIFNVQiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgU2VyaWFsIE51bWJlcjogMTE4MjczMDA0Mg0KDQpGSUQ9U0VMLTQyMS01LVIzMjUtVjAtWjAyNDAxNi1EMjAyMjAzMTgNCg0KRXZlbnQ6IEFCQyBUICAgICAgICBMb2NhdGlvbjogMS45MCAgICAgIFRpbWUgU291cmNlOiBJUklHDQpFdmVudCBOdW1iZXI6IDEwMDQ1ICAgIFNob3QgMVA6IDAgICAgU2hvdCAzUDogMCAgICBGcmVxOiA1OS45NiAgICBHcm91cDogMQ0KVGFyZ2V0czogVFJJUCBaMSBJTlNUIEEgQiBDDQpCcmVha2VyIDE6IENMT1NFRCB0byBPUEVOICAgIFRyaXAgVGltZTogMTg6MTY6NDAuMjQ5DQpDdXJyZW50cyAoQSBQcmkpLCBBQkNOR1E6ICA2MTIwICA2MDg1ICA2MTQyICAgIDQwICAgIDUyICAgIDYxDQo="}, {"name": "Line5_BC_Zone2_POTT.cev", "b64": "IkZJRCIsIkZJRD1TRUwtNDIxLTUtUjMyNS1WMC1aMDI0MDE2LUQyMDIyMDMxOCIsIjBBNTAiDQoiTU9OVEgiLCJEQVkiLCJZRUFSIiwiSE9VUiIsIk1JTiIsIlNFQyIsIk1TRUMiLCIwQUNBIg0KMTAsMjIsMjAyNiw5LDQxLDE3LDUwMiwiMDQ2MCINCiJGUkVRIiwiU0FNL0NZQ19BIiwiU0FNL0NZQ19EIiwiTlVNX09GX0NZQyIsIkVWRU5UIiwiTE9DQVRJT04iLCJTSE9UIiwiVEFSR0VUUyIsIjE0MjQiDQo1OS45OCw0LDQsMTUsIkJDIFQiLDkuODAsMCwiQ09NTSBaT05FMiBCIEMiLCIwOTNBIg0KIklBIiwiSUIiLCJJQyIsIklHIiwiVkEoa1YpIiwiVkIoa1YpIiwiVkMoa1YpIiwiVFJJRyIsIk0xUCBNMlAgWjFHIFoyRyBNMlBUIEtFWSBQVFJYIFRSSVAgT1VUMTAyIDUyQUExIElOMjAxICoiLCIxOTg5Ig0KNTY1LjcsLTI4Mi44LC0yODIuOCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDA2IiwiMEEwNCINCjAuMCw0ODkuOSwtNDg5LjksMC4wLDAuMDAsODIuMDYsLTgyLjA2LCIiLCIwMDYiLCIwOEYyIg0KLTU2NS43LDI4Mi44LDI4Mi44LC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDYiLCIwOUQ3Ig0KLTAuMCwtNDg5LjksNDg5LjksMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDA2IiwiMDk0QyINCjU2NS43LC0yODIuOCwtMjgyLjgsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwNiIsIjBBMDQiDQowLjAsNDg5LjksLTQ4OS45LDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDA2IiwiMDhGMiINCi01NjUuNywyODIuOCwyODIuOCwtMC4wLC05NC43NSw0Ny4zOCw0Ny4zOCwiIiwiMDA2IiwiMDlENyINCi0wLjAsLTQ4OS45LDQ4OS45LC0wLjAsLTAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMDYiLCIwOTc5Ig0KNTY1LjcsLTI4Mi44LC0yODIuOCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDA2IiwiMEEwNCINCjAuMCw0ODkuOSwtNDg5LjksMC4wLDAuMDAsODIuMDYsLTgyLjA2LCIiLCIwMDYiLCIwOEYyIg0KLTU2NS43LDI4Mi44LDI4Mi44LDAuMCwtOTQuNzUsNDcuMzgsNDcuMzgsIiIsIjAwNiIsIjA5QUEiDQotMC4wLC00ODkuOSw0ODkuOSwtMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDA2IiwiMDk3OSINCjU2NS43LC0yODIuOCwtMjgyLjgsLTAuMCw5NC43NSwtNDcuMzgsLTQ3LjM4LCIiLCIwMDYiLCIwQTMxIg0KLTAuMCw0ODkuOSwtNDg5LjksLTAuMCwtMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAwNiIsIjA5NzkiDQotNTY1LjcsMjgyLjgsMjgyLjgsMC4wLC05NC43NSw0Ny4zOCw0Ny4zOCwiIiwiMDA2IiwiMDlBQSINCi0wLjAsLTQ4OS45LDQ4OS45LDAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwNiIsIjA5NEMiDQo1NjUuNywtNDE3Ni4wLDM2MTAuMywwLjAsOTQuMDUsLTI4Ljk5LC0yOC40MywiPiIsIjQ0NiIsIjBBNkUiDQotMC4wLDE1MzMuMSwtMTUzMy4xLDAuMCwtMC4wMCw1MC4yMSwtNDkuMjMsIiIsIjQ0NiIsIjA5OEMiDQotNTY1LjcsNDE3Ni4wLC0zNjEwLjMsLTAuMCwtOTQuMDUsMjguOTksMjguNDMsIiIsIjQ3RSIsIjBBNkYiDQotMC4wLC0xNTMzLjEsMTUzMy4xLC0wLjAsLTAuMDAsLTUwLjIxLDQ5LjIzLCIiLCI0N0UiLCIwOUNCIg0KNTY1LjcsLTQxNzYuMCwzNjEwLjMsMC4wLDk0LjA1LC0yOC45OSwtMjguNDMsIiIsIjQ3RSIsIjBBNDIiDQotMC4wLDE1MzMuMSwtMTUzMy4xLDAuMCwtMC4wMCw1MC4yMSwtNDkuMjMsIiIsIjQ3RSIsIjA5OUUiDQotNTY1LjcsNDE3Ni4wLC0zNjEwLjMsLTAuMCwtOTQuMDUsMjguOTksMjguNDMsIiIsIjQ3RSIsIjBBNkYiDQotMC4wLC0xNTMzLjEsMTUzMy4xLC0wLjAsLTAuMDAsLTUwLjIxLDQ5LjIzLCIiLCI0N0UiLCIwOUNCIg0KNTY1LjcsLTQxNzYuMCwzNjEwLjMsMC4wLDk0LjA1LC0yOC45OSwtMjguNDMsIiIsIjQ3RSIsIjBBNDIiDQotMC4wLDE1MzMuMSwtMTUzMy4xLDAuMCwtMC4wMCw1MC4yMSwtNDkuMjMsIiIsIjQ3RSIsIjA5OUUiDQotNTY1LjcsNDE3Ni4wLC0zNjEwLjMsLTAuMCwtOTQuMDUsMjguOTksMjguNDMsIiIsIjQ3RSIsIjBBNkYiDQotMC4wLC0xNTMzLjEsMTUzMy4xLC0wLjAsLTAuMDAsLTUwLjIxLDQ5LjIzLCIiLCI0N0UiLCIwOUNCIg0KNTY1LjcsLTQxNzYuMCwzNjEwLjMsMC4wLDk0LjA1LC0yOC45OSwtMjguNDMsIiIsIjQ3RSIsIjBBNDIiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC0wLjAwLDgyLjA2LC04Mi4wNiwiIiwiNDc4IiwiMDhCNyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMzgiLCIwOEQ3Ig0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAxOCIsIjA4QUQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDAwIiwiMDg0NSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwMCIsIjA4QTQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDAwIiwiMDg0NSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwMCIsIjA4QTQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDAwIiwiMDg0NSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtMC4wMCwtODIuMDYsODIuMDYsIiIsIjAwMCIsIjA4QTQiDQowLjAsMC4wLDAuMCwwLjAsOTQuNzUsLTQ3LjM4LC00Ny4zOCwiIiwiMDAwIiwiMDg0NSINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLDgyLjA2LC04Mi4wNiwiIiwiMDAwIiwiMDdDMyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTk0Ljc1LDQ3LjM4LDQ3LjM4LCIiLCIwMDAiLCIwOENDIg0KMC4wLDAuMCwwLjAsMC4wLDAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMDAiLCIwN0MzIg0KMC4wLDAuMCwwLjAsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwMCIsIjA4NDUiDQowLjAsMC4wLDAuMCwwLjAsMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAwMCIsIjA3QzMiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC05NC43NSw0Ny4zOCw0Ny4zOCwiIiwiMDAwIiwiMDhDQyINCi0wLjAsLTAuMCwtMC4wLC0wLjAsLTAuMDAsLTgyLjA2LDgyLjA2LCIiLCIwMDAiLCIwOEE0Ig0KMC4wLDAuMCwwLjAsMC4wLDk0Ljc1LC00Ny4zOCwtNDcuMzgsIiIsIjAwMCIsIjA4NDUiDQowLjAsMC4wLDAuMCwwLjAsMC4wMCw4Mi4wNiwtODIuMDYsIiIsIjAwMCIsIjA3QzMiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC05NC43NSw0Ny4zOCw0Ny4zOCwiIiwiMDAwIiwiMDhDQyINCjAuMCwwLjAsMC4wLDAuMCwwLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDAwIiwiMDdDMyINCjAuMCwwLjAsMC4wLDAuMCw5NC43NSwtNDcuMzgsLTQ3LjM4LCIiLCIwMDAiLCIwODQ1Ig0KMC4wLDAuMCwwLjAsMC4wLDAuMDAsODIuMDYsLTgyLjA2LCIiLCIwMDAiLCIwN0MzIg0KLTAuMCwtMC4wLC0wLjAsLTAuMCwtOTQuNzUsNDcuMzgsNDcuMzgsIiIsIjAwMCIsIjA4Q0MiDQotMC4wLC0wLjAsLTAuMCwtMC4wLC0wLjAwLC04Mi4wNiw4Mi4wNiwiIiwiMDAwIiwiMDhBNCINCiJTRVRUSU5HUyIsIjAyRTEiDQoiUklEICAgICAgOj0gTElORSA1IiwiMDQyMyINCiJUSUQgICAgICA6PSBSSVZFUiBTVUIiLCIwNTNBIg0KIkxMICAgICAgIDo9IDEwLjUwIiwiMDM3MyINCiJDVFIgICAgICA6PSA0MDAiLCIwMzQ0Ig0KIlBUUiAgICAgIDo9IDEyMDAiLCIwMzgwIg0KIlRSICAgICAgIDo9IE0xUCBPUiBaMUcgT1IgTTJQVCBPUiBaMkdUIiwiMDkxQSINCiJUUkNPTU0gICA6PSBNMlAgT1IgWjJHIiwiMDVCQyINCiJFQ09NTSAgICA6PSBQT1RUIiwiMDQzRiINCg=="}]</script>
+<script>
+/* SEL Trip Event Analyzer - analysis core for the browser version.
+ *
+ * A line-for-line JavaScript port of the parsing and analysis in
+ * sel_trip_analyzer.py. tests/web_parity.js checks that both produce the same
+ * report for the sample files, so change them together.
+ *
+ * Works in browsers and Node (module.exports). No dependencies.
+ */
+(function (root) {
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Python-compatible regex and string helpers
+// ---------------------------------------------------------------------------
+const reCache = new Map();
+
+/** Translate a Python regex so '.', '^' and '$' behave exactly like Python's re. */
+function R(src, flags) {
+  flags = flags || "";
+  const key = src + "\u0000" + flags;
+  const hit = reCache.get(key);
+  if (hit) { hit.lastIndex = 0; return hit; }
+  const multi = flags.includes("m");
+  let out = "", inClass = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "\\") { out += c + (src[i + 1] || ""); i++; continue; }
+    if (inClass) { if (c === "]") inClass = false; out += c; continue; }
+    if (c === "[") {
+      inClass = true; out += c;
+      if (src[i + 1] === "^") { out += "^"; i++; }
+      if (src[i + 1] === "]") { out += "\\]"; i++; }
+      continue;
+    }
+    if (c === ".") { out += "[^\\n]"; continue; }
+    if (c === "^") { out += multi ? "(?<![^\\n])" : "(?<![\\s\\S])"; continue; }
+    if (c === "$") { out += multi ? "(?=\\n|(?![\\s\\S]))" : "(?=\\n?(?![\\s\\S]))"; continue; }
+    out += c;
+  }
+  const re = new RegExp(out, flags.replace("m", ""));
+  reCache.set(key, re);
+  return re;
+}
+const g = (re) => new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
+const sticky = (re) => new RegExp(re.source, re.flags + "y");
+
+function search(pat, s, flags) { return R(pat, flags).exec(s); }
+function pmatch(pat, s, flags) {          // re.match: anchored at the start
+  const re = sticky(R(pat, flags)); re.lastIndex = 0; return re.exec(s);
+}
+function fullmatch(pat, s, flags) {
+  const re = new RegExp("(?:" + R(pat, flags).source + ")(?![\\s\\S])", (flags || "").replace("m", "") + "y");
+  re.lastIndex = 0; return re.exec(s);
+}
+function finditer(pat, s, flags) { return [...s.matchAll(g(R(pat, flags)))]; }
+function sub(pat, repl, s, flags) { return s.replace(g(R(pat, flags)), repl); }
+function resplit(pat, s, flags) { return s.split(R(pat, flags)); }
+
+const WS = " \t\n\r\x0b\x0c\x1c\x1d\x1e\x1f\x85\u00a0";
+function strip(s, chars) {
+  chars = chars === undefined ? WS : chars;
+  let a = 0, b = s.length;
+  while (a < b && chars.includes(s[a])) a++;
+  while (b > a && chars.includes(s[b - 1])) b--;
+  return s.slice(a, b);
+}
+const splitWS = (s) => s.split(/[ \t\n\r\x0b\x0c\x1c-\x1f\x85\u00a0]+/).filter(Boolean);
+function splitlines(s) {
+  const parts = s.split(/\r\n|[\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029]/);
+  if (parts.length && parts[parts.length - 1] === "") parts.pop();
+  return parts;
+}
+function pyFloat(s) {
+  const t = strip(String(s));
+  if (/^[+-]?(inf|infinity)$/i.test(t)) return t[0] === "-" ? -Infinity : Infinity;
+  if (/^[+-]?nan$/i.test(t)) return NaN;
+  if (!/^[+-]?((\d(_?\d)*)(\.(\d(_?\d)*)?)?|\.\d(_?\d)*)([eE][+-]?\d(_?\d)*)?$/.test(t)) return null;
+  return Number(t.replace(/_/g, ""));
+}
+const isNum = (s) => pyFloat(s) !== null;
+function fnum(s, dflt) {
+  if (s === undefined || s === null) return dflt === undefined ? null : dflt;
+  const v = pyFloat(s);
+  return v === null ? (dflt === undefined ? null : dflt) : v;
+}
+function pyInt(s) {
+  if (typeof s === "number") return Math.trunc(s);
+  const t = strip(String(s));
+  if (!/^[+-]?\d(_?\d)*$/.test(t)) throw new Error("invalid literal for int(): '" + s + "'");
+  return parseInt(t.replace(/_/g, ""), 10);
+}
+/** Python round(): half to even. */
+function pyRound(x) {
+  const f = Math.floor(x), d = x - f;
+  if (d === 0.5) return f % 2 === 0 ? f : f + 1;
+  return Math.round(x);
+}
+/** Python f"{x:.{d}f}" (exact binary ties round half to even). */
+function fx(x, d) {
+  const m = Math.pow(10, d), y = Math.abs(x) * m, fl = Math.floor(y);
+  if (y - fl === 0.5 && fl % 2 === 0) return (x < 0 ? "-" : "") + (fl / m).toFixed(d);
+  return x.toFixed(d);
+}
+/** Python f"{x:,.{d}f}" */
+function fc(x, d) {
+  const s = fx(x, d), neg = s[0] === "-", body = neg ? s.slice(1) : s;
+  const [ip, dp] = body.split(".");
+  const grouped = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return (neg ? "-" : "") + grouped + (dp !== undefined ? "." + dp : "");
+}
+const pad2 = (n) => String(n).padStart(2, "0");
+function pyTitle(s) {
+  let out = "", prevCased = false;
+  for (const ch of s) {
+    const lo = ch.toLowerCase(), up = ch.toUpperCase(), cased = lo !== up;
+    out += cased ? (prevCased ? lo : up) : ch;
+    prevCased = cased;
+  }
+  return out;
+}
+function splitMax(s, sep, max) {
+  const parts = s.split(sep);
+  return parts.length <= max + 1 ? parts : parts.slice(0, max).concat(parts.slice(max).join(sep));
+}
+const uniq = (arr) => [...new Set(arr)];
+
+// ---------------------------------------------------------------------------
+// Bytes -> text
+// ---------------------------------------------------------------------------
+function latin1(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 8192)
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return s;
+}
+function readText(bytes) {
+  try {
+    let t = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    if (t.charCodeAt(0) === 0xfeff) t = t.slice(1);
+    return t;
+  } catch (e) {
+    return latin1(bytes);
+  }
+}
+function decodeBlob(data) {
+  if ((data[0] === 0xff && data[1] === 0xfe) || (data[0] === 0xfe && data[1] === 0xff) ||
+      (data.length > 4 && data[1] === 0 && data[3] === 0)) {
+    const be = data[0] === 0xfe && data[1] === 0xff;
+    return new TextDecoder(be ? "utf-16be" : "utf-16le").decode(data).replace(/\ufffd/g, "");
+  }
+  return latin1(data).replace(/[^\x09\x0a\x0d\x20-\x7e]+/g, "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Settings text
+// ---------------------------------------------------------------------------
+const SETTING_RE = '\\b([A-Z][A-Z0-9_]{0,11})\\s*:?=\\s*(.*?)(?=\\s{2,}[A-Z][A-Z0-9_]{0,11}\\s*:?=|\\"|$)';
+const USEFUL_SETTINGS = new Set(["RID", "TID", "SID", "LL", "CTR", "CTRN", "PTR", "PTRS", "Z1MAG", "Z1ANG", "Z0MAG",
+  "TR", "TRCOMM", "TRSOTF", "DTT", "ULTR", "ER", "79RI", "52A", "52AA1", "BFI",
+  "Z1P", "Z2P", "Z3P", "Z1MG", "Z2MG", "Z1G", "Z2D", "Z2PD", "Z2GD", "Z3D",
+  "50P1P", "50G1P", "50Q1P", "51PP", "51PC", "51PTD", "51GP", "51GC", "51GTD",
+  "51QP", "E21P", "E21MG", "E21XG", "E50P", "E50G", "E51S", "E32", "ECOMM", "E81",
+  "TOP", "TPA", "TPB", "TPC"]);
+
+function extractSettings(text) {
+  const out = {};
+  for (const line of splitlines(text)) {
+    if (!line.includes("=")) continue;
+    for (const m of finditer(SETTING_RE, line)) {
+      const key = m[1], val = strip(strip(strip(m[2]), ","));
+      if (!val || val.length > 400) continue;
+      if (USEFUL_SETTINGS.has(key) || ["TR", "E", "Z", "50", "51", "67", "87"].some((p) => key.startsWith(p)))
+        if (!(key in out)) out[key] = val;
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Interpretation tables
+// ---------------------------------------------------------------------------
+const FAULT_TYPES = {
+  AG: "Phase A-to-ground fault", BG: "Phase B-to-ground fault", CG: "Phase C-to-ground fault",
+  AB: "Phase A-B (phase-to-phase) fault", BC: "Phase B-C (phase-to-phase) fault",
+  CA: "Phase C-A (phase-to-phase) fault",
+  ABG: "Phase A-B-to-ground fault", BCG: "Phase B-C-to-ground fault", CAG: "Phase C-A-to-ground fault",
+  ABC: "Three-phase fault", ABCG: "Three-phase-to-ground fault",
+};
+const NON_FAULT_TYPES = {
+  TRIP: "Trip with no fault type identified (non-fault trip: transfer/remote/manual trip, " +
+        "external input, or fault type undetermined)",
+  ER: "Event triggered by the ER (event report trigger) equation - no trip",
+  TRIG: "Manually triggered event (TRI command) - no trip",
+  PULSE: "Output pulsed by command (PUL)",
+  OPEN: "Breaker open command", CLOSE: "Breaker close command",
+  BCW: "Breaker contact wear alarm", LOP: "Loss of potential",
+  OST: "Out-of-step trip", OSB: "Out-of-step blocking",
+  SOTF: "Switch-onto-fault",
+};
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+const TARGET_WORDS = [
+  ["\\bINST\\b", "instantaneous element"],
+  ["\\bCOMM\\b", "communications-assisted scheme (POTT/DCB/DCUB/DTT)"],
+  ["\\bSOTF\\b", "switch-onto-fault logic"],
+  ["\\bTIME\\b", "time-delayed element"],
+  ["\\bZ(?:ONE)?\\s*1\\b|\\bZONE1\\b|\\bZ1\\b", "Zone 1 distance"],
+  ["\\bZ(?:ONE)?\\s*2\\b|\\bZONE2\\b|\\bZ2\\b", "Zone 2 distance"],
+  ["\\bZ(?:ONE)?\\s*3\\b|\\bZONE3\\b|\\bZ3\\b", "Zone 3 distance"],
+  ["\\bZ(?:ONE)?\\s*4\\b|\\bZONE4\\b|\\bZ4\\b", "Zone 4 distance"],
+  ["\\b87\\w*\\b", "differential (87)"],
+  ["\\b51\\w*\\b", "time-overcurrent (51)"],
+  ["\\b50\\w*\\b", "instantaneous overcurrent (50)"],
+  ["\\b67\\w*\\b", "directional overcurrent (67)"],
+  ["\\b81\\w*\\b|\\bFREQ\\b", "frequency (81)"],
+  ["\\b27\\w*\\b", "undervoltage (27)"],
+  ["\\b59\\w*\\b", "overvoltage (59)"],
+  ["\\bBF\\w*\\b|\\b50BF\\b", "breaker failure"],
+  ["\\bCY\\b", "recloser cycling (reclose in progress)"],
+  ["\\bRS\\b", "recloser reset (ready)"],
+  ["\\b79\\w*\\b|\\bRCLS\\b", "reclosing"],
+  ["\\bLO\\b", "recloser locked out"],
+];
+
+const ELEMENT_RULES = [
+  ["^(Z|M)\\d+(P|G|MG|XG)?T$|^Z\\d+(P|G)?D$", "distance (time-delayed)"],
+  ["^(Z|M)\\d+(P|G|MG|XG|AB|BC|CA|AG|BG|CG)?$|^MAB\\d|^MBC\\d|^MCA\\d|^MAG\\d|^MBG\\d|^MCG\\d|^XAG\\d|^XBG\\d|^XCG\\d", "distance"],
+  ["^87", "differential"],
+  ["^51\\w*T$", "time-overcurrent trip"],
+  ["^51", "time-overcurrent pickup"],
+  ["^67", "directional overcurrent"],
+  ["^50BF|^BFT|^FBF", "breaker failure"],
+  ["^50", "instantaneous overcurrent"],
+  ["^32|^F32|^R32", "directional"],
+  ["^81", "frequency"],
+  ["^27", "undervoltage"],
+  ["^59", "overvoltage"],
+  ["^24", "volts/hertz"],
+  ["^46", "negative-sequence"],
+  ["^49", "thermal"],
+  ["^OST|^OSB", "out-of-step"],
+  ["^SOTF|^SOTFT", "switch-onto-fault"],
+  ["^(DTT|DTA|DTB|DTC|PTRX|PT\\d?|RX|KEY|TRCOMM|ECTT|DCB|POTT|Z2PGS|RB\\d|ROK|RBADA?)", "communications / transfer trip"],
+  ["^IN\\d+$", "contact input"],
+  ["^(TRIP|TR|TRIP\\d|3PT|TPA\\d?|TPB\\d?|TPC\\d?|TRP\\w*)$", "TRIP"],
+  ["^OUT\\d+$", "output contact"],
+  ["^(52A\\w*|52B\\w*)$", "breaker status"],
+  ["^79", "reclosing"],
+  ["^LOP|^ILOP", "loss of potential"],
+  ["^(SV|PSV|PLT|PCT|LT|LV|PCV)\\d+", "SELogic variable"],
+];
+const TRIP_NAMES = new Set(["TRIP", "TR", "TRIP1", "3PT", "TPA", "TPB", "TPC", "TRIP3", "TRP", "TPA1", "TRIPA"]);
+const BREAKER_NAMES = ["52A", "52AA1", "52AB1", "52AC1", "52A1", "IN101"];
+
+function elementClass(name) {
+  const n = name.toUpperCase();
+  for (const [pat, cls] of ELEMENT_RULES) if (pmatch(pat, n)) return cls;
+  return "";
+}
+
+function interpretEventType(et) {
+  et = strip((et || "")).toUpperCase();
+  if (!et) return ["", false];
+  let tripped = !!search("\\bT$|\\bTRIP\\b", et) || et.endsWith(" T");
+  let core = strip(sub("\\s+T$", "", et), " *");
+  core = sub("\\s+", "", core);
+  let desc;
+  if (has(FAULT_TYPES, core)) desc = FAULT_TYPES[core];
+  else if (has(NON_FAULT_TYPES, core)) { desc = NON_FAULT_TYPES[core]; if (core === "TRIP") tripped = true; }
+  else desc = "Event type '" + et + "'";
+  return [desc, tripped];
+}
+
+function interpretTargets(t) {
+  if (!t) return [];
+  const found = [];
+  for (const [pat, desc] of TARGET_WORDS)
+    if (search(pat, t.toUpperCase()) && !found.includes(desc)) found.push(desc);
+  return found;
+}
+
+function fmtLoc(loc, settings) {
+  if (!loc) return "";
+  if (loc.includes("$")) return loc + " (not calculated - relay could not determine distance)";
+  const v = fnum(loc);
+  const ll = settings ? fnum(settings.LL !== undefined ? settings.LL : "") : null;
+  if (v !== null && v < 0) return loc + " (negative: fault was likely behind the relay)";
+  if (v !== null && ll) return `${loc} line-length units (~${fx(100 * v / ll, 0)}% of LL=${settings.LL})`;
+  return loc + " (in the relay's line-length units)";
+}
+
+// ---------------------------------------------------------------------------
+// Event records
+// ---------------------------------------------------------------------------
+function newRec(source, kind) {
+  return {
+    source, kind: kind || "event", relay_id: "", terminal_id: "", fid: "", date: "", time: "",
+    event_type: "", location: "", shot: "", freq: "", targets: "",
+    currents: new Map(), voltages: new Map(), sequence: [], trip_cycle: null, open_cycle: null,
+    settings: {}, ser_lines: [], extra: [], dup_of: null, trigger_cycle: null, prefault_short: false, notes: [],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// CEV
+// ---------------------------------------------------------------------------
+function csvLine(line) {
+  const fields = []; let cur = "", inQ = false, atStart = true;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+      continue;
+    }
+    if (ch === ",") { fields.push(cur); cur = ""; atStart = true; continue; }
+    if (ch === '"' && atStart) { inQ = true; atStart = false; continue; }
+    cur += ch; atStart = false;
+  }
+  fields.push(cur);
+  return fields;
+}
+
+function parseCev(text, source) {
+  const rows = [];
+  for (let line of splitlines(text)) {
+    line = strip(line);
+    if (!line) continue;
+    const hasCk = !!search(',\\s*"[0-9A-Fa-f]{4}"\\s*$', line);
+    let fields = csvLine(line).map((f) => strip(f));
+    if (hasCk && fields.length > 1) fields = fields.slice(0, -1);
+    rows.push(fields);
+  }
+  const rec = newRec(source);
+  const kv = new Map();
+  let tableHdr = null, table = [];
+  let i = 0;
+  while (i < rows.length) {
+    const r = rows[i];
+    if (r.length && r[0].toUpperCase() === "FID") {
+      rec.fid = r.length > 1 ? r[1].split("FID=").join("") : "";
+      i++; continue;
+    }
+    if (r.length >= 2 && !r.some(isNum)) {
+      const block = []; let j = i + 1;
+      while (j < rows.length && rows[j].length === r.length && rows[j].some(isNum)) { block.push(rows[j]); j++; }
+      if (block.length === 1) r.forEach((k, idx) => kv.set(k.toUpperCase(), block[0][idx]));
+      else if (block.length > table.length) { tableHdr = r; table = block; }
+      i = block.length ? j : i + 1;
+      continue;
+    }
+    i++;
+  }
+  const get = (k, d) => (kv.has(k) ? kv.get(k) : d);
+  rec.event_type = get("EVENT", "");
+  rec.location = get("LOCATION", get("LOC", ""));
+  rec.shot = get("SHOT", get("SHOT_1P", ""));
+  rec.freq = get("FREQ", "");
+  rec.targets = get("TARGETS", "");
+  try {  // same order as Python: a missing time field still leaves the date set
+    const need = (k) => { if (!kv.has(k)) throw new Error("missing " + k); return kv.get(k); };
+    const y = pyInt(need("YEAR")), mo = pyInt(need("MONTH")), d = pyInt(need("DAY"));
+    rec.date = `${pad2(mo)}/${pad2(d)}/${y}`;
+    rec.time = `${pad2(pyInt(need("HOUR")))}:${pad2(pyInt(need("MIN")))}:${pad2(pyInt(need("SEC")))}.` +
+               String(pyInt(get("MSEC", 0))).padStart(3, "0");
+  } catch (e) { /* date/time not available */ }
+  rec.settings = extractSettings(text);
+  rec.relay_id = rec.settings.RID || "";
+  rec.terminal_id = rec.settings.TID || "";
+  if (tableHdr && table.length) analyzeTable(rec, tableHdr, table, fnum(kv.get("SAM/CYC_A"), 4) || 4);
+  return [rec];
+}
+
+function hexBits(h) { let b = ""; for (const ch of h) b += parseInt(ch, 16).toString(2).padStart(4, "0"); return b; }
+
+function analyzeTable(rec, hdr, table, sam) {
+  sam = sam && sam > 0 ? Math.trunc(sam) : 4;
+  const lag = Math.max(1, pyRound(sam / 4));
+  let trig = table.findIndex((row) => row.includes(">"));
+  if (trig < 0) trig = null;
+  const startFault = trig !== null ? trig : 0;
+  rec.trigger_cycle = trig !== null ? startFault / sam : null;
+  rec.prefault_short = trig !== null && trig < sam + lag;
+  const analog = [];
+
+  hdr.forEach((name, c) => {
+    const n = strip(name.toUpperCase().split("(")[0]);
+    if (name.includes(" ") || !n) return;
+    const vals = table.map((row) => fnum(row[c]));
+    if (vals.some((v) => v === null)) return;
+    const mags = [];
+    for (let k = lag; k < vals.length; k++) mags.push(Math.hypot(vals[k], vals[k - lag]) / Math.sqrt(2));
+    if (!mags.length) return;
+    const preEnd = trig !== null ? Math.max(sam, startFault - lag) : sam;
+    let preWin = mags.slice(Math.max(0, preEnd - sam), preEnd);
+    if (!preWin.length) preWin = mags.slice(0, sam);
+    const pre = preWin.reduce((a, b) => a + b, 0) / preWin.length;
+    analog.push([name, n, pre, mags]);
+  });
+
+  const firstOn = new Map(), preOn = new Set();
+  hdr.forEach((name, c) => {
+    if (!strip(name).includes(" ")) return;
+    const names = splitWS(name);
+    table.forEach((row, k) => {
+      const h = c < row.length ? strip(row[c]) : "";
+      if (!h || !/^[0-9A-Fa-f]+$/.test(h)) return;
+      const bits = hexBits(h);
+      for (let b = 0; b < Math.min(bits.length, names.length); b++) {
+        const el = names[b];
+        if (el === "*" || bits[b] !== "1") continue;
+        if (k === 0) preOn.add(el);
+        else if (!firstOn.has(el) && !preOn.has(el)) firstOn.set(el, k);
+      }
+    });
+    table.forEach((row, k) => {
+      const h = c < row.length ? strip(row[c]) : "";
+      if (!/^[0-9A-Fa-f]+$/.test(h || "-")) return;
+      const bits = hexBits(h), state = new Map();
+      for (let b = 0; b < Math.min(bits.length, names.length); b++) state.set(names[b], bits[b]);
+      for (const bn of BREAKER_NAMES.slice(0, 5))
+        if (preOn.has(bn) && state.get(bn) === "0" && rec.open_cycle === null) rec.open_cycle = k / sam;
+    });
+  });
+
+  const end = rec.open_cycle !== null ? Math.trunc(rec.open_cycle * sam) : table.length;
+  for (const [name, n, pre, mags] of analog) {
+    let win = mags.slice(Math.max(0, startFault - lag), Math.max(startFault - lag + 1, end - lag));
+    if (!win.length) win = mags;
+    if (pmatch("^(I[ABCNGRSPQ]|IA|IB|IC|IN|IG|3I0|3I2|I1|I2|IP)\\w*$", n)) rec.currents.set(name, [pre, Math.max(...win)]);
+    else if (pmatch("^V(A|B|C|AB|BC|CA|S|P|1|2)\\w*$", n)) rec.voltages.set(name, [pre, Math.min(...win)]);
+  }
+
+  const ordered = [...firstOn.entries()].map((e, idx) => [e[0], e[1], idx])
+    .sort((a, b) => a[1] - b[1] || a[2] - b[2]);
+  for (const [el, k] of ordered) rec.sequence.push([k / sam, el, "asserted"]);
+  for (const el of [...preOn].sort())
+    if (elementClass(el) && !["breaker status", "SELogic variable"].includes(elementClass(el)))
+      rec.sequence.push([0.0, el, "pre"]);
+  const trips = [...firstOn.entries()].filter(([el]) => TRIP_NAMES.has(el.toUpperCase())).map(([, k]) => k);
+  if (trips.length) rec.trip_cycle = Math.min(...trips) / sam;
+}
+
+// ---------------------------------------------------------------------------
+// Text reports (EVE / SUM / HIS / SER / HDR / TXT)
+// ---------------------------------------------------------------------------
+const EVENT_LINE_RE = "^\\s*Event\\s*(?:Type)?\\s*:\\s*(.+?)(?:\\s{2,}|$)";
+function grab(pat, text, flags) {
+  const m = search(pat, text, flags === undefined ? "im" : flags);
+  return m ? strip(m[1]) : "";
+}
+
+function parseText(text, source) {
+  if (text.includes('"FID"') || search('^"MONTH","DAY"', text, "m")) return parseCev(text, source);
+  const recs = [];
+  const settings = extractSettings(text);
+  if (search("\\bEVENT\\b.*\\bLOCAT", text, "i")) recs.push(...parseHis(text, source, settings));
+
+  const ser = finditer("^\\s*\\d*\\s*(\\d{1,2}/\\d{1,2}/\\d{2,4})\\s+(\\d{1,2}:\\d{2}:\\d{2}(?:\\.\\d+)?)\\s+(\\S+)\\s+(Asserted|Deasserted)\\b", text, "im");
+  if (ser.length) {
+    const r = newRec(source, "ser");
+    r.ser_lines = ser.map((m) => `${m[1]} ${m[2]}  ${m[3].padEnd(12)} ${m[4]}`);
+    recs.push(r);
+  }
+
+  const matches = finditer(EVENT_LINE_RE, text, "im");
+  const HEADER = "^[ \\t]*(\\S.*?)\\s{2,}Date\\s*:\\s*(\\S+)\\s+Time\\s*:\\s*(\\S+)[^\\n]*\\n((?:[ \\t]*\\n)*)([^\\n]*)";
+  matches.forEach((m, idx) => {
+    const prevEnd = idx ? matches[idx - 1].index + matches[idx - 1][0].length : 0;
+    const end = idx + 1 < matches.length ? matches[idx + 1].index : text.length;
+    const back = text.slice(prevEnd, m.index);
+    const chunk = text.slice(m.index, end);
+    const r = newRec(source);
+    let heads = finditer(HEADER, back, "m");
+    if (!heads.length) heads = finditer(HEADER, chunk, "m");
+    if (heads.length) {
+      const h = heads[heads.length - 1];
+      r.date = h[2]; r.time = h[3];
+      if (!settings.RID) {
+        r.relay_id = strip(h[1]);
+        const second = strip(h[5]);
+        if (second && !pmatch("^(Event|FID|#|=>|\\[)", second, "i")) r.terminal_id = strip(resplit("\\s{2,}", second)[0]);
+      }
+    }
+    r.event_type = strip(resplit("\\s{2,}|Location|Shot|Freq", m[1], "i")[0]);
+    r.location = grab("(?:Fault\\s+)?Location\\s*:\\s*([-$\\d.]+)", chunk);
+    r.shot = grab("Shot\\s*:\\s*(\\S+)", chunk);
+    r.freq = grab("Freq(?:uency)?\\s*:\\s*([\\d.]+)", chunk);
+    r.targets = grab("Targets?\\s*:\\s*(.+)$", chunk);
+    if (!r.date) {
+      r.date = grab("Date\\s*:\\s*(\\S+)", chunk);
+      r.time = grab("\\bTime\\s*:\\s*(\\d\\S*)", chunk);
+    }
+    if (settings.RID) { r.relay_id = settings.RID || ""; r.terminal_id = settings.TID || ""; }
+    r.fid = grab("FID\\s*=\\s*(\\S+)", back) || grab("FID\\s*=\\s*(\\S+)", chunk);
+    for (const lbl of ["Trip Time", "Event Time", "Breaker\\s*\\d*\\s*\\w*", "Fault Type", "Group", "Recloser"]) {
+      const v = grab("^\\s*(" + lbl + "\\s*:.+)$", chunk);
+      if (v) r.extra.push(sub("\\s+", " ", v));
+    }
+    const cur = search("Currents?\\s*\\(([^)]*)\\)\\s*,?\\s*([A-Z]+)\\s*:\\s*([-\\d.\\s]+)", chunk, "i");
+    if (cur) {
+      const labels = cur[2], nums = splitWS(cur[3]);
+      for (let k = 0; k < Math.min(labels.length, nums.length); k++) {
+        const fv = fnum(nums[k]);
+        if (fv !== null) r.currents.set(labels[k].toUpperCase() === "Q" ? "3I2" : "I" + labels[k].toUpperCase(), [null, fv]);
+      }
+    }
+    r.settings = settings;
+    recs.push(r);
+  });
+  return recs;
+}
+
+function parseHis(text, source, settings) {
+  const recs = [];
+  const head = pmatch("\\s*(.+?)\\s{2,}Date\\s*:", text);
+  const rid = settings.RID || (head ? strip(head[1]) : "");
+  for (const line of splitlines(text)) {
+    const m = pmatch("^\\s*(\\d+)\\s+(\\d{1,2}/\\d{1,2}/\\d{2,4})\\s+(\\d{1,2}:\\d{2}:\\d{2}(?:\\.\\d+)?)\\s+(.*)$", line);
+    if (!m) continue;
+    const toks = splitWS(m[4]);
+    const et = [];
+    while (toks.length && !(isNum(toks[0]) || toks[0].includes("$"))) et.push(toks.shift());
+    const r = newRec(source, "history");
+    r.date = m[2]; r.time = m[3]; r.event_type = et.join(" ");
+    const nums = [];
+    while (toks.length && (isNum(toks[0]) || toks[0].includes("$"))) nums.push(toks.shift());
+    if (nums.length) r.location = nums[0];
+    if (nums.length > 1) r.currents.set("Fault current", [null, fnum(nums[1], 0)]);
+    if (nums.length > 2) r.freq = nums[2];
+    if (nums.length > 4) r.shot = nums[4];
+    r.targets = toks.join(" ");
+    r.settings = settings;
+    r.relay_id = rid;
+    recs.push(r);
+  }
+  return recs;
+}
+
+// ---------------------------------------------------------------------------
+// RDB: OLE compound file / zip / raw scan
+// ---------------------------------------------------------------------------
+function readOle(buf) {
+  const sig = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+  if (buf.length < 512 || sig.some((b, i) => buf[i] !== b)) return null;
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const u16 = (o) => dv.getUint16(o, true), u32 = (o) => dv.getUint32(o, true);
+  const ss = 1 << u16(0x1e), mss = 1 << u16(0x20);
+  const nFat = u32(0x2c), dirStart = u32(0x30), cutoff = u32(0x38);
+  const miniFatStart = u32(0x3c), difStart = u32(0x44), nDif = u32(0x48);
+  const END = 0xfffffffe, FREE = 0xffffffff;
+  const secOff = (sid) => (sid + 1) * ss;
+  const fatSecs = [];
+  for (let i = 0; i < 109 && fatSecs.length < nFat; i++) { const s = u32(0x4c + i * 4); if (s !== FREE) fatSecs.push(s); }
+  let dif = difStart;
+  for (let n = 0; n < nDif && dif < END && fatSecs.length < nFat; n++) {
+    const o = secOff(dif);
+    for (let i = 0; i < ss / 4 - 1 && fatSecs.length < nFat; i++) fatSecs.push(u32(o + i * 4));
+    dif = u32(o + ss - 4);
+  }
+  const fat = [];
+  for (const s of fatSecs) { const o = secOff(s); for (let i = 0; i < ss / 4; i++) fat.push(o + i * 4 + 4 <= buf.length ? u32(o + i * 4) : FREE); }
+  const chain = (start, table) => {
+    const out = [], seen = new Set();
+    for (let s = start; s < END && s < table.length && !seen.has(s); s = table[s]) { seen.add(s); out.push(s); }
+    return out;
+  };
+  const readChain = (start) => {
+    const parts = chain(start, fat).map((s) => buf.subarray(secOff(s), Math.min(secOff(s) + ss, buf.length)));
+    const out = new Uint8Array(parts.reduce((a, p) => a + p.length, 0));
+    let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  };
+  const dir = readChain(dirStart), entries = [];
+  const ddv = new DataView(dir.buffer, dir.byteOffset, dir.byteLength);
+  for (let o = 0; o + 128 <= dir.length; o += 128) {
+    const nl = ddv.getUint16(o + 0x40, true);
+    const name = new TextDecoder("utf-16le").decode(dir.subarray(o, o + Math.max(0, Math.min(64, nl) - 2)));
+    entries.push({ name, type: dir[o + 0x42], left: ddv.getUint32(o + 0x44, true), right: ddv.getUint32(o + 0x48, true),
+                   child: ddv.getUint32(o + 0x4c, true), start: ddv.getUint32(o + 0x74, true), size: ddv.getUint32(o + 0x78, true) });
+  }
+  if (!entries.length) return null;
+  const rootE = entries[0];
+  const miniStream = readChain(rootE.start).subarray(0, rootE.size);
+  const miniFatBytes = miniFatStart < END ? readChain(miniFatStart) : new Uint8Array(0);
+  const mdv = new DataView(miniFatBytes.buffer, miniFatBytes.byteOffset, miniFatBytes.byteLength);
+  const miniFat = []; for (let o = 0; o + 4 <= miniFatBytes.length; o += 4) miniFat.push(mdv.getUint32(o, true));
+  const readStream = (e) => {
+    if (e.size < cutoff) {
+      const parts = chain(e.start, miniFat).map((s) => miniStream.subarray(s * mss, s * mss + mss));
+      const out = new Uint8Array(parts.reduce((a, p) => a + p.length, 0));
+      let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+      return out.subarray(0, e.size);
+    }
+    return readChain(e.start).subarray(0, e.size);
+  };
+  const kidsOf = (sid) => {
+    const out = [], seen = new Set();
+    const walk = (s) => {
+      if (s === FREE || s >= entries.length || seen.has(s)) return;
+      seen.add(s); walk(entries[s].left); out.push(s); walk(entries[s].right);
+    };
+    walk(sid);
+    return out.sort((a, b) => (entries[a].name < entries[b].name ? -1 : entries[a].name > entries[b].name ? 1 : 0));
+  };
+  const files = [];
+  const list = (sid, prefix) => {
+    for (const k of kidsOf(entries[sid].child)) {
+      const e = entries[k];
+      if (e.type === 1) list(k, prefix.concat(e.name));
+      else if (e.type === 2) files.push([prefix.concat(e.name).join("/"), e]);
+    }
+  };
+  list(0, []);
+  return files.map(([name, e]) => { try { return [name, readStream(e)]; } catch (x) { return null; } }).filter(Boolean);
+}
+
+async function readZip(buf) {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let eocd = -1;
+  for (let o = buf.length - 22; o >= Math.max(0, buf.length - 65557); o--)
+    if (dv.getUint32(o, true) === 0x06054b50) { eocd = o; break; }
+  if (eocd < 0) return null;
+  const n = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+    const lho = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(buf.subarray(p + 46, p + 46 + nlen));
+    p += 46 + nlen + elen + clen;
+    try {
+      const ds = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+      const raw = buf.subarray(ds, ds + csize);
+      let data;
+      if (method === 0) data = raw;
+      else if (method === 8 && typeof DecompressionStream !== "undefined") {
+        const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        data = new Uint8Array(await new Response(stream).arrayBuffer());
+      } else continue;
+      out.push([name, data]);
+    } catch (e) { /* skip unreadable member */ }
+  }
+  return out;
+}
+
+async function parseRdb(bytes, fileName) {
+  let texts = [];
+  let ole = null;
+  try { ole = readOle(bytes); } catch (e) { ole = null; }
+  if (ole) texts = ole.map(([n, d]) => [n, decodeBlob(d)]);
+  if (!texts.length) {
+    const z = await readZip(bytes).catch(() => null);
+    if (z) texts = z.map(([n, d]) => [n, decodeBlob(d)]);
+  }
+  let method = texts.length ? (ole && ole.length ? "ole" : "zip") : null;
+  if (!texts.length) { texts.push(["raw", decodeBlob(bytes)]); method = "scan"; }
+
+  const combined = {}, perRelay = new Map();
+  for (const [name, t] of texts) {
+    const s = extractSettings(t);
+    if (!Object.keys(s).length) continue;
+    const top = name.split("/")[0];
+    if (!perRelay.has(top)) perRelay.set(top, {});
+    const tgt = perRelay.get(top);
+    for (const [k, v] of Object.entries(s)) if (!(k in tgt)) tgt[k] = v;
+    for (const [k, v] of Object.entries(s)) if (!(k in combined)) combined[k] = v;
+  }
+  const out = new Map();
+  if (perRelay.size <= 1) {
+    if (!Object.keys(combined).length) return out;
+    combined.__method__ = method;
+    out.set(combined.RID || fileName, combined);
+    return out;
+  }
+  for (const [top, s] of perRelay) { s.__method__ = method; out.set(s.RID || top, s); }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Loading
+// ---------------------------------------------------------------------------
+const EVENT_EXTS = [".cev", ".eve", ".txt", ".sum", ".his", ".ser", ".hdr", ".log", ".chi"];
+const SETTINGS_EXTS = [".rdb"];
+const ALL_EXTS = EVENT_EXTS.concat(SETTINGS_EXTS);
+const extOf = (name) => { const m = /(\.[^.\\/]*)$/.exec(name); return m ? m[1].toLowerCase() : ""; };
+
+/** files: [{name, bytes: Uint8Array}] in load order. */
+async function loadFiles(files) {
+  const events = [], rdb = new Map(), errors = [];
+  for (const f of files) {
+    const ext = extOf(f.name);
+    try {
+      if (SETTINGS_EXTS.includes(ext)) for (const [k, v] of await parseRdb(f.bytes, f.name)) rdb.set(k, v);
+      else if (ext === ".cev") events.push(...parseCev(readText(f.bytes), f.name));
+      else events.push(...parseText(readText(f.bytes), f.name));
+    } catch (e) {
+      errors.push(`${f.name}: ${e && e.message ? e.message : e}`);
+    }
+  }
+  return { events, rdb, errors };
+}
+
+// ---------------------------------------------------------------------------
+// Analysis
+// ---------------------------------------------------------------------------
+function matchSettings(rec, rdb) {
+  if (!rdb.size) return [{}, "", "none"];
+  const rid = strip(rec.relay_id || "").toUpperCase();
+  for (const [label, s] of rdb)
+    if (rid && (rid === strip(String(label)).toUpperCase() || rid === strip(String(s.RID || "")).toUpperCase()))
+      return [s, label, "rid"];
+  if (!rid && rdb.size === 1) { const label = rdb.keys().next().value; return [rdb.get(label), label, "assumed"]; }
+  return [{}, "", "mismatch"];
+}
+
+const eventCore = (et) => strip(sub("\\s+T$", "", strip(et || "").toUpperCase()), " *").split(" ").join("");
+function eventPhases(et) { const core = eventCore(et); return has(FAULT_TYPES, core) ? new Set(core) : null; }
+function targetPhases(targets) {
+  const toks = new Set(splitWS((targets || "").toUpperCase()));
+  const ph = new Set([..."ABC"].filter((p) => toks.has(p)));
+  if (toks.has("G") || toks.has("N")) ph.add("G");
+  return ph;
+}
+function phaseCurrents(rec) {
+  const ph = new Map(), grounds = new Map();
+  for (const [name, val] of rec.currents) {
+    const n = strip(name.toUpperCase().split("(")[0]);
+    const m = pmatch("^I([ABC])(?:W\\d+|_PRI|_SEC)?$", n);
+    if (m) ph.set(m[1], val);
+    else { const gm = pmatch("^(IG|3I0|IN)", n); if (gm && !grounds.has(gm[1])) grounds.set(gm[1], val); }
+  }
+  const gnd = grounds.get("IG") || grounds.get("3I0") || grounds.get("IN") || null;
+  return [ph, gnd];
+}
+function equationHits(equation, elements) {
+  const eq = sub("(\\bNOT\\s+|!)\\(?\\s*[A-Z0-9_]+", " ", equation.toUpperCase());
+  const tokens = new Set(finditer("[A-Z0-9_]+", eq).map((m) => m[0]));
+  return uniq(elements.filter((el) => tokens.has(el.toUpperCase())));
+}
+
+const NON_PROTECTION = ["", "TRIP", "output contact", "breaker status", "SELogic variable", "reclosing"];
+const TRIP_EQUATIONS = [["TR", "trip equation"], ["TRCOMM", "communications-assisted trip equation"],
+  ["TRSOTF", "switch-onto-fault trip equation"], ["DTT", "direct transfer trip equation"]];
+const setEq = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
+
+function analyzeEvent(rec, settings, how, label) {
+  how = how || "none"; label = label || "";
+  const [desc, trippedByType] = interpretEventType(rec.event_type);
+  const core = eventCore(rec.event_type);
+  const isFault = has(FAULT_TYPES, core);
+  const tc = rec.trip_cycle;
+  const tripped = trippedByType || tc !== null;
+  const tdesc = interpretTargets(rec.targets);
+  const cause = [], checks = [], gaps = [];
+
+  const asserted = rec.sequence.filter((x) => x[2] === "asserted").map((x) => [x[0], x[1]]);
+  const before = asserted.filter(([c]) => tc === null || c <= tc + 0.01);
+  const prot = before.map(([c, el]) => [c, el, elementClass(el)]).filter((x) => !NON_PROTECTION.includes(x[2]));
+  const initiators = prot.filter((x) => tc !== null && tc - x[0] <= 0.5);
+  const pickups = prot.filter((x) => !initiators.includes(x));
+
+  const eqHits = new Map();
+  for (const [key] of TRIP_EQUATIONS)
+    if (settings[key]) { const hits = equationHits(settings[key], before.map((x) => x[1])); if (hits.length) eqHits.set(key, hits); }
+
+  if (tripped) cause.push(`Relay TRIPPED. ${desc || "Event"}.`);
+  else cause.push(desc ? `No trip recorded. ${desc}.` : "No trip recorded for this event.");
+  if (tdesc.length) cause.push("Front-panel targets indicate: " + tdesc.join(", ") + `  [${strip(rec.targets)}]`);
+
+  let primary = [];
+  if (eqHits.has("TR")) {
+    primary = eqHits.get("TR");
+    cause.push("Trip equation (TR) elements that asserted before the trip: " + primary.join(", ") + " -> these caused the trip.");
+  }
+  const commBits = before.map((x) => x[1]).filter((el) => elementClass(el) === "communications / transfer trip");
+  for (const [key, what] of TRIP_EQUATIONS.slice(1)) {
+    if (!eqHits.has(key)) continue;
+    primary = primary.length ? primary : eqHits.get(key);
+    let line = `Elements in the ${what} (${key}) asserted before the trip: ` + eqHits.get(key).join(", ");
+    if (key === "TRCOMM" && commBits.length) {
+      line += `, with ${commBits.join(", ")} from the communications scheme -> communications-assisted trip (e.g. POTT/DCUB)`;
+      primary = primary.concat(commBits.filter((b) => !primary.includes(b) && b !== "KEY"));
+    }
+    cause.push(line + ".");
+  }
+  if (!primary.length && initiators.length) {
+    primary = initiators.map((x) => x[1]);
+    cause.push("Element(s) that asserted with the trip: " +
+      initiators.map(([c, el, cls]) => `${el} (${cls}, ${fx(c, 2)} cyc)`).join(", ") + " -> most likely tripping element(s).");
+  }
+  if (pickups.length)
+    cause.push("Earlier pickups before the trip: " + pickups.slice(0, 10).map(([c, el, cls]) => `${el} (${cls}, ${fx(c, 2)} cyc)`).join(", "));
+
+  const classes = new Set(initiators.map((x) => x[2]).concat(primary.map(elementClass)));
+  if (tripped && !isFault) {
+    if (classes.has("communications / transfer trip") || classes.has("contact input"))
+      cause.push("No fault type was identified and a communications/input bit asserted with the trip: " +
+                 "most likely a direct/remote transfer trip or an external trip input, not a local fault.");
+    else if (classes.has("frequency"))
+      cause.push("Frequency element tripped: likely underfrequency load shedding or a system disturbance.");
+    else if (classes.has("undervoltage") || classes.has("overvoltage"))
+      cause.push("Voltage element tripped: check system voltage conditions or loss of source.");
+    else if (classes.has("breaker failure"))
+      cause.push("Breaker-failure logic operated: a breaker failed to clear a fault.");
+    else if (classes.has("out-of-step"))
+      cause.push("Out-of-step logic operated: power swing / loss of synchronism.");
+    else if (splitWS((rec.targets || "").toUpperCase()).includes("COMM"))
+      cause.push("COMM target with no fault type: most likely a transfer trip received from the remote end.");
+    else if (search("\\b81\\b", rec.targets || ""))
+      cause.push("Frequency (81) target: likely underfrequency load shedding or a system disturbance.");
+  }
+
+  if (tc !== null && rec.open_cycle !== null && rec.open_cycle > tc)
+    cause.push(`Breaker opened ~${fx(rec.open_cycle - tc, 2)} cycles after trip (trip at ${fx(tc, 2)} cyc, 52A dropped at ${fx(rec.open_cycle, 2)} cyc).`);
+  if (rec.shot && rec.shot !== "0") cause.push(`Reclose shot counter = ${rec.shot} (event occurred during a reclose sequence).`);
+  cause.push(...rec.notes);
+
+  if (rec.kind === "history" && tripped && !rec.dup_of)
+    gaps.push("History row only, so the cause is read from the targets. Load this event's .CEV report to confirm which element tripped.");
+  else if (rec.kind !== "history" && !rec.sequence.length && tripped)
+    gaps.push("No relay element data in this file, so the tripping element is inferred from the front-panel targets. " +
+              "Load the .CEV report for this event to confirm.");
+  if (tripped && !settings.TR) {
+    if (how === "mismatch")
+      gaps.push(`Settings files are loaded, but none match relay '${rec.relay_id}', so no settings were applied. Add this relay's .RDB.`);
+    else
+      gaps.push("No settings for this relay, so the trip equation (TR) and line length couldn't be checked. " +
+                "Add the relay's .RDB (or use a CEV that includes settings).");
+  }
+  if (settings.__method__ === "scan")
+    gaps.push("Settings were read with a best-effort scan of the .RDB file; some values may be missing.");
+
+  if (how === "assumed")
+    checks.push(`This event has no relay ID, so settings from the only loaded RDB (${label}) were assumed to apply. Confirm it's the same relay.`);
+  if (rec.event_type && !has(FAULT_TYPES, core) && !has(NON_FAULT_TYPES, core))
+    checks.push(`Event type '${rec.event_type}' isn't a code this tool recognizes; interpret it manually.`);
+  if (core === "TRIP")
+    checks.push("The relay tripped without identifying a fault type. Confirm whether this was a transfer trip, " +
+                "a manual/SCADA open, or an external trip input.");
+
+  const ep = eventPhases(rec.event_type), tp = targetPhases(rec.targets);
+  if (ep && ep.size && tp.size) {
+    const eAbc = new Set([...ep].filter((x) => x !== "G")), tAbc = new Set([...tp].filter((x) => x !== "G"));
+    if (tAbc.size && !setEq(eAbc, tAbc))
+      checks.push(`Targets show phase(s) ${[...tAbc].sort().join("")} but the event type says ${[...eAbc].sort().join("")}.`);
+    if (tAbc.size && ep.has("G") !== tp.has("G"))
+      checks.push("Targets and event type disagree on whether ground was involved.");
+  }
+
+  const [ph, gnd] = phaseCurrents(rec);
+  if (ep && ep.size && ph.size >= 2) {
+    let top = null;
+    for (const [k, v] of ph) if (top === null || v[1] > ph.get(top)[1]) top = k;
+    const [topPre, topFault] = ph.get(top);
+    const eAbc = new Set([...ep].filter((x) => x !== "G"));
+    const first = splitWS(rec.event_type)[0];
+    if (!eAbc.has(top))
+      checks.push(`Highest fault current is on phase ${top} (${fc(topFault, 0)} A), but the event type says ${first}.`);
+    if (topPre && topFault < 1.5 * topPre)
+      checks.push(`Fault current barely rose above load (${fc(topFault, 0)} A vs ${fc(topPre, 0)} A prefault). ` +
+                  "Could be a high-impedance fault, a weak source, or a misclassified event.");
+    if (gnd !== null && topFault > 0) {
+      const gv = gnd[1];
+      if (ep.has("G") && gv < 0.1 * topFault)
+        checks.push(`Ground fault reported, but ground current (${fc(gv, 0)} A) is small next to phase current (${fc(topFault, 0)} A).`);
+      if (!ep.has("G") && gv > 0.3 * topFault)
+        checks.push(`Significant ground current (${fc(gv, 0)} A) for a fault classified without ground (${first}).`);
+    }
+  }
+
+  const loc = strip(rec.location || "");
+  const v = fnum(loc);
+  const ll = fnum(settings.LL !== undefined ? settings.LL : "");
+  if (isFault) {
+    if (!loc) gaps.push("No fault location in this file.");
+    else if (loc.includes("$"))
+      checks.push("The relay couldn't calculate a fault location ($$$$$). This usually means too little fault data or a very fast clearing.");
+  }
+  if (v !== null && isFault) {
+    if (v < 0)
+      checks.push(`Negative fault location (${loc}) usually means the fault was behind the relay (reverse direction). ` +
+                  "Check the directional elements and CT polarity.");
+    else if (ll) {
+      const pct = 100 * v / ll;
+      if (v > ll * 1.02)
+        checks.push(`Fault location ${loc} is beyond the end of the line (LL = ${settings.LL}). Possible fault on the adjacent section, or a location error.`);
+      const zone1 = tdesc.includes("Zone 1 distance") || primary.some((el) => pmatch("^(Z|M)1", el));
+      if (zone1 && pct > 90)
+        checks.push(`Zone 1 operated for a fault at ~${fx(pct, 0)}% of the line, beyond typical Zone 1 reach (80-90%). ` +
+                    "Check for overreach or a location error.");
+    } else if (settings.TR || !tripped)
+      gaps.push("Line length (LL) isn't known, so the fault location can't be checked against the line. Load the relay's .RDB.");
+  }
+
+  const f = fnum(rec.freq);
+  if (f) {
+    const nominal = Math.abs(f - 50) < Math.abs(f - 60) ? 50.0 : 60.0;
+    if (Math.abs(f - nominal) > 0.5) checks.push(`Frequency was ${fx(f, 2)} Hz, well off nominal ${fx(nominal, 0)} Hz.`);
+  }
+
+  if (rec.sequence.length) {
+    if (trippedByType && tc === null) checks.push("The event type shows a trip (T), but no TRIP bit asserted in this record.");
+    if (tc !== null && rec.event_type && !trippedByType) checks.push("TRIP asserted in the record, but the event type doesn't show a trip.");
+    if (tripped && settings.TR && !eqHits.size)
+      checks.push("No element from the trip equations asserted before the trip. It may have come from a manual/SCADA command, " +
+                  "another logic path, or an element not in this record.");
+    if (tripped && !prot.length && !eqHits.size) checks.push("No protection element asserted before the trip in this record.");
+    if (tc !== null) {
+      if (rec.open_cycle === null)
+        checks.push("No breaker-open indication in the record. Confirm the breaker opened (the record may end too soon, or 52A isn't in this report).");
+      else if (rec.open_cycle < tc)
+        checks.push("Breaker status dropped before the trip asserted. The breaker may have been opened by another relay or manually.");
+      else if (rec.open_cycle - tc > 5)
+        checks.push(`Breaker took ${fx(rec.open_cycle - tc, 1)} cycles to open after the trip (typical is 2-5). Check the breaker and trip circuit.`);
+    }
+    if (rec.prefault_short) checks.push("The record triggered very early, so 'prefault' values may include fault data.");
+  }
+
+  let level;
+  if (rec.kind === "history") level = 1;
+  else if (rec.sequence.length && settings.TR) level = 3;
+  else if (rec.sequence.length || rec.targets) level = 2;
+  else level = 1;
+  if (checks.length) level -= checks.length >= 3 ? 2 : 1;
+  level = Math.max(1, level);
+  let basis = rec.kind === "history" ? "history row" : rec.sequence.length ? "element data" : rec.targets ? "targets only" : "event type only";
+  if (settings.TR) basis += ", settings" + (label ? ` from ${label}` : " in event file");
+  return { tripped, desc, cause, checks, gaps, confidence: { 3: "High", 2: "Medium", 1: "Low" }[level], basis, primary };
+}
+
+function shortCause(rec, settings, a) {
+  a = a || analyzeEvent(rec, settings);
+  const parts = [];
+  if (a.desc) {
+    const d = sub("\\s*\\((?:non-fault|phase-to-phase|event report)[^)]*\\)", "", a.desc).split(" (")[0];
+    parts.push(sub(" - no trip$", "", d));
+  }
+  if (a.primary.length) parts.push("via " + a.primary.slice(0, 3).join(", "));
+  else { const td = interpretTargets(rec.targets); if (td.length) parts.push("via " + td.slice(0, 3).join("/")); }
+  const loc = rec.location && !rec.location.includes("$") ? rec.location : "";
+  if (loc) parts.push("@ " + loc);
+  const n = a.checks.length + a.gaps.length;
+  return (a.tripped ? "TRIP - " : "No trip - ") + parts.join(" ") + (n ? `  [${n} to check]` : "");
+}
+
+// ---- dates (mirrors datetime.strptime for the formats used)
+function daysIn(y, m) { return [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]; }
+function parseDate(d) {
+  const fmts = [
+    [/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, (m) => [+m[3], +m[1], +m[2]]],
+    [/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/, (m) => [+m[3] <= 68 ? 2000 + +m[3] : 1900 + +m[3], +m[1], +m[2]]],
+    [/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/, (m) => [+m[1], +m[2], +m[3]]],
+    [/^(\d{4})-(\d{1,2})-(\d{1,2})$/, (m) => [+m[1], +m[2], +m[3]]],
+    [/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, (m) => [+m[3], +m[2], +m[1]]],
+  ];
+  for (const [re, f] of fmts) {
+    const m = re.exec(d);
+    if (!m) continue;
+    const [y, mo, day] = f(m);
+    if (y >= 1 && mo >= 1 && mo <= 12 && day >= 1 && day <= daysIn(y, mo)) return [y, mo, day];
+  }
+  return null;
+}
+/** Microseconds since epoch (naive), or null. */
+function eventDatetime(rec) {
+  const ymd = parseDate(strip(rec.date || ""));
+  if (!ymd) return null;
+  let h = 0, mi = 0, s = 0, us = 0;
+  const m = pmatch("(\\d{1,2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?", strip(rec.time || ""));
+  if (m) { h = +m[1]; mi = +m[2]; s = +m[3]; us = m[4] ? Math.trunc(parseFloat("0." + m[4]) * 1e6) : 0; }
+  const d = new Date(0); d.setUTCFullYear(ymd[0], ymd[1] - 1, ymd[2]); d.setUTCHours(h, mi, s, 0);
+  return d.getTime() * 1000 + us;
+}
+
+function linkDuplicates(events) {
+  const detailed = events.map((e, i) => [i + 1, e, eventDatetime(e)]).filter(([, e]) => e.kind === "event");
+  for (const e of events) {
+    if (e.kind !== "history") continue;
+    const dt = eventDatetime(e);
+    if (dt === null) continue;
+    for (const [i, d, ddt] of detailed) {
+      if (ddt !== null && Math.abs(ddt - dt) / 1e6 <= 1.0 &&
+          (!e.relay_id || !d.relay_id || e.relay_id.toUpperCase() === d.relay_id.toUpperCase())) {
+        e.notes.push(`Same event as #${i} (${d.source}), which has more detail.`);
+        e.dup_of = i;
+        break;
+      }
+    }
+  }
+}
+
+function nowStamp(date) {
+  const d = date || new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function buildReport(events, rdb, errors, nFiles, comments, opts) {
+  opts = opts || {};
+  comments = comments || "";
+  const showSeq = opts.sequence !== false, showSettings = opts.settings !== false, showSer = opts.ser !== false;
+  const now = opts.now || nowStamp();
+  const ev = events.filter((e) => e.kind === "event" || e.kind === "history")
+    .map((e, i) => [e, eventDatetime(e), i])
+    .sort((a, b) => ((a[1] === null) - (b[1] === null)) || ((a[1] === null ? -Infinity : a[1]) - (b[1] === null ? -Infinity : b[1])) || (a[2] - b[2]))
+    .map((x) => x[0]);
+  for (const e of ev) { e.notes = e.notes.filter((n) => !n.startsWith("Same event as")); e.dup_of = null; }
+  linkDuplicates(ev);
+  const ser = events.filter((e) => e.kind === "ser");
+
+  const analyses = ev.map((e) => {
+    const [sRdb, label, how] = matchSettings(e, rdb);
+    const s = Object.assign({}, e.settings, sRdb);
+    return [e, s, label, how, analyzeEvent(e, s, how, label)];
+  });
+  const nItems = analyses.reduce((t, x) => t + x[4].checks.length + x[4].gaps.length, 0);
+  const nEv = analyses.filter((x) => x[4].checks.length || x[4].gaps.length).length;
+
+  const out = [];
+  out.push("SEL TRIP EVENT SUMMARY", "=".repeat(60), `Generated: ${now}`,
+           `Files analyzed: ${nFiles}   Events found: ${ev.length}   Settings databases: ${rdb.size}`);
+  if (ev.length)
+    out.push(`Needs review: ${nItems} item(s) to check across ${nEv} of ${ev.length} event(s)` + (nItems ? " - see the CHECK lines" : ""));
+  out.push("");
+  if (strip(comments)) { out.push("ANALYST COMMENTS / NOTES", "-".repeat(60), ...splitlines(strip(comments)), ""); }
+
+  if (!ev.length && !ser.length) out.push("No event data recognized in the loaded files.");
+  else {
+    out.push("QUICK SUMMARY", "-".repeat(60));
+    analyses.forEach(([e, s, , , a], idx) => {
+      const when = strip(`${e.date} ${e.time}`) || "date n/a";
+      const who = e.relay_id || e.terminal_id || e.source;
+      out.push(`${String(idx + 1).padStart(2)}. ${when} | ${who} | ${e.event_type || "?"} | ${shortCause(e, s, a)}`);
+    });
+    out.push("", "EVENT DETAILS", "-".repeat(60));
+    const shown = new Map();
+    analyses.forEach(([e, s, label, , a], idx) => {
+      const n = idx + 1;
+      out.push(`Event ${n} of ${ev.length}  (${e.kind === "history" ? "history row" : "event report"})`);
+      out.push(`  Source file : ${e.source}`);
+      const relay = [e.relay_id, e.terminal_id].filter(Boolean).join(" / ");
+      if (relay) out.push(`  Relay       : ${relay}`);
+      if (e.fid) out.push(`  Firmware    : ${e.fid}`);
+      if (e.date || e.time) out.push(`  Date / Time : ${e.date} ${e.time}`);
+      if (e.event_type) out.push(`  Event type  : ${e.event_type}  (${a.desc})`);
+      if (e.location) out.push(`  Fault loc.  : ${fmtLoc(e.location, s)}`);
+      if (e.targets) out.push(`  Targets     : ${e.targets}`);
+      if (e.freq) out.push(`  Frequency   : ${e.freq} Hz`);
+      if (e.shot) out.push(`  Shot        : ${e.shot}`);
+      for (const x of e.extra) out.push(`  ${x}`);
+      if (e.currents.size) {
+        const parts = [...e.currents].map(([k, [pre, post]]) => `${k} ${fc(post, 0)}` + (pre !== null ? ` (pre ${fc(pre, 0)})` : ""));
+        const est = e.sequence.length || [...e.currents.values()].some(([p]) => p !== null) ? ", estimated from samples" : "";
+        out.push("  Currents    : " + parts.join("; ") + `  [A, max during fault${est}]`);
+      }
+      if (e.voltages.size) {
+        const parts = [...e.voltages].map(([k, [pre, post]]) => `${k} ${fc(pre, 2)} -> ${fc(post, 2)}`);
+        out.push("  Voltages    : " + parts.join("; ") + "  [prefault -> min during fault]");
+      }
+      const nChk = a.checks.length + a.gaps.length;
+      out.push(`  Confidence  : ${a.confidence} (${a.basis})` + (nChk ? ` - ${nChk} item(s) to check` : ""));
+      out.push("  Probable cause:");
+      for (const c of a.cause) out.push(`    - ${c}`);
+      if (nChk) { out.push("  Check before relying on this:"); for (const c of a.checks.concat(a.gaps)) out.push(`    - CHECK: ${c}`); }
+      if (showSeq && e.sequence.length) {
+        out.push("  Element sequence (cycles from start of record):");
+        const rel = e.sequence.filter((x) => elementClass(x[1]));
+        const rest = e.sequence.length - rel.length;
+        for (const [cyc, el, st] of rel.slice(0, 40))
+          out.push(`    ${fx(cyc, 2).padStart(6)}  ${el.padEnd(10)} ${st === "pre" ? "already asserted at start" : "asserted"}  (${elementClass(el)})`);
+        if (rel.length > 40) out.push(`    ... ${rel.length - 40} more`);
+        if (rest) out.push(`    (${rest} other relay word bits changed - not listed)`);
+      }
+      if (showSettings && Object.keys(s).length) {
+        const keys = ["TR", "TRCOMM", "TRSOTF", "DTT", "LL", "CTR", "PTR", "Z1MAG", "Z1P", "Z1MG", "50P1P", "50G1P", "51PP", "51GP", "ER"]
+          .filter((k) => k in s);
+        if (keys.length) {
+          const src = label ? `RDB: ${label}` : "event file";
+          const sig = JSON.stringify([src, keys.map((k) => [k, s[k]])]);
+          if (shown.has(sig)) out.push(`  Settings    : same as Event ${shown.get(sig)} (${src})`);
+          else {
+            shown.set(sig, n);
+            out.push(`  Settings context (${src}):`);
+            for (const k of keys) out.push(`    ${k} := ${s[k]}`);
+          }
+        }
+      }
+      out.push("");
+    });
+  }
+  if (showSer && ser.length) {
+    out.push("SEQUENTIAL EVENTS RECORDER (trip-related lines)", "-".repeat(60));
+    for (const r of ser) {
+      out.push(`  From ${r.source}:`);
+      let lines = r.ser_lines.filter((ln) => elementClass(splitWS(ln)[2]));
+      if (!lines.length) lines = r.ser_lines;
+      for (const ln of lines.slice(0, 80)) out.push(`    ${ln}`);
+    }
+    out.push("");
+  }
+  if (rdb.size && !ev.length) {
+    out.push("SETTINGS LOADED", "-".repeat(60));
+    for (const [label, s] of rdb) out.push(`  ${label}: TR := ${s.TR !== undefined ? s.TR : "n/a"}`);
+    out.push("");
+  }
+  if (errors.length) { out.push("FILES THAT COULD NOT BE READ", "-".repeat(60), ...errors.map((e) => "  " + e), ""); }
+  out.push("Note: automated interpretation - verify against the relay oscillography and settings.");
+  return out.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Report text -> blocks (for the formatted Word / print view)
+// ---------------------------------------------------------------------------
+const KV_RE = "^ {2}([A-Za-z][A-Za-z ./]{1,14}?)\\s*:\\s?(.*)$";
+const SUB_RE = "^ {2}(\\S.*?):\\s*$";
+const SEQ_RE = "^\\s{3,}([\\d.]+)\\s+(\\S+)\\s+(already asserted at start|asserted)\\s+\\((.*)\\)\\s*$";
+const QS_RE = "^\\s*(\\d+)\\.\\s+(.*)$";
+
+function parseReportText(text) {
+  const blocks = [], para = [];
+  let section = "", subh = "";
+  const lines = text.split("\r\n").join("\n").split("\n");
+  const flush = () => { if (para.length) { blocks.push(["para", para.join("\n")]); para.length = 0; } };
+  const add = (kind, ...payload) => {
+    flush();
+    const last = blocks[blocks.length - 1];
+    if (last && last[0] === kind && ["kv", "bullets", "mono", "meta"].includes(kind)) last[1].push(...payload[0]);
+    else if (last && kind === "table" && last[0] === "table" && JSON.stringify(last[1]) === JSON.stringify(payload[0])) last[2].push(...payload[1]);
+    else blocks.push([kind, ...payload.map((p) => (Array.isArray(p) ? p.slice() : p))]);
+  };
+  for (const ln of lines) {
+    const s = strip(ln);
+    if (!s) { flush(); continue; }
+    if (fullmatch("[=\\-]{6,}", s)) continue;
+    if (!blocks.length && !para.length && s.toUpperCase().startsWith("SEL TRIP")) { blocks.push(["title", pyTitle(s).split("Sel ").join("SEL ")]); continue; }
+    if (!section && pmatch("^(Generated|Files analyzed|Needs review)\\b", s)) { add("meta", [s]); continue; }
+    if (ln === s && fullmatch("[A-Z][A-Z /&\\-]{3,}(\\s*\\(.*\\))?", s)) {
+      section = s; subh = "";
+      add("h1", pyTitle(s).split("Ser").join("SER").split("Rdb").join("RDB"));
+      continue;
+    }
+    if (s.startsWith("Note:") && ln === s) { add("note", s); continue; }
+    if (section === "QUICK SUMMARY") {
+      const m = pmatch(QS_RE, ln);
+      if (m && m[2].split("|").length - 1 >= 3) {
+        const parts = splitMax(m[2], "|", 3).map((p) => strip(p));
+        add("table", ["#", "Date / time", "Relay", "Type", "Cause"], [[m[1]].concat(parts)]);
+        continue;
+      }
+    }
+    if (pmatch("^Event \\d+ of \\d+", ln)) { subh = ""; add("h2", s); continue; }
+    let m = pmatch(SUB_RE, ln);
+    if ((m && !pmatch(KV_RE, ln)) || (m && ["Probable", "Element", "Settings", "From"].some((p) => m[1].startsWith(p)))) {
+      subh = m[1]; add("sub", subh); continue;
+    }
+    if (ln.startsWith("    ")) {
+      if (s.startsWith("- ")) { add("bullets", [s.slice(2)]); continue; }
+      m = pmatch(SEQ_RE, ln);
+      if (m) { add("table", ["Cycle", "Element", "State", "Function"], [[m[1], m[2], m[3], m[4]]]); continue; }
+      m = pmatch("^\\s+([A-Z0-9_]+) := (.*)$", ln);
+      if (m) { add("kv", [[m[1], m[2], true]]); continue; }
+      if (subh.startsWith("From") || section.startsWith("SEQUENTIAL")) { add("mono", [s]); continue; }
+      add("note", s); continue;
+    }
+    m = pmatch(KV_RE, ln);
+    if (m && section === "EVENT DETAILS") { add("kv", [[strip(m[1]), strip(m[2]), false]]); continue; }
+    if (section.startsWith("FILES THAT") && ln.startsWith("  ")) { add("bullets", [s]); continue; }
+    para.push(s);
+  }
+  flush();
+  return blocks;
+}
+
+/** Split a cause string so TRIP / No trip / CHECK prefixes and [n to check] can be coloured. */
+function tripRuns(text) {
+  let runs = [[text, null]];
+  for (const [word, color] of [["Relay TRIPPED", "trip"], ["TRIP", "trip"], ["No trip recorded", "ok"], ["No trip", "ok"], ["CHECK:", "warn"]]) {
+    if (text.startsWith(word)) { runs = [[word, color], [text.slice(word.length), null]]; break; }
+  }
+  const lastText = runs[runs.length - 1][0];
+  const m = /\s*\[\d+ to check\]$/.exec(lastText);
+  if (m) {
+    runs[runs.length - 1] = [lastText.slice(0, m.index), runs[runs.length - 1][1]];
+    runs.push([lastText.slice(m.index), "warn"]);
+  }
+  return runs;
+}
+
+const api = {
+  loadFiles, buildReport, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
+  parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, nowStamp, fx, fc, pyTitle, elementClass,
+};
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+else root.SELCore = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+(function () {
+"use strict";
+const VERSION = "1.2.0";
+const REPO = "kefirman9000/sel-trip-analyzer";
+const HTML_ASSET = "SEL_Trip_Analyzer.html";
+const core = window.SELCore;
+const $ = (id) => document.getElementById(id);
+const out = $("out");
+const state = { files: [], empty: true, update: null };
+
+// ---------------------------------------------------------------- prefs
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("sel-trip:" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("sel-trip:" + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+};
+function setStatus(t) { $("status").textContent = t; }
+function flash(btn, text) {
+  const orig = btn.dataset.orig || btn.textContent;
+  btn.dataset.orig = orig; btn.textContent = text;
+  clearTimeout(btn._t); btn._t = setTimeout(() => { btn.textContent = orig; }, 1600);
+}
+
+// ---------------------------------------------------------------- theme
+const prefersDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+function applyTheme(dark) {
+  const root = document.documentElement;
+  root.classList.add("no-anim");               // switch colours instantly, no half-themed flash
+  root.setAttribute("data-theme", dark ? "dark" : "light");
+  $("dark").checked = dark;
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("no-anim")));
+}
+applyTheme(store.get("dark", prefersDark ? prefersDark.matches : false));
+$("dark").addEventListener("change", () => { applyTheme($("dark").checked); store.set("dark", $("dark").checked); });
+
+for (const [id, key] of [["optSeq", "seq"], ["optSet", "set"], ["optSer", "ser"]]) {
+  $(id).checked = store.get(key, true);
+  $(id).addEventListener("change", () => store.set(key, $(id).checked));
+}
+
+// ---------------------------------------------------------------- files
+const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
+const allowed = (name) => core.ALL_EXTS.includes(core.extOf(name)) && !name.toUpperCase().startsWith("README");
+
+function renderFiles() {
+  const ul = $("files");
+  ul.textContent = "";
+  if (!state.files.length) {
+    const li = document.createElement("li"); li.className = "empty"; li.textContent = "No files yet"; ul.appendChild(li);
+  }
+  state.files.forEach((f, i) => {
+    const li = document.createElement("li");
+    const n = document.createElement("span"); n.className = "fname"; n.textContent = f.name; n.title = f.path || f.name;
+    const s = document.createElement("span"); s.className = "fsize"; s.textContent = fmtSize(f.bytes.length);
+    const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Remove";
+    x.setAttribute("aria-label", "Remove " + f.name);
+    x.addEventListener("click", () => { state.files.splice(i, 1); renderFiles(); if (state.files.length) generate(); else showEmpty(); });
+    li.append(n, s, x); ul.appendChild(li);
+  });
+  $("count").textContent = state.files.length ? state.files.length + " loaded" : "none loaded";
+}
+
+async function addFiles(list) {
+  // list: [{file: File, path: string, fromFolder: bool}] already in order
+  let added = 0;
+  for (const { file, path, fromFolder } of list) {
+    if (fromFolder && !allowed(file.name)) continue;
+    const key = (path || file.name) + "|" + file.size + "|" + file.lastModified;
+    if (state.files.some((f) => f.key === key)) continue;
+    state.files.push({ key, name: file.name, path, bytes: new Uint8Array(await file.arrayBuffer()) });
+    added++;
+  }
+  renderFiles();
+  if (added) generate();
+  else if (list.length) setStatus("No new SEL files found in what was added.");
+}
+
+/** Order folder files like the desktop version: each folder's files (sorted) before its subfolders. */
+function folderOrder(a, b) {
+  const pa = a.path.split("/"), pb = b.path.split("/");
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    if (pa[i] === pb[i]) continue;
+    const aFile = i === pa.length - 1, bFile = i === pb.length - 1;
+    if (aFile !== bFile) return aFile ? -1 : 1;
+    return pa[i] < pb[i] ? -1 : 1;
+  }
+  return pa.length - pb.length;
+}
+
+function readAllEntries(reader) {
+  return new Promise((resolve) => {
+    const all = [];
+    const next = () => reader.readEntries((batch) => { if (!batch.length) resolve(all); else { all.push(...batch); next(); } }, () => resolve(all));
+    next();
+  });
+}
+async function walkEntry(entry, prefix, outList) {
+  if (entry.isFile) {
+    const file = await new Promise((res, rej) => entry.file(res, rej)).catch(() => null);
+    if (file) outList.push({ file, path: prefix + file.name, fromFolder: true });
+  } else if (entry.isDirectory) {
+    const kids = await readAllEntries(entry.createReader());
+    for (const k of kids) await walkEntry(k, prefix + entry.name + "/", outList);
+  }
+}
+
+const drop = $("drop");
+drop.addEventListener("click", () => $("pickFiles").click());
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("pickFiles").click(); } });
+let dragDepth = 0;
+document.addEventListener("dragenter", (e) => { e.preventDefault(); dragDepth++; drop.classList.add("over"); });
+document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove("over"); } });
+document.addEventListener("dragover", (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; });
+document.addEventListener("drop", async (e) => {
+  e.preventDefault(); dragDepth = 0; drop.classList.remove("over");
+  const dt = e.dataTransfer; if (!dt) return;
+  const items = dt.items ? [...dt.items].filter((i) => i.kind === "file") : [];
+  const entries = items.map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null));
+  const list = [];
+  if (entries.length && entries.every(Boolean)) {
+    for (const en of entries) {
+      const sub = [];
+      await walkEntry(en, "", sub);
+      if (en.isFile) sub.forEach((x) => { x.fromFolder = false; });  // a file dropped on its own is always read
+      else sub.sort(folderOrder);
+      list.push(...sub);
+    }
+  } else {
+    for (const f of dt.files) list.push({ file: f, path: f.name, fromFolder: false });
+  }
+  addFiles(list);
+});
+$("pickFiles").addEventListener("change", (e) => {
+  addFiles([...e.target.files].map((f) => ({ file: f, path: f.name, fromFolder: false }))); e.target.value = "";
+});
+$("pickFolder").addEventListener("change", (e) => {
+  const list = [...e.target.files].map((f) => ({ file: f, path: f.webkitRelativePath || f.name, fromFolder: true }));
+  list.sort(folderOrder); addFiles(list); e.target.value = "";
+});
+$("addFiles").addEventListener("click", () => $("pickFiles").click());
+$("addFolder").addEventListener("click", () => $("pickFolder").click());
+$("clear").addEventListener("click", () => { state.files = []; renderFiles(); showEmpty(); setStatus("Cleared"); });
+$("samples").addEventListener("click", () => {
+  const data = JSON.parse($("sample-data").textContent);
+  let added = 0;
+  for (const s of data) {
+    const key = "sample|" + s.name;
+    if (state.files.some((f) => f.key === key)) continue;
+    const bin = atob(s.b64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    state.files.push({ key, name: s.name, path: "samples/" + s.name, bytes }); added++;
+  }
+  renderFiles();
+  if (added) generate().then(() => setStatus("Loaded the sample files - these are made-up events for trying the program"));
+});
+
+// ---------------------------------------------------------------- summary
+function showEmpty() { out.textContent = ""; state.empty = true; }
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function lineHtml(ln, i) {
+  const s = ln.trim(), n = ln.length;
+  const cls = Array.from({ length: n }, () => new Set());
+  const mark = (a, b, c) => { for (let k = Math.max(0, a); k < Math.min(n, b); k++) cls[k].add(c); };
+  if (i === 0 && s.startsWith("SEL TRIP")) mark(0, n, "h1");
+  else if (/^[=\-]{10,}$/.test(s)) mark(0, n, "rule");
+  else if (ln === s && /^[A-Z][A-Z /&()\-]{3,}$/.test(s)) mark(0, n, "h2");
+  else if (/^Event \d+ of \d+/.test(ln) || s.startsWith("Probable cause")) mark(0, n, "b");
+  else { const m = /^(\s{2}[A-Za-z][A-Za-z ./]{2,12}:)/.exec(ln); if (m) mark(0, m[1].length, "lbl"); }
+  let k = ln.indexOf("CHECK:");
+  if (k >= 0) { mark(k, n, "warn"); mark(k, k + 6, "warnb"); }
+  const m2 = /\[\d+ to check\]/.exec(ln);
+  if (m2) mark(m2.index, m2.index + m2[0].length, "warnb");
+  if ((s.startsWith("Needs review:") || s.startsWith("Confidence")) && s.includes("to check")) mark(0, n, "warn");
+  for (const [word, c] of [["TRIP - ", "trip"], ["Relay TRIPPED", "trip"], ["No trip - ", "ok"], ["No trip recorded", "ok"]]) {
+    k = ln.indexOf(word);
+    if (k >= 0) mark(k, k + word.replace(/ -\s*$/, "").length, c);
+  }
+  let html = "", cur = null, buf = "";
+  const flush = () => { if (buf) html += cur ? `<span class="${cur}">${esc(buf)}</span>` : esc(buf); buf = ""; };
+  for (let j = 0; j < n; j++) {
+    let c = [...cls[j]];
+    if (c.includes("warnb")) c = c.filter((x) => x !== "warn");
+    const key = c.sort().join(" ") || null;
+    if (key !== cur) { flush(); cur = key; }
+    buf += ln[j];
+  }
+  flush();
+  return html;
+}
+
+function showReport(text) {
+  out.innerHTML = text.split("\n").map(lineHtml).join("\n");
+  state.empty = false;
+}
+const summaryText = () => (state.empty ? "" : out.innerText.replace(/\n$/, ""));
+
+let busy = false;
+async function generate() {
+  if (!state.files.length) { setStatus("Add some files first"); return; }
+  if (busy) return;
+  busy = true; setStatus("Analyzing…");
+  try {
+    const { events, rdb, errors } = await core.loadFiles(state.files.map((f) => ({ name: f.name, bytes: f.bytes })));
+    const text = core.buildReport(events, rdb, errors, state.files.length, $("comments").value,
+      { sequence: $("optSeq").checked, settings: $("optSet").checked, ser: $("optSer").checked });
+    showReport(text);
+    const n = events.filter((e) => e.kind !== "ser").length, nf = state.files.length;
+    setStatus(`${n} event${n === 1 ? "" : "s"} from ${nf} file${nf === 1 ? "" : "s"}` + (errors.length ? `  -  ${errors.length} could not be read` : ""));
+  } catch (e) {
+    setStatus("Something went wrong: " + (e && e.message ? e.message : e));
+  } finally { busy = false; }
+}
+$("generate").addEventListener("click", generate);
+
+// typing into the summary: keep it plain text
+try { out.contentEditable = "plaintext-only"; } catch (e) { /* older browser */ }
+if (out.contentEditable !== "plaintext-only") {
+  out.contentEditable = "true";
+  out.addEventListener("paste", (e) => {
+    e.preventDefault();
+    document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain"));
+  });
+}
+out.addEventListener("input", () => { state.empty = out.textContent.length === 0; });
+
+// ---------------------------------------------------------------- copy / export
+async function copyAll() {
+  if (state.empty) { setStatus("Generate a summary first"); return; }
+  const text = summaryText();
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  flash($("copy"), "Copied ✓"); setStatus("Summary copied to clipboard");
+}
+$("copy").addEventListener("click", copyAll);
+
+const C = { ink: "#1B1B1B", muted: "#666666", accent: "#0B5CAD", rule: "#D6DCE4", head: "#EAF1FA", band: "#F7F9FC",
+            trip: "#C42B1C", ok: "#0F7B0F", warn: "#A15C00" };
+function runsHtml(t) {
+  return core.tripRuns(t).map(([txt, col]) => (col ? `<b style="color:${C[col]}">${esc(txt)}</b>` : esc(txt))).join("");
+}
+function reportHtml(text) {
+  const FONT = "font-family:Calibri,'Segoe UI',Arial,sans-serif;";
+  const cell = FONT + "padding:3px 8px;border-bottom:0.5pt solid " + C.rule + ";vertical-align:top;font-size:9pt;";
+  const keep = "page-break-after:avoid;break-after:avoid;";                       // headings stay with what follows
+  const whole = (n) => (n <= 18 ? "page-break-inside:avoid;break-inside:avoid;" : "");  // short tables stay on one page
+  const parts = [];
+  for (const blk of core.parseReportText(text)) {
+    const [kind] = blk;
+    if (kind === "title") parts.push(`<h1 style="font-size:20pt;margin:0 0 2pt;color:${C.ink}">${esc(blk[1])}</h1>`);
+    else if (kind === "meta") parts.push(`<p style="font-size:8.5pt;color:${C.muted};margin:0 0 10pt">${blk[1].map(esc).join("&nbsp;&nbsp;&nbsp; ")}</p>`);
+    else if (kind === "h1") parts.push(`<h2 style="${keep}font-size:13pt;color:${C.accent};margin:14pt 0 4pt">${esc(blk[1])}</h2>`);
+    else if (kind === "h2") parts.push(`<h3 style="${keep}font-size:11pt;color:${C.ink};margin:11pt 0 4pt">${esc(blk[1])}</h3>`);
+    else if (kind === "sub") parts.push(`<h4 style="${keep}font-size:9.5pt;color:${C.muted};margin:8pt 0 3pt">${esc(blk[1])}</h4>`);
+    else if (kind === "para") parts.push(`<p style="margin:0 0 5pt">${blk[1].split("\n").map(esc).join("<br>")}</p>`);
+    else if (kind === "note") parts.push(`<p style="font-size:8.5pt;font-style:italic;color:${C.muted};margin:3pt 0">${esc(blk[1])}</p>`);
+    else if (kind === "bullets") parts.push(`<ul style="margin:2pt 0 6pt;padding-left:18pt">${blk[1].map((b) => `<li style="margin:1pt 0">${runsHtml(b)}</li>`).join("")}</ul>`);
+    else if (kind === "mono") parts.push(`<pre style="font-family:Consolas,'Courier New',monospace;font-size:8pt;margin:2pt 0 6pt">${blk[1].map(esc).join("\n")}</pre>`);
+    else if (kind === "kv") {
+      parts.push(`<table style="${whole(blk[1].length)}border-collapse:collapse;width:100%;margin:2pt 0 6pt">` + blk[1].map(([k, v, mono]) => {
+        const ff = mono ? "font-family:Consolas,'Courier New',monospace;" : "";
+        return `<tr><td width="22%" style="${cell}width:22%;font-weight:bold;color:${C.muted};${ff}">${esc(k)}</td><td style="${cell}${ff}">${esc(v)}</td></tr>`;
+      }).join("") + `</table>`);
+    } else if (kind === "table") {
+      const [, headers, rows] = blk;
+      const widths = headers[0] === "#" ? [5, 21, 15, 8, 51] : headers[0] === "Cycle" ? [10, 16, 26, 48] : headers.map(() => 100 / headers.length);
+      parts.push(`<table style="${whole(rows.length)}border-collapse:collapse;width:100%;margin:2pt 0 8pt"><tr>` +
+        headers.map((h, j) => `<th width="${widths[j]}%" style="${cell}width:${widths[j]}%;text-align:left;background:${C.head};color:${C.accent}">${esc(h)}</th>`).join("") + "</tr>" +
+        rows.map((r, i) => `<tr>` + r.map((v, j) => `<td style="${cell}${i % 2 ? "background:" + C.band + ";" : ""}">${headers[j] === "Cause" ? runsHtml(v) : esc(v)}</td>`).join("") + "</tr>").join("") +
+        `</table>`);
+    }
+  }
+  return `<div style="font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:10.5pt;color:${C.ink};line-height:1.35">${parts.join("\n")}` +
+         `<p style="font-size:7.5pt;color:${C.muted};margin-top:14pt;border-top:0.5pt solid ${C.rule};padding-top:4pt">SEL Trip Event Analyzer v${VERSION}</p></div>`;
+}
+function download(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const stamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+function exportAs(kind) {
+  closeMenu();
+  if (state.empty) { setStatus("Generate a summary first"); return; }
+  const text = summaryText(), name = `Trip summary ${stamp()}`;
+  if (kind === "txt") download(name + ".txt", new Blob([text.replace(/\n/g, "\r\n")], { type: "text/plain;charset=utf-8" }));
+  else if (kind === "doc") {
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">` +
+      `<head><meta charset="utf-8"><title>${esc(name)}</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->` +
+      `<style>@page Section1{size:8.5in 11.0in;margin:0.7in 0.8in 0.7in 0.8in;} div.Section1{page:Section1;} table{mso-table-lspace:0;mso-table-rspace:0;width:100%;} ` +
+      `body,p,li,td,th,h1,h2,h3,h4{font-family:Calibri,'Segoe UI',Arial,sans-serif;} td,th{font-size:9pt;}</style></head>` +
+      `<body><div class="Section1">${reportHtml(text)}</div></body></html>`;
+    download(name + ".doc", new Blob(["\ufeff", doc], { type: "application/msword" }));
+  } else if (kind === "pdf") {
+    $("print-root").innerHTML = reportHtml(text);
+    const t = document.title; document.title = name;
+    setTimeout(() => { window.print(); document.title = t; }, 50);
+    setStatus('In the print window, choose "Save as PDF" as the printer');
+    return;
+  }
+  flash($("exportBtn"), "Exported ✓");
+  setStatus("Saved " + name + (kind === "doc" ? ".doc" : ".txt") + " to your downloads");
+}
+function closeMenu() { $("exportMenu").classList.remove("open"); $("exportBtn").setAttribute("aria-expanded", "false"); }
+$("exportBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const open = $("exportMenu").classList.toggle("open");
+  $("exportBtn").setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".menu-wrap")) closeMenu(); });
+$("exportMenu").addEventListener("click", (e) => { const b = e.target.closest("[data-exp]"); if (b) exportAs(b.dataset.exp); });
+
+// ---------------------------------------------------------------- feedback
+$("send").addEventListener("click", () => {
+  const text = $("feedback").value.trim();
+  if (!text) { setStatus("Type your feedback first"); $("feedback").focus(); return; }
+  const summary = summaryText();
+  const exts = [...new Set(state.files.map((f) => core.extOf(f.name)))].sort();
+  let body = `${text}\n\n---\nApp version: v${VERSION} (browser)  \nFiles loaded: ${state.files.length} (${exts.join(", ") || "none"})\n`;
+  if ($("attach").checked && summary) {
+    if (!confirm("Feedback is posted as a public GitHub issue, so anyone can read the attached summary (relay names, dates, locations).\n\nAttach it anyway?")) return;
+    const room = 6000 - encodeURIComponent(body).length;
+    let clip = summary;
+    while (clip && encodeURIComponent(clip).length > room) clip = clip.slice(0, Math.floor(clip.length * 0.8));
+    body += "\n<details><summary>Summary output</summary>\n\n```\n" + clip + (clip.length < summary.length ? "\n... (truncated)" : "") + "\n```\n</details>\n";
+  }
+  const title = "Feedback: " + text.replace(/\s+/g, " ").slice(0, 70);
+  window.open(`https://github.com/${REPO}/issues/new?` + new URLSearchParams({ title, body }), "_blank", "noopener");
+  $("feedback").value = "";
+  flash($("send"), "Opened ✓");
+  setStatus("Feedback opened on GitHub - click 'Create' there to submit");
+});
+
+// ---------------------------------------------------------------- updates
+const vt = (v) => (String(v).match(/\d+/g) || ["0"]).slice(0, 4).map(Number);
+const newer = (a, b) => { const x = vt(a), y = vt(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
+const hosted = /\.github\.io$/.test(location.hostname);
+async function checkUpdates(manual) {
+  if (hosted) { if (manual) setStatus("You're using the online version, which is always the latest."); return; }
+  $("updBtn").disabled = true;
+  if (manual) setStatus("Checking GitHub for updates…");
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
+    if (!r.ok) throw new Error("GitHub said " + r.status);
+    const rel = await r.json();
+    const asset = (rel.assets || []).find((a) => a.name === HTML_ASSET);
+    if (newer(rel.tag_name, VERSION) && asset) {
+      state.update = { version: rel.tag_name.replace(/^v/i, ""), url: asset.browser_download_url, notes: (rel.body || "").trim() };
+      $("updBtn").textContent = "Update to v" + state.update.version; $("updBtn").classList.add("accent");
+      $("bannerText").textContent = `Version ${state.update.version} is available (you have ${VERSION}). Download it and use it in place of this file.`;
+      $("banner").classList.add("show");
+      setStatus("Version " + state.update.version + " is available");
+    } else if (manual) setStatus(`You're on the latest version (v${VERSION})`);
+  } catch (e) {
+    if (manual) setStatus("Couldn't reach GitHub to check for updates (" + (e.message || e) + ")");
+  } finally { $("updBtn").disabled = false; }
+}
+function getUpdate() { if (state.update) window.open(state.update.url, "_blank", "noopener"); }
+$("updBtn").addEventListener("click", () => (state.update ? getUpdate() : checkUpdates(true)));
+$("bannerGet").addEventListener("click", getUpdate);
+$("bannerClose").addEventListener("click", () => $("banner").classList.remove("show"));
+if (hosted) { $("updBtn").style.display = "none"; }
+else if (navigator.onLine !== false) setTimeout(() => checkUpdates(false), 1200);
+
+// ---------------------------------------------------------------- help + keys
+$("helpBtn").addEventListener("click", () => $("help").showModal());
+$("helpClose").addEventListener("click", () => $("help").close());
+$("help").addEventListener("click", (e) => { if (e.target === $("help")) $("help").close(); });
+document.addEventListener("keydown", (e) => {
+  const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (e.key === "Escape") closeMenu();
+  else if (e.key === "F1") { e.preventDefault(); $("help").showModal(); }
+  else if (e.key === "F5" || (ctrl && e.key === "Enter")) { e.preventDefault(); generate(); }
+  else if (ctrl && e.shiftKey && k === "c") { e.preventDefault(); copyAll(); }
+  else if (ctrl && !e.shiftKey && k === "o") { e.preventDefault(); $("pickFiles").click(); }
+  else if (ctrl && !e.shiftKey && k === "s") { e.preventDefault(); exportAs("doc"); }
+  else if (ctrl && !e.shiftKey && k === "p") { e.preventDefault(); exportAs("pdf"); }
+  else if (ctrl && !e.shiftKey && k === "d") { e.preventDefault(); applyTheme(!$("dark").checked); store.set("dark", $("dark").checked); }
+});
+
+renderFiles();
+showEmpty();
+// test hook
+window.__selApp = { state, generate, summaryText, reportHtml, exportAs };
+})();
+</script>
+</body>
+</html>
