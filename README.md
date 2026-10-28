@@ -288,6 +288,28 @@ where, and is it getting worse?*
   recurring issue's events with ◀ ▶.
 - **Work log**: note tree trimming, breaker tests, setting changes; they're
   marked on the location's chart so you can see whether it helped.
+- **What changed**: after each import (or since you last clicked *mark as
+  seen*), a list at the top of the Overview: new recurring issues, hot spots
+  that grew, locations that moved up the ranking, trends that turned, breakers
+  that started slowing, and the new events at each location.
+- **Breaker health**: the time from trip to breaker open for every record with
+  element data (`.CEV`, COMTRADE), plotted over time with its trend. A breaker
+  rising 0.5+ cycles a year is flagged *getting slower* (with when it will pass
+  5 cycles) before it's actually slow. Also the trip operations and the fault
+  current interrupted (Σ kA and Σ kA² for contact wear).
+- **Weather**: set where each station is (or it uses the locations from the
+  Trip Analyzer) and it looks up the weather at the hour of every trip, one
+  request per station. Charts can be coloured storm / calm; trips in storms
+  count less in the score; and recurring faults say whether they happen in
+  storms (exposed line) or calm weather (equipment, animals, vegetation).
+  New trips are looked up automatically.
+- **Watch a folder** (Chrome / Edge): pick your relay download folder and new
+  files are added as they arrive while the page is open; it carries on after a
+  reload (the browser may ask to allow the folder again).
+- **Open in Trip Analyzer**: any event opens in the Trip Analyzer with its
+  file, its COMTRADE pair and the relay's settings, straight onto the
+  Waveforms page for a `.CEV` or COMTRADE record. The Analyzer has a *Trip
+  History* button back.
 - **Exports**: historical report as **Word** (with charts) or **PDF**, **text**,
   **events CSV** and **ranked locations CSV**, for everything, one station or
   one relay. **Back up / restore** the whole history as one `.json` to move it
