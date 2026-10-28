@@ -218,7 +218,8 @@ input[type="text"], .evlist input, #wPins input {
 .verdict li.warnli, #wFlags li { color: var(--warn); }
 #wFlags { margin-top: 6px; }
 .wv-main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; align-items: start; }
-.wv-side { display: flex; flex-direction: column; gap: 12px; }
+.wv-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.wv-side .card { overflow-x: auto; }
 .toolrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .toolrow .grow { flex: 1; }
 .toolrow button { min-height: 28px; padding: 2px 10px; }
@@ -283,7 +284,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
   .grid, .feedback { grid-template-columns: 1fr; }
   .feedback .side { flex-direction: row; align-items: center; }
   #out { padding: 12px; font-size: 12px; }
-  .wv-main, .wv-lower { grid-template-columns: 1fr; }
+  .wv-main, .wv-lower { grid-template-columns: minmax(0, 1fr); }
   .evlist li { grid-template-columns: 28px 1fr; }
   .evlist li > input, .evlist li > button { grid-column: 2; }
   .wx-relays { grid-template-columns: auto 1fr auto; }
