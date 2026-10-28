@@ -149,6 +149,7 @@ function recordFrom(it, pathOf) {
     cause: a.cause.slice(), checks: a.checks.slice(), gaps: a.gaps.slice(),
     evidence: (a.evidence || []).map((x) => x.text), confidence: a.confidence, basis: a.basis,
     seq: e.sequence.filter((x) => x[2] === "asserted").slice(0, 24).map(([cy, el]) => [+cy.toFixed(2), el]),
+    waveId: e.waveRef ? e.waveRef.id : e.wave ? it.id : "",
     sources: [{ name: src.name, path: src.path, hash: src.hash || "" }],
     pair: it.pair ? core.relayKey(it.pair.other.e) : "", incident: it.incident ? it.incident.items.length : 0,
   };
@@ -199,8 +200,20 @@ async function analyzeFiles(files) {
     const src = pathOf(it.e.source);
     if (r && !r.sources.some((s) => s.path === src.path)) r.sources.push({ name: src.name, path: src.path, hash: src.hash });
   }
+  // which settings files describe which relay, so an event can be sent to the Trip Analyzer with its settings
+  const settingsFiles = {};
+  for (const [name, f] of byKey) {
+    const ext = core.extOf(f.name);
+    let rids = [];
+    try {
+      if (core.SETTINGS_EXTS.includes(ext)) rids = [...(await core.parseRdb(f.bytes, f.name))].map(([k, v]) => v.RID || k);
+      else if (core.SETTINGS_TEXT_EXTS.includes(ext)) { const st = core.settingsFromText(core.readText(f.bytes), f.name); if (st) rids = [st[1].RID || st[0]]; }
+    } catch (e) { /* not readable: already reported */ }
+    for (const rid of rids) (settingsFiles[upper(rid)] = settingsFiles[upper(rid)] || []).push({ name: f.name, path: f.path || f.name, hash: f.hash || "" });
+  }
+  for (const r of records) r.settingsFiles = settingsFiles[upper(r.relay)] || [];
   const settings = [...rdb].map(([label, s]) => [label, { RID: s.RID || "", TID: s.TID || "", SID: s.SID || "", LL: s.LL || "", file: s.__file__ || "" }]);
-  return { records, errors: errors.map((x) => x.replace(/#\d+:/, ":")), settings };
+  return { records, errors: errors.map((x) => x.replace(/#\d+:/, ":")), settings, settingsFiles };
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +232,10 @@ const DEFAULTS = {
   halfLifeDays: 365,   // older events count for less in the score
   sequenceMinutes: 10, // reports on one relay this close together are one occasion (a reclose sequence)
   from: "", to: "",    // limit everything to this date range
+  stormWeight: 0.6,    // a trip in a storm counts this much in the score (weather, not the line)
+  slowCycles: 5,       // breaker clearing slower than this is "slow"
+  slowingPerYear: 0.5, // clearing time rising this many cycles a year (or more) is "slowing"
+  weather: {},         // record id -> {text, kinds: ["lightning", "wind", ...] or ["calm"], location}
   overrides: {},       // relay -> station
   worklog: {},         // relay -> [{date, text}]
 };
@@ -325,6 +342,10 @@ function buildModel(allRecords, cfgIn) {
     r.stationName = st.name; r.stationFrom2 = st.from;
   }
 
+  for (const r of records) {
+    const w = cfg.weather[r.id] || null;
+    r.wx = w; r.storm = w ? !w.kinds.includes("calm") : null;
+  }
   const dated = records.filter((r) => r.ms !== null);
   const latest = dated.length ? dated[dated.length - 1].ms : Date.now();
   const anchor = cfg.asOf ? Date.parse(cfg.asOf + "T23:59:59.999Z") : latest;
@@ -351,6 +372,8 @@ function buildModel(allRecords, cfgIn) {
     }
     occs.forEach((o, i) => {
       o.n = i + 1; o.id = o.recs[0].id; o.tripped = o.recs.some((r) => r.tripped);
+      const wx = o.recs.find((r) => r.wx);
+      o.storm = wx ? wx.storm : null;
       o.issues = new Map();
       for (const r of o.recs) { r.occ = `${L.key}#${o.n}`; r.occSize = o.recs.length; for (const x of r.issues) if (!o.issues.has(x.key)) o.issues.set(x.key, r); }
     });
@@ -413,22 +436,44 @@ function buildModel(allRecords, cfgIn) {
     hot.push(...L.hotspots);
     L.worklog = (cfg.worklog[L.relay] || cfg.worklog[L.key] || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
 
+    // ---- weather
+    const known = occs.filter((o) => o.tripped && o.storm !== null);
+    const kinds = {};
+    for (const o of known) { const w = o.recs.find((r) => r.wx).wx; for (const k of w.kinds) if (k !== "calm") kinds[k] = (kinds[k] || 0) + 1; }
+    L.wx = { known: known.length, storm: known.filter((o) => o.storm).length, calm: known.filter((o) => !o.storm).length, kinds, unknown: L.tripOccasions - known.length };
+    for (const x of L.recurring) {
+      if (ISSUE[x.key].group !== "faults" && x.key !== "lockout") continue;   // weather explains faults, not breaker or scheme problems
+      const os = occs.filter((o) => o.issues.has(x.key) && o.storm !== null);
+      if (os.length >= 3) {
+        const calm = os.filter((o) => !o.storm).length;
+        x.weather = { known: os.length, calm, storm: os.length - calm };
+        if (calm / os.length >= 0.7) x.weatherNote = `${calm} of ${os.length} happened in calm weather, so storms don't explain them: look for equipment, animals or vegetation growing into the line.`;
+        else if (calm / os.length <= 0.3) x.weatherNote = `${os.length - calm} of ${os.length} happened in storms: the line may be exposed (trees, lightning protection, conductor spacing).`;
+      }
+    }
+
+    // ---- breaker health: how fast it clears, and how much current it has interrupted
+    L.breaker = breakerHealth(L, occs, cfg, anchor);
+
     // ---- score
     const why = [];
     let base = 0, extra = 0;
     for (const o of occs) {
       if (o.ms === null) continue;
       const age = Math.max(0, (anchor - o.ms) / DAY);
-      const f = Math.pow(0.5, age / cfg.halfLifeDays);
+      const f = Math.pow(0.5, age / cfg.halfLifeDays) * (o.storm ? cfg.stormWeight : 1);
       base += (o.tripped ? 1 : 0.25) * f;
       for (const key of o.issues.keys()) extra += ISSUE[key].weight * f;
     }
-    if (base) why.push([`${plural(L.tripOccasions, "trip")}${L.trips > L.tripOccasions ? ` (${L.trips} operations counting recloses)` : ""}${L.occasions > L.tripOccasions ? `, ${L.occasions - L.tripOccasions} other events` : ""}; older ones count less`, base]);
+    const stormy = occs.filter((o) => o.storm).length;
+    if (base) why.push([`${plural(L.tripOccasions, "trip")}${L.trips > L.tripOccasions ? ` (${L.trips} operations counting recloses)` : ""}${L.occasions > L.tripOccasions ? `, ${L.occasions - L.tripOccasions} other events` : ""}; older ones count less${stormy ? `, ${stormy} in storms count ${Math.round(cfg.stormWeight * 100)}%` : ""}`, base]);
     if (extra) why.push(["Severity of the issues found", extra]);
     const rec = 2 * L.recurring.length, hs = 1.5 * L.hotspots.length;
     if (rec) why.push([`${plural(L.recurring.length, "recurring issue")}`, rec]);
     if (hs) why.push([`${plural(L.hotspots.length, "fault hot spot")}`, hs]);
-    let score = base + extra + rec + hs;
+    const bk = L.breaker && L.breaker.slowing ? 2 : 0;
+    if (bk) why.push([`Breaker clearing time rising (${L.breaker.slope.toFixed(1)} cycles a year)`, bk]);
+    let score = base + extra + rec + hs + bk;
     const mult = L.trend.dir === "up" ? 1.3 : L.trend.dir === "down" ? 0.85 : 1;
     if (mult !== 1) { why.push([`Trend ${L.trend.label.toLowerCase()} (${L.trend.text})`, score * (mult - 1)]); score *= mult; }
     L.score = +score.toFixed(1);
@@ -478,9 +523,13 @@ function buildModel(allRecords, cfgIn) {
   }
   recurring.sort((a, b) => b.inWindow - a.inWindow || (b.last || 0) - (a.last || 0));
   hot.sort((a, b) => b.n - a.n);
+  const breakers = ranked.filter((L) => L.breaker).map((L) => L.breaker)
+    .sort((a, b) => (b.slowing - a.slowing) || (b.latest - a.latest));
+  const wxAll = { known: 0, storm: 0, calm: 0, kinds: {} };
+  for (const L of ranked) { wxAll.known += L.wx.known; wxAll.storm += L.wx.storm; wxAll.calm += L.wx.calm; for (const [k, n] of Object.entries(L.wx.kinds)) wxAll.kinds[k] = (wxAll.kinds[k] || 0) + n; }
   return {
     cfg, anchor, first, latest, months, byMonth, records, relays: ranked, stations: stationList, issues: issueStats,
-    recurring, hotspots: hot, byId: new Map(records.map((r) => [r.id, r])),
+    recurring, hotspots: hot, breakers, wx: wxAll, byId: new Map(records.map((r) => [r.id, r])),
     totals: { events: records.length, trips: tripsAll.length, faults: records.filter((r) => r.fault).length,
               review: records.filter((r) => r.checks.length).length, relays: ranked.length, stations: stationList.length,
               undated: records.filter((r) => r.ms === null).length,
@@ -490,12 +539,92 @@ function buildModel(allRecords, cfgIn) {
 }
 
 // ---------------------------------------------------------------------------
+// Breaker health
+// ---------------------------------------------------------------------------
+/** Least-squares slope (per x unit) and intercept. */
+function fitLine(pts) {
+  const n = pts.length;
+  if (n < 2) return null;
+  const mx = pts.reduce((a, p) => a + p[0], 0) / n, my = pts.reduce((a, p) => a + p[1], 0) / n;
+  let sxx = 0, sxy = 0;
+  for (const [x, y] of pts) { sxx += (x - mx) ** 2; sxy += (x - mx) * (y - my); }
+  if (!sxx) return null;
+  const slope = sxy / sxx;
+  return { slope, at: (x) => my + slope * (x - mx) };
+}
+/** Clearing times (trip to breaker open, from element data) and fault current interrupted, for one relay's breaker. */
+function breakerHealth(L, occs, cfg, anchor) {
+  const ops = L.records.filter((r) => r.tripped && r.ms !== null);
+  const pts = L.records.filter((r) => r.clearCyc !== null && r.ms !== null).map((r) => ({ ms: r.ms, cyc: r.clearCyc, id: r.id }));
+  const amps = (r) => Math.max(0, ...["A", "B", "C"].map((p) => r.amps[p] || 0), r.amps.F || 0);
+  let kA = 0, kA2 = 0;
+  for (const r of ops) { const a = amps(r) / 1000; kA += a; kA2 += a * a; }
+  if (!pts.length && !ops.length) return null;
+  const out = { relayKey: L.key, relay: L.relay, station: L.station, ops: ops.length, kA: +kA.toFixed(1), kA2: +kA2.toFixed(1),
+                points: pts, n: pts.length, latest: pts.length ? pts[pts.length - 1].cyc : null, first: pts.length ? pts[0].cyc : null,
+                max: pts.length ? Math.max(...pts.map((p) => p.cyc)) : null, slow: pts.filter((p) => p.cyc > cfg.slowCycles).length,
+                slope: 0, slowing: false, reach: null, fit: null, limit: cfg.slowCycles };
+  if (pts.length >= 3) {
+    const t0 = pts[0].ms;
+    const f = fitLine(pts.map((p) => [(p.ms - t0) / (365.25 * DAY), p.cyc]));
+    if (f) {
+      out.slope = f.slope;
+      out.fit = { from: [pts[0].ms, f.at(0)], to: [pts[pts.length - 1].ms, f.at((pts[pts.length - 1].ms - t0) / (365.25 * DAY))] };
+      out.slowing = f.slope >= cfg.slowingPerYear && out.latest - out.first >= 1;
+      const nowY = (anchor - t0) / (365.25 * DAY), nowV = f.at(nowY);
+      if (out.slowing && nowV < cfg.slowCycles) out.reach = Math.round(anchor + ((cfg.slowCycles - nowV) / f.slope) * 365.25 * DAY);
+    }
+  }
+  out.verdict = !pts.length ? "No clearing times (needs .CEV or COMTRADE with the breaker status)"
+    : out.slowing ? (out.latest > cfg.slowCycles ? `Slow and getting slower: ${out.first} → ${out.latest} cycles` : `Getting slower: ${out.first} → ${out.latest} cycles; ${out.reach ? "reaches " + cfg.slowCycles + " cycles around " + isoDate(out.reach) : ""}`)
+    : out.slow ? `${plural(out.slow, "slow opening")} (over ${cfg.slowCycles} cycles), not a steady trend` : `Normal: latest ${out.latest} cycles`;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// What changed: the model now against the model built from the events seen before
+// ---------------------------------------------------------------------------
+/** before, after: models; newIds: ids of events added since. -> [{kind, relayKey, relay, station, text, ids, level}] */
+function changes(before, after, newIds) {
+  const out = [];
+  const B = new Map(before.relays.map((L) => [L.key, L])), fresh = new Set(newIds);
+  const add = (L, kind, text, ids, level) => out.push({ kind, relayKey: L.key, relay: L.relay, station: L.station, text, ids: ids || [], level: level || 1 });
+  for (const L of after.relays) {
+    const b = B.get(L.key);
+    const mine = L.records.filter((r) => fresh.has(r.id));
+    if (!b) { add(L, "new", `New location: ${plural(L.events, "event")}${L.recurring.length ? `, ${plural(L.recurring.length, "recurring issue")} already` : ""}`, mine.map((r) => r.id), 2); }
+    else if (mine.length) add(L, "events", `${plural(mine.length, "new event")}${mine.filter((r) => r.tripped).length ? ` (${mine.filter((r) => r.tripped).length} trips)` : ""}, latest ${isoDate(Math.max(...mine.map((r) => r.ms || 0)))}`, mine.map((r) => r.id), 0);
+    if (!b) continue;
+    for (const x of L.recurring) {
+      const was = b.recurring.find((y) => y.key === x.key);
+      if (!was) add(L, "recurring", `Now recurring: ${x.label.toLowerCase()} (${x.inWindow} in ${x.windowDays} days)`, x.allIds, 3);
+      else if (x.inWindow > was.inWindow) add(L, "recurring", `${x.label} more often: ${was.inWindow} → ${x.inWindow} in ${x.windowDays} days`, x.allIds, 2);
+    }
+    for (const y of b.recurring) if (!L.recurring.some((x) => x.key === y.key)) add(L, "eased", `No longer recurring: ${y.label.toLowerCase()}`, [], 0);
+    for (const h of L.hotspots) {
+      const was = b.hotspots.find((g) => Math.abs(g.at - h.at) <= Math.max(h.tol, g.tol));
+      if (!was) add(L, "hotspot", `New fault hot spot: ${h.n} faults at ${fx(h.from, 2)} to ${fx(h.to, 2)}`, h.ids, 3);
+      else if (h.n > was.n) add(L, "hotspot", `Hot spot at ~${fx(h.at, 2)} grew: ${was.n} → ${h.n} faults`, h.ids, 2);
+    }
+    if (L.trend.dir !== b.trend.dir && (L.trend.dir === "up" || L.trend.dir === "down"))
+      add(L, "trend", `Trips now ${L.trend.label.toLowerCase()} (${trendWords(L.trend)})`, [], L.trend.dir === "up" ? 2 : 0);
+    if (L.breaker && L.breaker.slowing && !(b.breaker && b.breaker.slowing)) add(L, "breaker", `Breaker getting slower: ${L.breaker.first} → ${L.breaker.latest} cycles`, L.breaker.points.map((p) => p.id), 3);
+    else if (L.breaker && b.breaker && L.breaker.latest !== null && b.breaker.latest !== null && L.breaker.latest > b.breaker.latest + 0.5 && L.breaker.latest > L.limit)
+      add(L, "breaker", `Breaker cleared slower: ${b.breaker.latest} → ${L.breaker.latest} cycles`, L.breaker.points.map((p) => p.id), 2);
+    if (b.rank - L.rank >= 2 || (L.rank <= 3 && b.rank > 3)) add(L, "rank", `Moved up to #${L.rank} (was #${b.rank})`, [], L.rank <= 3 ? 2 : 1);
+  }
+  const order = { new: 0, recurring: 1, hotspot: 2, breaker: 3, trend: 4, rank: 5, events: 6, eased: 7 };
+  return out.sort((a, b) => b.level - a.level || order[a.kind] - order[b.kind] || (a.relay < b.relay ? -1 : 1));
+}
+
+// ---------------------------------------------------------------------------
 // Report: Word blocks (docx.js), text and CSV
 // ---------------------------------------------------------------------------
 const fmtDate = (ms) => (ms === null || ms === undefined ? "-" : isoDate(ms));
 const fmtWhen = (r) => (r.ms === null ? `${r.rawDate} ${r.rawTime}`.trim() || "(no date)" : `${r.date} ${r.time.slice(0, 8)}`);
 const arrow = (t) => (t.dir === "up" ? "▲ " : t.dir === "down" ? "▼ " : "") + t.label;
 const issueList = (r) => r.issues.filter((x) => ISSUE[x.key].group !== "data").map((x) => ISSUE[x.key].label + (x.detail && !FAULT_KEYS[x.detail] ? ` (${x.detail})` : "")).join("; ");
+const WX_LABEL = { lightning: "thunderstorm", wind: "wind", ice: "ice/snow", rain: "heavy rain", heat: "heat" };
 const trendWords = (t) => (t.days >= 360 ? `${t.recent} in the last year vs ${t.prev} the year before` : `${t.recent} in the last ${t.days} days vs ${t.prev} before`);
 const whereText = (L) => `${L.relay}${L.station && L.station !== "Unassigned" ? ` (${L.station})` : ""}`;
 
@@ -511,7 +640,7 @@ function scoped(model, opts) {
 /** opts: {station, relay, sections: {overview, ranking, recurring, hotspots, trends, matrix, details, events, worklog}, top, notes} */
 function reportBlocks(model, opts) {
   opts = opts || {};
-  const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
+  const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, breakers: true, weather: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
   const S = scoped(model, opts);
   const recs = S.records;
   const dated = recs.filter((r) => r.ms !== null);
@@ -532,7 +661,8 @@ function reportBlocks(model, opts) {
       ["Recurring issues", S.recurring.length ? `${S.recurring.length} at ${plural(new Set(S.recurring.map((x) => x.relayKey)).size, "location")}` : "none"],
       ["Fault hot spots", S.hotspots.length ? `${S.hotspots.length}` : "none"],
       ["Needs review", `${recs.filter((r) => r.checks.length).length} events have items to check`],
-    ]]);
+    ].concat(S.relays.some((L) => L.breaker && L.breaker.slowing) ? [["Breakers", `getting slower at ${S.relays.filter((L) => L.breaker && L.breaker.slowing).map(whereText).join(", ")}`]] : [])
+     .concat(model.wx.known ? [["Weather", `${S.relays.reduce((a, L) => a + L.wx.storm, 0)} of ${S.relays.reduce((a, L) => a + L.wx.known, 0)} trips with weather were in storms`]] : [])]);
     const up = S.relays.filter((L) => L.trend.dir === "up"), down = S.relays.filter((L) => L.trend.dir === "down");
     if (up.length) blocks.push(["para", `Trips are increasing at ${up.map(whereText).join(", ")}.`]);
     if (down.length) blocks.push(["para", `Trips are decreasing at ${down.map(whereText).join(", ")}.`]);
@@ -575,6 +705,27 @@ function reportBlocks(model, opts) {
     else blocks.push(["para", "No location's trip count changed much."]);
     if (issueRows.length) { blocks.push(["h2", "By issue"]); blocks.push(["table", ["Location", "Issue", "Trend", "Compared"], issueRows, [24, 30, 16, 30]]); }
   }
+  if (sec.breakers !== false) {
+    const bks = S.relays.map((L) => L.breaker).filter((b) => b && b.n);
+    if (bks.length) {
+      blocks.push(["h1", "Breaker health"]);
+      blocks.push(["note", `Clearing time = trip to breaker open, from records with element data (.CEV or COMTRADE). Over ${model.cfg.slowCycles} cycles is slow; rising ${model.cfg.slowingPerYear}+ cycles a year is "getting slower".`]);
+      blocks.push(["table", ["Location", "Openings timed", "First", "Latest", "Change a year", "Operations", "kA interrupted", "Verdict"],
+        bks.sort((a, b) => b.slowing - a.slowing || b.latest - a.latest).map((b) => [whereText(b), String(b.n), `${b.first} cyc`, `${b.latest} cyc`, b.n >= 3 ? `${b.slope >= 0 ? "+" : ""}${b.slope.toFixed(2)} cyc` : "-",
+          String(b.ops), String(b.kA), b.verdict]), [16, 8, 8, 8, 10, 10, 10, 30]]);
+    }
+  }
+  if (sec.weather !== false && model.wx.known) {
+    const rows = S.relays.filter((L) => L.wx.known).map((L) => [whereText(L), String(L.wx.known), String(L.wx.storm), String(L.wx.calm),
+      L.wx.known ? `${Math.round(100 * L.wx.storm / L.wx.known)}%` : "-", topEntries(L.wx.kinds, 4).map(([k, n]) => `${WX_LABEL[k] || k} ${n}`).join(", ") || "-"]);
+    if (rows.length) {
+      blocks.push(["h1", "Weather"]);
+      blocks.push(["note", "Weather in the station's area at the hour of each trip (Open-Meteo). A storm makes weather a likely cause; repeat trips in calm weather point to the line itself."]);
+      blocks.push(["table", ["Location", "Trips with weather", "In storms", "Calm", "Storm share", "What kind"], rows, [26, 12, 10, 10, 10, 32]]);
+      const calmRec = S.recurring.filter((x) => x.weatherNote);
+      if (calmRec.length) blocks.push(["bullets", calmRec.map((x) => `${whereText(x)}, ${x.label.toLowerCase()}: ${x.weatherNote}`)]);
+    }
+  }
   if (sec.matrix && S.relays.length) {
     const keys = ISSUES.filter((I) => I.group !== "data" && S.relays.some((L) => L.counts[I.key])).map((I) => I.key);
     if (keys.length) {
@@ -594,7 +745,9 @@ function reportBlocks(model, opts) {
       const img = opts.chart ? opts.chart("relay", L) : null;
       if (img) blocks.push(img);
       const bl = [];
-      for (const x of L.recurring) bl.push(`Recurring: ${x.label}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.advice}`);
+      for (const x of L.recurring) bl.push(`Recurring: ${x.label}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.weatherNote ? x.weatherNote + " " : ""}${x.advice}`);
+      if (L.breaker && L.breaker.n) bl.push(`Breaker: ${L.breaker.verdict}. ${L.breaker.ops} operations, ${L.breaker.kA} kA interrupted.`);
+      if (L.wx.known) bl.push(`Weather: ${L.wx.storm} of ${L.wx.known} trips in storms${Object.keys(L.wx.kinds).length ? ` (${topEntries(L.wx.kinds, 4).map(([k, n]) => `${WX_LABEL[k] || k} ${n}`).join(", ")})` : ""}.`);
       for (const h of L.hotspots) bl.push(`Hot spot: ${h.n} faults at ${fx(h.from, 2)} to ${fx(h.to, 2)}${h.pct !== null ? ` (~${h.pct}% of the line)` : ""}, ${fmtDate(h.first)} to ${fmtDate(h.last)}.`);
       for (const [key, n] of topEntries(L.counts, 12)) if (!L.recurring.some((x) => x.key === key)) bl.push(`${ISSUE[key].label}: ${n}`);
       const ph = ["A", "B", "C"].filter((p) => L.phases[p]).map((p) => `phase ${p} ${L.phases[p]}`).concat(L.phases.G ? [`ground ${L.phases.G}`] : []);
@@ -638,25 +791,26 @@ function blocksToText(blocks) {
 const csvField = (v) => { v = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const csv = (rows) => rows.map((r) => r.map(csvField).join(",")).join("\r\n") + "\r\n";
 const EVENT_COLUMNS = ["Date", "Time", "Station", "Relay", "Event type", "Tripped", "Fault", "Phases", "Location", "% of line",
-  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Source files"];
+  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Source files"];
 function eventsCsv(model, opts) {
   const S = scoped(model, opts || {});
   const recurIds = new Set(S.recurring.flatMap((x) => x.allIds)), hotIds = new Set(S.hotspots.flatMap((h) => h.ids));
   return csv([EVENT_COLUMNS].concat(S.records.map((r) => [r.date || r.rawDate, r.time || r.rawTime, r.stationName, r.relay, r.et, r.tripped ? "Yes" : "No",
     r.fault ? "Yes" : "No", r.phases, r.loc, r.locPct ?? "", r.clearCyc ?? "", issueList(r), r.short, r.checks.join(" | "), r.confidence,
-    recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.sources.map((s) => s.path).join(" | ")])));
+    recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.wx ? r.wx.text : "", r.sources.map((s) => s.path).join(" | ")])));
 }
 const LOCATION_COLUMNS = ["Rank", "Station", "Relay", "Score", "Events", "Trips", "Faults", "First event", "Last trip", "Trend",
-  "Trips recent", "Trips before", "Recurring issues", "Hot spots", "Needs review", "Main issues"];
+  "Trips recent", "Trips before", "Recurring issues", "Hot spots", "Needs review", "Main issues", "Trips in storms", "Breaker latest (cycles)", "Breaker change a year", "kA interrupted"];
 function locationsCsv(model, opts) {
   const S = scoped(model, opts || {});
   return csv([LOCATION_COLUMNS].concat(S.relays.map((L) => [L.rank, L.station, L.relay, L.score, L.events, L.trips, L.faults, fmtDate(L.first), fmtDate(L.lastTrip),
     L.trend.label, L.trend.recent, L.trend.prev, L.recurring.map((x) => `${x.label} (${x.inWindow} in ${x.windowDays} d)`).join("; "),
-    L.hotspots.map((h) => `${h.n} at ${fx(h.from, 2)}-${fx(h.to, 2)}`).join("; "), L.review, L.top.map((t) => `${t.label} ${t.n}`).join("; ")])));
+    L.hotspots.map((h) => `${h.n} at ${fx(h.from, 2)}-${fx(h.to, 2)}`).join("; "), L.review, L.top.map((t) => `${t.label} ${t.n}`).join("; "),
+    L.wx.known ? `${L.wx.storm} of ${L.wx.known}` : "", L.breaker && L.breaker.latest !== null ? L.breaker.latest : "", L.breaker && L.breaker.n >= 3 ? L.breaker.slope.toFixed(2) : "", L.breaker ? L.breaker.kA : ""])));
 }
 
 const api = {
-  analyzeFiles, buildModel, mergeRecords, combineTrends, issuesFor, trendOf, bestWindow, hotSpots, monthRange,
+  analyzeFiles, buildModel, mergeRecords, combineTrends, changes, breakerHealth, fitLine, WX_LABEL, issuesFor, trendOf, bestWindow, hotSpots, monthRange,
   reportBlocks, blocksToText, eventsCsv, locationsCsv, EVENT_COLUMNS, LOCATION_COLUMNS,
   ISSUES, ISSUE, GROUPS, DEFAULTS, trendWords, isoDate, monthKey, fmtWhen, issueList, whereText, arrow,
 };

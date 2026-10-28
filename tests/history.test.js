@@ -101,3 +101,47 @@ test("station overrides and the existing samples still work", async () => {
   assert.deepEqual(old.errors, []);
   assert.equal(old.records.length, 14);
 });
+
+test("breaker health: Line 5 is getting slower, the other end isn't", async () => {
+  const { m } = await model();
+  const b = relay(m, "LINE 5").breaker, hill = relay(m, "LINE 5 HILL").breaker;
+  assert.equal(b.n, 6);
+  assert.ok(b.slowing && b.slope > 1 && b.latest === 7.75);
+  assert.ok(!hill.slowing && hill.latest === 2.5);
+  assert.ok(relay(m, "LINE 5").why.some((w) => /Breaker clearing time rising/.test(w.text)));
+  assert.equal(relay(m, "FEEDER 12").breaker.n, 0, "no clearing times from .SUM files");
+  assert.ok(H.blocksToText(H.reportBlocks(m, {})).includes("BREAKER HEALTH"));
+});
+
+test("weather: storms lower the score and recurring faults get a weather verdict", async () => {
+  const { r, m } = await model();
+  const wx = {};
+  for (const x of r.records) wx[x.id] = x.relay === "FEEDER 8" ? { text: "thunderstorm", kinds: ["lightning"] } : { text: "clear", kinds: ["calm"] };
+  const w = H.buildModel(r.records, { weather: wx });
+  assert.ok(relay(w, "FEEDER 8").score < relay(m, "FEEDER 8").score);
+  assert.equal(relay(w, "FEEDER 12").score, relay(m, "FEEDER 12").score);
+  assert.match(relay(w, "FEEDER 12").recurring.find((x) => x.key === "f_slg").weatherNote, /calm weather/);
+  assert.match(relay(w, "FEEDER 8").recurring.find((x) => x.key === "f_slg").weatherNote, /storms/);
+  assert.ok(!relay(w, "LINE 5").recurring.find((x) => x.key === "slow_breaker").weatherNote, "no weather verdict for a breaker problem");
+  assert.ok(H.blocksToText(H.reportBlocks(w, {})).includes("WEATHER"));
+});
+
+test("what changed after adding the last two months", async () => {
+  const { r, m } = await model();
+  const before = H.buildModel(r.records.filter((x) => x.date < "2026-09-01"), {});
+  const ch = H.changes(before, m, r.records.filter((x) => x.date >= "2026-09-01").map((x) => x.id));
+  const has = (relayName, kind, re) => ch.some((c) => c.relay === relayName && c.kind === kind && re.test(c.text));
+  assert.ok(has("FEEDER 12", "hotspot", /grew/));
+  assert.ok(has("FEEDER 12", "recurring", /more often/));
+  assert.ok(has("LINE 5", "recurring", /slow breaker/));
+  assert.ok(has("FEEDER 12", "events", /5 new events/));
+  assert.ok(!ch.some((c) => c.relay === "FEEDER 3"), "nothing new at Feeder 3");
+  assert.deepEqual(H.changes(m, m, []), []);
+});
+
+test("events carry what the Trip Analyzer needs", async () => {
+  const { r } = await model();
+  const cev = r.records.find((x) => x.relay === "LINE 5");
+  assert.equal(cev.waveId, cev.id);
+  assert.deepEqual(cev.settingsFiles.map((s) => s.name), ["LINE5_settings.set"]);
+});

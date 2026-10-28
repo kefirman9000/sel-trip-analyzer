@@ -18,7 +18,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def main():
     out_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "SEL_Trip_History.html")
     with open(os.path.join(ROOT, "sel_trip_analyzer.py"), encoding="utf-8") as f:
-        version = re.search(r'^VERSION = "([^"]+)"', f.read(), re.M).group(1)
+        py = f.read()
+    version = re.search(r'^VERSION = "([^"]+)"', py, re.M).group(1)
+    repo = re.search(r'^GITHUB_REPO = "([^"]+)"', py, re.M).group(1)
     with open(os.path.join(ROOT, "web", "history.html"), encoding="utf-8") as f:
         page = f.read()
     with open(os.path.join(ROOT, "assets", "icon-128.png"), "rb") as f:
@@ -37,9 +39,9 @@ def main():
                     samples.append({"name": name, "path": os.path.relpath(full, ROOT).replace(os.sep, "/"),
                                     "b64": base64.b64encode(f.read()).decode()})
 
-    page = (page.replace("{{VERSION}}", version).replace("{{ICON}}", icon)
+    page = (page.replace("{{VERSION}}", version).replace("{{REPO}}", repo).replace("{{ICON}}", icon)
                 .replace("{{SAMPLES_JSON}}", json.dumps(samples).replace("</", "<\\/")))
-    for key, name in [("CORE_JS", "core.js"), ("ANALYSIS_JS", "analysis.js"), ("DOCX_JS", "docx.js"), ("HISTORY_JS", "history.js")]:
+    for key, name in [("CORE_JS", "core.js"), ("ANALYSIS_JS", "analysis.js"), ("DOCX_JS", "docx.js"), ("WEATHER_JS", "weather.js"), ("HISTORY_JS", "history.js")]:
         with open(os.path.join(ROOT, "web", name), encoding="utf-8") as f:
             code = f.read()
         if "</script" in code.lower():
