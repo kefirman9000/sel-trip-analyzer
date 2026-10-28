@@ -5,10 +5,14 @@
 Drop in SEL relay event files and get a plain-English summary of **what tripped
 and why**, ready to paste into an outage report or export to Word or PDF.
 
-**[⬇ Download for Windows](../../releases/latest/download/SEL_Trip_Analyzer.exe)** ·
-**[Browser version](../../releases/latest/download/SEL_Trip_Analyzer.html)** (any computer, nothing to install) ·
-**[Sample files](../../releases/latest/download/SEL_sample_files.zip)** ·
-[Report a problem](../../issues/new)
+| | |
+|---|---|
+| **[⬇ Windows program](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.exe)** | `SEL_Trip_Analyzer.exe`: download and double-click, no install |
+| **[⬇ Browser version](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)** | `SEL_Trip_Analyzer.html`: any computer (Windows, Mac, Linux), works offline |
+| **[▶ Use it online](https://kefirman9000.github.io/sel-trip-analyzer/)** | Opens in your browser, nothing to download |
+| **[⬇ Sample files](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_sample_files.zip)** | Made-up SEL events in every supported format, to try it out |
+
+Latest version: see [Releases](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest) · [Report a problem or suggest something](https://github.com/kefirman9000/sel-trip-analyzer/issues/new)
 
 ![Trip summary](docs/screenshots/main.png)
 
@@ -39,15 +43,15 @@ and why**, ready to paste into an outage report or export to Word or PDF.
    appears straight away.
 
 Want to see it work first? Click **Try samples** in the program, or download the
-[sample files](../../releases/latest/download/SEL_sample_files.zip).
+[sample files](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_sample_files.zip).
 
 ## Browser version
 
 Can't run `.exe` files, or not on Windows? Use **`SEL_Trip_Analyzer.html`**, a
 single file that does the same analysis inside your web browser.
 
-1. Download [SEL_Trip_Analyzer.html](../../releases/latest/download/SEL_Trip_Analyzer.html)
-   or use the online copy at <https://kefirman9000.github.io/sel-trip-analyzer/>.
+1. Download [SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html),
+   or [use it online](https://kefirman9000.github.io/sel-trip-analyzer/) without downloading anything.
 2. Double-click it. It opens in Chrome, Edge, Firefox or Safari, on Windows, Mac
    or Linux. It also works offline.
 3. Drag your event files or a folder onto the page, exactly like the Windows program.
