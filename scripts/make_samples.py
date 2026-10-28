@@ -385,6 +385,41 @@ Currents (A Pri), ABCNGQ:   228  1395  221  4  1172  781
              digitals=[("51G", on(inception, open_cyc + 0.5)), ("51GT", on(trip_cyc, open_cyc + 0.5)),
                        ("TRIP", on(trip_cyc, open_cyc + 1.5)), ("OUT101", on(trip_cyc, open_cyc + 1.5)),
                        ("52A", on(0, open_cyc)), ("IN101", on(0, open_cyc))])
+    # 9d) COMTRADE from a different maker's relay (generic channel names): B-to-ground fault,
+    #     ground instantaneous overcurrent trips after 1.5 cycles, breaker clears 3 cycles later
+    sam, f0, inception, n_cyc = 32, 60.0, 3.0, 14
+    trip_cyc = inception + 1.5
+    open_cyc = trip_cyc + 3.0
+    pre = {"A": P(305, -28), "B": P(298, -148), "C": P(301, 92)}
+    flt = {"A": pre["A"], "B": P(3420, -205), "C": pre["C"]}
+    def state22(k):
+        c = k / sam
+        return "pre" if c < inception else "fault" if c < open_cyc else "open"
+    tf0 = 2 * math.pi * inception
+    def cur22(ph):
+        def fn(k):
+            st, th = state22(k), 2 * math.pi * k / sam
+            if st == "open":
+                return 0.0
+            z = flt[ph] if st == "fault" else pre[ph]
+            return wave(z, th, (k / sam - inception, tf0) if st == "fault" else None, st == "fault" and ph == "B")
+        return fn
+    def volt22(ph, base, sag):
+        def fn(k):
+            st = state22(k)
+            mag = sag if st == "fault" else 0.0 if st == "open" else 66.4
+            return mag * math.sqrt(2) * math.cos(2 * math.pi * k / sam + math.radians(base))
+        return fn
+    on22 = lambda a, b=None: (lambda k: 1 if a <= k / sam and (b is None or k / sam < b) else 0)  # noqa: E731
+    comtrade("Line22_other_maker", station="NORTH STN", device="LINE 22",
+             start=dt.datetime(2026, 10, 24, 6, 12, 40, 250000) - dt.timedelta(seconds=inception / f0),
+             trigger_offset_cyc=inception, sam=sam, ncyc=n_cyc, freq=f0,
+             analogs=[("Line Ia", "A", "A", 0.2, 600, 5, cur22("A")), ("Line Ib", "B", "A", 0.2, 600, 5, cur22("B")),
+                      ("Line Ic", "C", "A", 0.2, 600, 5, cur22("C")),
+                      ("Bus Va", "A", "kV", 0.005, 1, 1, volt22("A", 0, 64.0)), ("Bus Vb", "B", "kV", 0.005, 1, 1, volt22("B", -120, 21.5)),
+                      ("Bus Vc", "C", "kV", 0.005, 1, 1, volt22("C", 120, 65.2))],
+             digitals=[("GND IOC1 OP", on22(trip_cyc, open_cyc + 0.25)), ("PH TOC1 PKP", on22(inception + 0.25, open_cyc + 0.25)),
+                       ("TRIP BUS 1 OP", on22(trip_cyc, open_cyc + 1.0)), ("BKR 1 CLOSED", on22(0, open_cyc))])
     ole_file(os.path.join(OUT, "Feeder3_settings.rdb"), "FEEDER 3", [
         ("Global", "SID     =OAK HILL SUB\r\nRID     =FEEDER 3\r\nTID     =OAK HILL SUB\r\n"),
         ("Group 1", "RID     =FEEDER 3                       TID     =OAK HILL SUB\r\n"
@@ -430,6 +465,8 @@ Line5_Hill_BC_Zone1.cev        CEV      Other end of LINE 5, same fault    Paire
 Feeder8_storm.sum              SUM      Two trips a minute after Feeder 3  Grouped with Feeder 3 as one incident (storm)
 Feeder3_CG_51G.cfg / .dat      COMTRADE Feeder 3 fault, 32 samples/cycle   Waveform analysis: 51G U3 timing vs settings
 Feeder3_settings.rdb           RDB      Feeder 3 relay settings            Used for the 51G evaluation (TD 2.00, U3)
+Line22_other_maker.cfg / .dat  COMTRADE Another maker's relay, B-to-ground Summarized from the waveforms and its own
+                                         fault, ground IOC trip             channel names (no SEL file needed)
 Feeder9_AG_needs_review.cev    CEV      Deliberately inconsistent record   Several CHECK flags: wrong phase, beyond line,
                                                                            slow breaker
 

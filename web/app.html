@@ -1237,6 +1237,7 @@ function renderEvents() {
   const cts = comtradeIndex();
   const waveId = (it) => {
     if (it.e.wave) return it.id;
+    if (it.e.waveRef) return it.e.waveRef.id;
     const k = core.relayKey(it.e).toUpperCase();
     const hit = it.dt === null ? null : cts.find((c) => c.relay === k && Math.abs(c.dt - it.dt) <= 2e6);
     return hit ? hit.id : null;
@@ -1308,7 +1309,7 @@ function renderEvents() {
       <td class="wx${stormy(it) ? " storm" : ""}" title="${esc(w ? w.text + "\n" + (w.hints || []).map((h) => h.text).join("\n") : "")}">${esc(wtxt) || '<span class="hint">-</span>'}</td>
       <td class="note"><input type="text" value="${esc(notes[id] || "")}" placeholder="Add a note…" aria-label="Note for event ${num.get(it)}"></td>
       <td class="act">${it.a.tripped || reviews[id] ? `<button data-act="review" title="Correct operation or misoperation? (NERC PRC-004)">Review</button>` : ""}<button data-act="why" aria-expanded="${whyOpen.has(id)}" title="What this conclusion is based on">Why?</button><button data-act="details" title="Show this event in the summary">Details</button>${waveId(it) ? `<button data-act="wave" data-rec="${esc(waveId(it))}" title="Open its waveforms">Waveforms</button>` : ""}</td>
-    </tr>` + (whyOpen.has(id) ? whyRow(it, e.wave ? id : null) : "");
+    </tr>` + (whyOpen.has(id) ? whyRow(it, e.wave ? id : e.waveRef ? e.waveRef.id : null) : "");
   }).join("");
   tbl.innerHTML = head + `<tbody>${body || `<tr><td colspan="9" class="evt-empty">No events match.</td></tr>`}</tbody>`;
 }

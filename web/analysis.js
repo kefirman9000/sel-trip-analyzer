@@ -684,11 +684,90 @@ function analyze(rec, settings) {
   return { cls, oc: evaluateOvercurrent(rec, s, cls), elements: elementTimeline(rec), settings: s };
 }
 
+// ---------------------------------------------------------------------------
+// COMTRADE records as events (any relay maker): fault type from the waveforms,
+// trip, breaker and elements from the digital channels
+// ---------------------------------------------------------------------------
+const isTripCh = (name) => core.elementClass(name) === "TRIP";
+const breakerSense = (name) => {          // +1: on while closed (52A); -1: on while open (52B)
+  const n = name.toUpperCase();
+  if (core.elementClass(name) !== "breaker status") return 0;
+  if (/52\s*B|OPEN/.test(n)) return -1;
+  return 1;
+};
+
+function eventFromRecord(r) {
+  const e = core.newRec(r.source, "event");
+  e.relay_id = core.strip(r.relay || r.station || "");
+  e.terminal_id = core.strip(r.station || "") === e.relay_id ? "" : core.strip(r.station || "");
+  e.date = r.date || ""; e.time = r.time || "";
+  e.freq = String(r.freq || "");
+  const spc = r.spc;
+  // digital channels: first change after the start, in cycles from the start (like SEL element data)
+  let trip = null, open = null, breaker = null;
+  const seq = [];
+  r.digitals.forEach((d, j) => {
+    const v = d.values;
+    let first = -1;
+    for (let k = 1; k < r.n; k++) if (v[k] && !v[k - 1]) { first = k; break; }
+    const sense = breakerSense(d.name);
+    if (sense) {
+      if (open === null) for (let k = 1; k < r.n; k++) {
+        if ((sense > 0 && v[k - 1] && !v[k]) || (sense < 0 && !v[k - 1] && v[k])) { open = k; breaker = d.name; break; }
+      }
+      return;
+    }
+    if (v[0]) { if (core.elementClass(d.name) && !["breaker status", "SELogic variable"].includes(core.elementClass(d.name))) seq.push([0, d.name, "pre", j]); return; }
+    if (first < 0) return;
+    seq.push([first / spc, d.name, "asserted", j]);
+    if (isTripCh(d.name) && (trip === null || first < trip)) trip = first;
+  });
+  seq.sort((a, b) => (a[2] === "pre") - (b[2] === "pre") || a[0] - b[0] || a[3] - b[3]);
+  e.sequence = seq.map(([c, n, st]) => [c, n, st]);
+  e.trip_cycle = trip !== null ? trip / spc : null;
+  e.open_cycle = open !== null ? open / spc : null;
+  e.trigger_cycle = (r.trigger || 0) / spc;
+  // fault type from the currents
+  const cls = classify(r);
+  const isFault = cls.code !== "NONE" && cls.code !== "INRUSH" && core.FAULT_TYPES[cls.code];
+  e.event_type = isFault ? cls.code + (trip !== null ? " T" : "") : trip !== null ? "TRIP" : "ER";
+  // prefault and fault magnitudes (largest during the fault, up to the breaker opening)
+  const ch = channels(r);
+  const pre = cls.preIdx !== null ? cls.preIdx : Math.min(r.n - 1, spc);
+  const end = Math.min(r.n - 1, open !== null ? open : (cls.faultIdx || r.trigger || 0) + 10 * spc);
+  const from = Math.min(r.n - 1, Math.max(pre + spc, r.trigger || 0));
+  const peak = (c, pick) => { let best = null; for (let k = from; k <= Math.max(from, end); k += Math.max(1, Math.round(spc / 8))) { const m = mag(r, c, k); best = best === null ? m : pick(best, m); } return best; };
+  for (const p of ["A", "B", "C", "N"]) {
+    const c = ch["I" + p]; if (!c) continue;
+    e.currents.set(p === "N" ? "IN" : "I" + p, [mag(r, c, pre), peak(c, Math.max)]);
+  }
+  for (const p of ["A", "B", "C"]) {
+    const c = ch["V" + p]; if (!c) continue;
+    e.voltages.set("V" + p, [mag(r, c, pre), peak(c, Math.min)]);
+  }
+  e.notes.push(`Fault type from the waveforms: ${cls.name}.`);
+  for (const n of cls.notes) e.notes.push(n);
+  e.waveRef = { id: r.id, sam: spc, breaker };
+  e.extra.push(`Record      : COMTRADE ${r.revision || ""} from ${r.relay || "?"}${r.station ? " at " + r.station : ""}, ${Math.round(r.sps)} samples/s`);
+  return e;
+}
+
+/** files: the COMTRADE files from core.loadFiles -> {events, errors}. */
+function eventsFromComtrade(files) {
+  const { records, errors } = comtradeRecords(files);
+  const events = [];
+  for (const r of records) {
+    try { events.push(eventFromRecord(r)); } catch (err) { errors.push(`${r.source}: couldn't summarize the COMTRADE record (${err.message || err})`); }
+  }
+  return { events, errors };
+}
+
 const api = {
   recordFromEvent, parseComtrade, comtradeRecords, phasorAt, harmonics, rmsTrend, sequence, snapshot, channels,
   classify, evaluateOvercurrent, curveTime, CURVES, translateElement, elementGroup, elementTimeline, analyze,
-  FAULT_NAMES, cabs, cang, polar, wrap,
+  FAULT_NAMES, cabs, cang, polar, wrap, eventsFromComtrade, eventFromRecord,
 };
+if (core && core.useComtradeReader) core.useComtradeReader(eventsFromComtrade);
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.SELAnalysis = api;
 })(typeof window !== "undefined" ? window : globalThis);

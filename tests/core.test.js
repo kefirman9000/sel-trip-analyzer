@@ -223,7 +223,7 @@ test("zip archives and settings saved as text", async () => {
   catch (e) { zipBytes = null; }
   if (zipBytes) {
     const r = await core.loadFiles([{ name: "events.zip", bytes: new Uint8Array(zipBytes) }]);
-    assert.deepEqual(r.events.map((e) => e.source), ["Feeder12_AG_Zone1.cev"]);
+    assert.deepEqual(r.events.map((e) => e.source), ["Feeder12_AG_Zone1.cev", "Feeder3_CG_51G.cfg"], "the COMTRADE record becomes an event too");
     assert.deepEqual(r.comtrade.map((f) => f.name).sort(), ["Feeder3_CG_51G.cfg", "Feeder3_CG_51G.dat"]);
   }
   const sho = "SHO\r\nRID     =FEEDER 3          TID     =OAK HILL SUB\r\nCTR     =240       LL      =8.00\r\n51GP    =1.00      51GC    =U3        51GTD   =2.00\r\n";
@@ -282,4 +282,58 @@ test("operation review (PRC-004): suggestions, due dates, report section, CSV lo
   assert.equal(csv[0], core.REVIEW_COLUMNS.join(","));
   assert.ok(csv.some((l) => l.startsWith("10/22/2026,09:41:17.506,LINE 5 HILL,HILL SUB,BC T,") && l.includes(",Misoperation,Unnecessary Trip - During Fault,Incorrect Settings,J,2026-10-28,2027-02-19,2026-10-28,2026-12-27,")));
   assert.equal(csv.filter(Boolean).length - 1, items.filter((it) => it.a.tripped).length);
+});
+
+
+/** A made-up COMTRADE record from a non-SEL relay: BG fault, ground IOC trips at 1.5 cyc, breaker opens 3 cyc later. */
+function otherMakerComtrade() {
+  const f = 60, spc = 32, n = 12 * spc, trig = 2 * spc;
+  const cfg = ["NORTH STN,LINE 22 (OTHER MAKER),1999", "8,5A,3D",
+    "1,Line Ia,A,,A,0.1,0,0,-32767,32767,600,5,P", "2,Line Ib,B,,A,0.1,0,0,-32767,32767,600,5,P", "3,Line Ic,C,,A,0.1,0,0,-32767,32767,600,5,P",
+    "4,Line Va,A,,kV,0.001,0,0,-32767,32767,1,1,P", "5,Line Vb,B,,kV,0.001,0,0,-32767,32767,1,1,P",
+    "1,GND IOC1 OP,,,0", "2,TRIP BUS 1 OP,,,0", "3,BKR 1 CLOSED,,,1",
+    "60", "1", `${f * spc},${n}`, "05/03/2026,08:15:30.000000", "05/03/2026,08:15:30.033333", "ASCII", "1"].join("\r\n") + "\r\n";
+  const rows = [];
+  for (let k = 0; k < n; k++) {
+    const w = 2 * Math.PI * k / spc, faulted = k >= trig && k < trig + 4.5 * spc;
+    const ib = faulted ? 3000 : 300;
+    const va = 67 * Math.SQRT2 * Math.sin(w), vb = (faulted ? 20 : 67) * Math.SQRT2 * Math.sin(w - 2.094);
+    const a = [300 * Math.SQRT2 * Math.sin(w - 0.5), ib * Math.SQRT2 * Math.sin(w - 2.6 - (faulted ? 1.0 : 0)), 300 * Math.SQRT2 * Math.sin(w + 1.6)].map((x) => Math.round(x / 0.1))
+      .concat([va, vb].map((x) => Math.round(x / 0.001)));
+    const ioc = k >= trig + 1.5 * spc && k < trig + 5 * spc ? 1 : 0, tr = k >= trig + 1.5 * spc && k < trig + 6 * spc ? 1 : 0, bkr = k < trig + 4.5 * spc ? 1 : 0;
+    rows.push([k + 1, Math.round(k * 1e6 / (f * spc)), ...a, ioc, tr, bkr].join(","));
+  }
+  return [{ name: "L22_fault.cfg", bytes: new TextEncoder().encode(cfg) }, { name: "L22_fault.dat", bytes: new TextEncoder().encode(rows.join("\r\n") + "\r\n") }];
+}
+
+test("COMTRADE from another maker becomes a summarized event", async () => {
+  assert.equal(core.elementClass("GND IOC1 OP"), "instantaneous overcurrent");
+  assert.equal(core.elementClass("PH TOC1 OP"), "time-overcurrent trip");
+  assert.equal(core.elementClass("TRIP BUS 1 OP"), "TRIP");
+  assert.equal(core.elementClass("BKR 1 CLOSED"), "breaker status");
+  assert.equal(core.elementClass("PDIS1.Op"), "distance");
+  assert.equal(core.elementClass("DIST Z1 TRIP"), "distance");
+  assert.equal(core.elementClass("Z1G"), "distance", "SEL names unchanged");
+  const { events, rdb, errors } = await core.loadFiles(otherMakerComtrade());
+  assert.deepEqual(errors, []);
+  assert.equal(events.length, 1);
+  const e = events[0];
+  assert.equal(e.relay_id, "LINE 22 (OTHER MAKER)");
+  assert.equal(e.terminal_id, "NORTH STN");
+  assert.equal(e.event_type, "BG T");
+  assert.equal(e.date, "03/05/2026");
+  const a = core.analyzeEvent(e, {}, "none", "");
+  assert.ok(a.tripped);
+  assert.deepEqual(a.primary, ["GND IOC1 OP"]);
+  assert.match(core.shortCause(e, {}, a), /Phase B-to-ground fault via GND IOC1 OP/);
+  assert.match(a.cause.join("\n"), /Breaker opened ~3\.00 cycles after trip/);
+  assert.ok(a.gaps.some((g) => g.startsWith("Read from a COMTRADE record")));
+  const ev = a.evidence.find((x) => x.elements.includes("GND IOC1 OP"));
+  assert.ok(ev && ev.idx === 112, JSON.stringify(ev));
+  assert.equal(e.waveRef.id, "comtrade:L22_fault.cfg");
+  const [cur] = [...e.currents].filter(([k]) => k === "IB").map(([, v]) => v);
+  assert.ok(cur[1] > 2500 && cur[0] < 400, String(cur));
+  // with an SEL report for the same relay and time, the COMTRADE copy isn't added twice
+  const both = await core.loadFiles(read(SAMPLES, ["Feeder3_CG_51G.eve", "Feeder3_CG_51G.cfg", "Feeder3_CG_51G.dat"]));
+  assert.deepEqual(both.events.map((x) => x.source), ["Feeder3_CG_51G.eve"]);
 });

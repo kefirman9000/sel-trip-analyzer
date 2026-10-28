@@ -253,9 +253,28 @@ const ELEMENT_RULES = [
 const TRIP_NAMES = new Set(["TRIP", "TR", "TRIP1", "3PT", "TPA", "TPB", "TPC", "TRIP3", "TRP", "TPA1", "TRIPA"]);
 const BREAKER_NAMES = ["52A", "52AA1", "52AB1", "52AC1", "52A1", "IN101"];
 
+// Other makers' channel names (GE "PH TOC1 OP", ABB "ZM01-TRIP", IEC 61850 "PTOC1.Op", "Dist Z1 Trip"...):
+// used only when no SEL rule matches. Protection functions first, so "DIST Z1 TRIP" is distance, not just TRIP.
+const GENERIC_RULES = [
+  ["BRE?A?KE?R\\s*FAIL|\\bBF\\b|RBRF|50BF", "breaker failure"],
+  ["XCBR|\\bBKR\\b|BREAKER|\\bCB\\b|(^|[^0-9])52\\s*[AB]\\b", "breaker status"],
+  ["RREC|RECLOS|(^|[^0-9])79([^0-9]|$)", "reclosing"],
+  ["PDIF|DIFF|(^|[^0-9])87", "differential"],
+  ["PDIS|DIST|\\bZ(ONE)?\\s*-?\\d|\\bZM\\d|(^|[^0-9])21([^0-9]|$)", "distance"],
+  ["PSCH|POTT|\\bDCB\\b|\\bDTT\\b|TRANSFER|PERMISSIVE|CARRIER|\\bRX\\b|RECEIVE", "communications / transfer trip"],
+  ["PTUF|PTOF|FREQ|\\bU?F\\s*<|(^|[^0-9])81", "frequency"],
+  ["PTUV|UNDER\\s*VOLT|\\bU\\s*<|(^|[^0-9])27([^0-9]|$)", "undervoltage"],
+  ["PTOV|OVER\\s*VOLT|\\bU\\s*>|(^|[^0-9])59([^0-9]|$)", "overvoltage"],
+  ["PTOC|\\bTOC|I\\w*>\\s*(?!>)|(^|[^0-9])51", "time-overcurrent trip"],
+  ["PIOC|\\bIOC|I\\w*>>|(^|[^0-9])50", "instantaneous overcurrent"],
+  ["PTRC|TRIP|\\bTRP\\b|(^|[^0-9])86([^0-9]|$)", "TRIP"],
+];
 function elementClass(name) {
   const n = name.toUpperCase();
   for (const [pat, cls] of ELEMENT_RULES) if (pmatch(pat, n)) return cls;
+  if (/[^A-Z0-9_]/.test(n) || /^(P|R|X)[A-Z]{3}\d/.test(n))
+    for (const [pat, cls] of GENERIC_RULES) if (search(pat, n))
+      return cls === "time-overcurrent trip" && /PKP|PICKUP|\bPU\b|START|\bSTR\b/.test(n) ? "time-overcurrent pickup" : cls;
   return "";
 }
 
@@ -746,6 +765,10 @@ function settingsFromText(text, name) {
 }
 const extOf = (name) => { const m = /(\.[^.\\/]*)$/.exec(name); return m ? m[1].toLowerCase() : ""; };
 
+/** analysis.js registers how to turn COMTRADE records into events (any relay maker). */
+let comtradeReader = null;
+function useComtradeReader(fn) { comtradeReader = fn; }
+
 /** files: [{name, bytes: Uint8Array}] in load order. */
 async function loadFiles(files) {
   const events = [], rdb = new Map(), errors = [], comtrade = [];
@@ -774,6 +797,18 @@ async function loadFiles(files) {
     } catch (e) {
       errors.push(`${f.name}: ${e && e.message ? e.message : e}`);
     }
+  }
+  if (!comtradeReader && typeof require === "function") { try { require("./analysis.js"); } catch (e) { /* page loads it itself */ } }
+  if (comtradeReader && comtrade.length) {
+    // a COMTRADE record that matches an SEL report already loaded (same relay, within 2 s) adds nothing new
+    const sel = events.filter((e) => e.kind === "event").map((e) => [relayKey(e).toUpperCase(), eventDatetime(e)]);
+    const r = comtradeReader(comtrade);
+    for (const e of r.events) {
+      const k = relayKey(e).toUpperCase(), dt = eventDatetime(e);
+      if (dt !== null && sel.some(([sk, sdt]) => sk === k && sdt !== null && Math.abs(sdt - dt) <= 2e6)) continue;
+      events.push(e);
+    }
+    errors.push(...r.errors);
   }
   return { events, rdb, errors, comtrade };
 }
@@ -889,7 +924,7 @@ function analyzeEvent(rec, settings, how, label) {
   }
 
   if (tc !== null && rec.open_cycle !== null && rec.open_cycle > tc)
-    cause.push(`Breaker opened ~${fx(rec.open_cycle - tc, 2)} cycles after trip (trip at ${fx(tc, 2)} cyc, 52A dropped at ${fx(rec.open_cycle, 2)} cyc).`);
+    cause.push(`Breaker opened ~${fx(rec.open_cycle - tc, 2)} cycles after trip (trip at ${fx(tc, 2)} cyc, ${rec.waveRef ? "breaker status changed" : "52A dropped"} at ${fx(rec.open_cycle, 2)} cyc).`);
   if (rec.shot && rec.shot !== "0") cause.push(`Reclose shot counter = ${rec.shot} (event occurred during a reclose sequence).`);
   cause.push(...rec.notes);
 
@@ -898,7 +933,10 @@ function analyzeEvent(rec, settings, how, label) {
   else if (rec.kind !== "history" && !rec.sequence.length && tripped)
     gaps.push("No relay element data in this file, so the tripping element is inferred from the front-panel targets. " +
               "Load the .CEV report for this event to confirm.");
-  if (tripped && !settings.TR) {
+  if (tripped && !settings.TR && rec.waveRef) {
+    gaps.push("Read from a COMTRADE record: the tripping element is taken from its digital channels, with no relay settings or fault location. " +
+              "Confirm against the relay's own event report.");
+  } else if (tripped && !settings.TR) {
     if (how === "mismatch")
       gaps.push(`Settings files are loaded, but none match relay '${rec.relay_id}', so no settings were applied. Add this relay's .RDB.`);
     else
@@ -995,11 +1033,12 @@ function analyzeEvent(rec, settings, how, label) {
   }
 
   // what each conclusion rests on, with the sample to look at in the record (for "Show on graph")
-  const sam = rec.wave ? rec.wave.sam : null;
+  const sam = rec.wave ? rec.wave.sam : rec.waveRef ? rec.waveRef.sam : null;
   const at = (c) => (sam && c !== null && c !== undefined ? Math.round(c * sam) : null);
   const firstAt = (el) => { const hit = asserted.find((x) => x[1] === el); return hit ? hit[0] : null; };
   const evidence = [];
-  if (rec.event_type) evidence.push({ text: `The relay recorded event type ${strip(rec.event_type)}` + (desc ? ` (${desc})` : ""), idx: null, elements: [] });
+  if (rec.event_type && rec.waveRef) evidence.push({ text: `The waveforms show a ${desc ? desc.charAt(0).toLowerCase() + desc.slice(1) : strip(rec.event_type)}`, idx: rec.trigger_cycle !== null ? at(rec.trigger_cycle) : null, elements: [] });
+  else if (rec.event_type) evidence.push({ text: `The relay recorded event type ${strip(rec.event_type)}` + (desc ? ` (${desc})` : ""), idx: null, elements: [] });
   if (tdesc.length) evidence.push({ text: `Front-panel targets ${strip(rec.targets)}: ${tdesc.join(", ")}`, idx: null, elements: [] });
   for (const [key, hits] of eqHits) {
     const c = Math.min(...hits.map(firstAt).filter((x) => x !== null));
@@ -1012,12 +1051,13 @@ function analyzeEvent(rec, settings, how, label) {
     if (c !== null) evidence.push({ text: `${el} (${elementClass(el) || "relay element"}) asserted at ${fx(c, 2)} cyc`, idx: at(c), elements: [el] });
   }
   if (tc !== null) {
-    const trips = asserted.filter((x) => TRIP_NAMES.has(x[1].toUpperCase()) && Math.abs(x[0] - tc) < 1e-9).map((x) => x[1]);
+    const trips = asserted.filter((x) => (TRIP_NAMES.has(x[1].toUpperCase()) || elementClass(x[1]) === "TRIP") && Math.abs(x[0] - tc) < 1e-9).map((x) => x[1]);
     evidence.push({ text: `TRIP asserted at ${fx(tc, 2)} cyc`, idx: at(tc), elements: trips });
   }
   if (rec.open_cycle !== null) {
     const bk = BREAKER_NAMES.filter((b) => rec.wave && rec.wave.digitals.some((d) => d.name === b));
-    evidence.push({ text: `Breaker status (${bk[0] || "52A"}) dropped at ${fx(rec.open_cycle, 2)} cyc` +
+    if (rec.waveRef && rec.waveRef.breaker) bk.unshift(rec.waveRef.breaker);
+    evidence.push({ text: `Breaker status (${bk[0] || "52A"}) ${rec.waveRef ? "changed" : "dropped"} at ${fx(rec.open_cycle, 2)} cyc` +
                     (tc !== null && rec.open_cycle > tc ? `: cleared ${fx(rec.open_cycle - tc, 2)} cyc after the trip` : ""), idx: at(rec.open_cycle), elements: bk.slice(0, 1) });
   }
   if (loc && v !== null) evidence.push({ text: `Fault location ${loc}` + (ll ? ` on a ${settings.LL} line (${fx(100 * v / ll, 0)}%)` : ""), idx: null, elements: [] });
@@ -1030,7 +1070,7 @@ function analyzeEvent(rec, settings, how, label) {
   else level = 1;
   if (checks.length) level -= checks.length >= 3 ? 2 : 1;
   level = Math.max(1, level);
-  let basis = rec.kind === "history" ? "history row" : rec.sequence.length ? "element data" : rec.targets ? "targets only" : "event type only";
+  let basis = rec.kind === "history" ? "history row" : rec.waveRef ? "COMTRADE waveforms and channels" : rec.sequence.length ? "element data" : rec.targets ? "targets only" : "event type only";
   if (settings.TR) basis += ", settings" + (label ? ` from ${label}` : " in event file");
   return { tripped, desc, cause, checks, gaps, confidence: { 3: "High", 2: "Medium", 1: "Low" }[level], basis, primary, evidence };
 }
@@ -1791,7 +1831,7 @@ const api = {
   loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
   parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, ARCHIVE_EXTS, SETTINGS_TEXT_EXTS, unzip, settingsFromText, nowStamp, eventDatetime, eventCore,
   interpretEventType, interpretTargets, extractSettings, splitWS, strip, splitlines, csvLine, latin1, FAULT_TYPES, fx, fc, pyTitle, elementClass,
-  MISOP_CATEGORIES, MISOP_CAUSES, REVIEW_OUTCOMES, REVIEW_COLUMNS, REVIEW_DAYS, CAP_DAYS, reviewDue, suggestReview, reviewRows, reviewLine, reviewCsv, addDays,
+  newRec, useComtradeReader, BREAKER_NAMES, TRIP_NAMES, MISOP_CATEGORIES, MISOP_CAUSES, REVIEW_OUTCOMES, REVIEW_COLUMNS, REVIEW_DAYS, CAP_DAYS, reviewDue, suggestReview, reviewRows, reviewLine, reviewCsv, addDays,
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.SELCore = api;
