@@ -152,7 +152,9 @@ your computer, appear in the event's details, and are searchable. The
 Open **Station locations & weather** and type where each relay is (a town such
 as *Ocala, FL*, or *latitude, longitude*). To set several at once, tick them (or
 **Select all**), type one location and click **Apply to ticked** (or **Apply to
-all**). Then click **Look up weather**. Each event
+all**). Then click **Look up weather**.
+
+![Station locations and weather](docs/screenshots/weather.png) Each event
 gets a *Weather* line (conditions, temperature, wind and gusts, rain or snow
 for that hour), and when the weather could explain the trip it's added to the
 probable cause:
