@@ -73,6 +73,14 @@ button:disabled { opacity: .55; cursor: default; }
 .switch input:checked::after { transform: translateX(20px); background: var(--on-accent); }
 label.check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
 label.check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.field { display: inline-flex; align-items: center; gap: 6px; }
+select, input[type="search"] {
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; min-height: 32px; padding: 4px 8px;
+}
+select { padding-right: 4px; cursor: pointer; max-width: 190px; }
+input[type="search"] { width: 210px; }
+input[type="search"]::placeholder { color: var(--muted); }
 
 /* drop zone */
 .drop {
@@ -224,11 +232,12 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     </section>
   </div>
 
-  <div class="actions">
-    <span class="hint">Include:</span>
-    <label class="check"><input type="checkbox" id="optSeq" checked> Element timeline</label>
-    <label class="check"><input type="checkbox" id="optSet" checked> Settings context</label>
-    <label class="check"><input type="checkbox" id="optSer" checked> SER lines</label>
+  <div class="actions" aria-label="View options">
+    <label class="field"><span class="hint">Show</span><select id="vShow"></select></label>
+    <label class="field"><span class="hint">Relay</span><select id="vRelay"></select></label>
+    <label class="field"><span class="hint">Sort</span><select id="vSort"></select></label>
+    <label class="field"><span class="hint">Detail</span><select id="vDetail"></select></label>
+    <label class="check"><input type="checkbox" id="vDups"> Hide duplicates</label>
     <span class="grow"></span>
     <button class="accent" id="generate" title="F5 or Ctrl+Enter">Generate summary</button>
   </div>
@@ -236,12 +245,14 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   <div class="summary-head">
     <span class="cap">Trip summary</span><span class="hint">editable</span>
     <span class="grow"></span>
+    <input type="search" id="vSearch" placeholder="Search events (Ctrl+F)" aria-label="Search events">
     <button id="copy" title="Ctrl+Shift+C">Copy all</button>
     <div class="menu-wrap">
       <button id="exportBtn" aria-haspopup="true" aria-expanded="false">Export ▾</button>
       <div class="menu" id="exportMenu" role="menu">
         <button role="menuitem" data-exp="doc">Word document (.doc)<small>Formatted report, opens in Word · Ctrl+S</small></button>
         <button role="menuitem" data-exp="pdf">PDF / Print<small>Choose "Save as PDF" in the print window · Ctrl+P</small></button>
+        <button role="menuitem" data-exp="csv">Spreadsheet for Excel (.csv)<small>One row per event, same filter and order</small></button>
         <button role="menuitem" data-exp="txt">Plain text (.txt)</button>
       </div>
     </div>
@@ -301,6 +312,16 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <p>INST instantaneous · TIME time-delayed · COMM communications-assisted · ZONE1/2/3 distance zones ·
        50 instantaneous overcurrent · 51 time-overcurrent · 81 frequency · SOTF switch-onto-fault ·
        A B C G N faulted phases / ground · RS recloser reset (ready) · CY recloser cycling · LO recloser locked out</p>
+    <h3>Organizing the summary</h3>
+    <table>
+      <tr><td>Show</td><td>All events, trips only, needs review, faults only, or no-trip events (the numbers are how many events each includes)</td></tr>
+      <tr><td>Relay</td><td>Only one relay's events</td></tr>
+      <tr><td>Sort</td><td>Oldest first, newest first, by relay, or needs review first</td></tr>
+      <tr><td>Detail</td><td>Summary only (overview + one line per event), Standard (adds details and CHECKs), or Full (adds element timeline, settings and SER)</td></tr>
+      <tr><td>Hide duplicates</td><td>Skip history rows already covered by a detailed report</td></tr>
+      <tr><td>Search</td><td>Only events whose details contain the text</td></tr>
+    </table>
+    <p>The summary says which view it shows. <b>Export → Spreadsheet</b> gives one row per event with the same filter and order, ready to sort and filter in Excel.</p>
     <h3>Confidence and checks</h3>
     <table>
       <tr><td>High</td><td>Element data and settings, and nothing looked wrong</td></tr>
@@ -314,7 +335,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
        Negative means behind the relay; $$$$$ means the relay couldn't calculate it.</p>
     <h3>Shortcuts</h3>
     <p><kbd>Ctrl</kbd>+<kbd>O</kbd> add files · <kbd>F5</kbd> generate · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> copy ·
-       <kbd>Ctrl</kbd>+<kbd>S</kbd> Word · <kbd>Ctrl</kbd>+<kbd>P</kbd> PDF · <kbd>Ctrl</kbd>+<kbd>D</kbd> dark mode · <kbd>F1</kbd> help</p>
+       <kbd>Ctrl</kbd>+<kbd>S</kbd> Word · <kbd>Ctrl</kbd>+<kbd>P</kbd> PDF · <kbd>Ctrl</kbd>+<kbd>F</kbd> search · <kbd>Ctrl</kbd>+<kbd>D</kbd> dark mode · <kbd>F1</kbd> help</p>
     <p class="hint">The analysis is automated. Always confirm against the oscillography and settings.
        <a href="https://github.com/{{REPO}}#readme" target="_blank" rel="noopener">Full guide on GitHub</a></p>
   </div>
@@ -335,7 +356,7 @@ const HTML_ASSET = "SEL_Trip_Analyzer.html";
 const core = window.SELCore;
 const $ = (id) => document.getElementById(id);
 const out = $("out");
-const state = { files: [], empty: true, update: null };
+const state = { files: [], empty: true, update: null, edited: false, cache: null, lastSearch: "" };
 
 // ---------------------------------------------------------------- prefs
 const store = {
@@ -361,10 +382,56 @@ function applyTheme(dark) {
 applyTheme(store.get("dark", prefersDark ? prefersDark.matches : false));
 $("dark").addEventListener("change", () => { applyTheme($("dark").checked); store.set("dark", $("dark").checked); });
 
-for (const [id, key] of [["optSeq", "seq"], ["optSet", "set"], ["optSer", "ser"]]) {
-  $(id).checked = store.get(key, true);
-  $(id).addEventListener("change", () => store.set(key, $(id).checked));
+// ---------------------------------------------------------------- view options
+const view = { show: store.get("show", "all"), sort: store.get("sort", "time"), detail: store.get("detail", "standard"), relay: "" };
+for (const [k, list, dflt] of [["show", core.SHOW_OPTIONS, "all"], ["sort", core.SORT_OPTIONS, "time"], ["detail", core.DETAIL_OPTIONS, "standard"]])
+  if (!list.some((o) => o[0] === view[k])) view[k] = dflt;
+$("vDups").checked = store.get("hideDups", true);
+function fillSelect(sel, opts, value) {
+  sel.textContent = "";
+  for (const [v, text] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = text; sel.appendChild(o); }
+  sel.value = value;
 }
+function refreshChoices(ch) {
+  fillSelect($("vShow"), core.SHOW_OPTIONS.map(([k, l]) => [k, ch ? `${l} (${ch.counts[k]})` : l]), view.show);
+  const relays = ch ? ch.relays : [];
+  if (view.relay && !relays.some(([k]) => k === view.relay)) view.relay = "";
+  fillSelect($("vRelay"), [["", relays.length ? `All relays (${relays.reduce((t, [, n]) => t + n, 0)})` : "All relays"]]
+    .concat(relays.map(([k, n]) => [k, `${k} (${n})`])), view.relay);
+  fillSelect($("vSort"), core.SORT_OPTIONS, view.sort);
+  fillSelect($("vDetail"), core.DETAIL_OPTIONS, view.detail);
+}
+const currentOpts = () => ({ show: view.show, relay: view.relay, sort: view.sort, detail: view.detail,
+                             hide_duplicates: $("vDups").checked, search: $("vSearch").value.trim() });
+function editsOk() {
+  if (state.empty || !state.edited) return true;
+  return confirm("Changing the view rebuilds the summary, so the edits you made in the summary box will be lost.\n\n" +
+                 "Tip: copy or export your edited summary first.\n\nRebuild the summary now?");
+}
+for (const [id, key] of [["vShow", "show"], ["vRelay", "relay"], ["vSort", "sort"], ["vDetail", "detail"]]) {
+  $(id).addEventListener("change", () => {
+    if (!editsOk()) { $(id).value = view[key]; return; }
+    view[key] = $(id).value;
+    if (key !== "relay") store.set(key, view[key]);
+    if (state.files.length) generate(false);
+  });
+}
+$("vDups").addEventListener("change", () => {
+  if (!editsOk()) { $("vDups").checked = !$("vDups").checked; return; }
+  store.set("hideDups", $("vDups").checked);
+  if (state.files.length) generate(false);
+});
+let searchTimer = null;
+$("vSearch").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    if ($("vSearch").value.trim() === state.lastSearch) return;
+    if (!editsOk()) { $("vSearch").value = state.lastSearch; return; }
+    if (state.files.length) generate(false);
+  }, 300);
+});
+$("vSearch").addEventListener("keydown", (e) => { if (e.key === "Escape") { $("vSearch").value = ""; $("vSearch").dispatchEvent(new Event("input")); } });
+refreshChoices(null);
 
 // ---------------------------------------------------------------- files
 const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
@@ -467,7 +534,10 @@ $("pickFolder").addEventListener("change", (e) => {
 });
 $("addFiles").addEventListener("click", () => $("pickFiles").click());
 $("addFolder").addEventListener("click", () => $("pickFolder").click());
-$("clear").addEventListener("click", () => { state.files = []; renderFiles(); showEmpty(); setStatus("Cleared"); });
+$("clear").addEventListener("click", () => {
+  state.files = []; state.cache = null; view.relay = ""; refreshChoices(null);
+  renderFiles(); showEmpty(); setStatus("Cleared");
+});
 $("samples").addEventListener("click", () => {
   const data = JSON.parse($("sample-data").textContent);
   let added = 0;
@@ -520,26 +590,40 @@ function lineHtml(ln, i) {
 function showReport(text) {
   out.innerHTML = text.split("\n").map(lineHtml).join("\n");
   state.empty = false;
+  state.edited = false;
 }
 const summaryText = () => (state.empty ? "" : out.innerText.replace(/\n$/, ""));
 
 let busy = false;
-async function generate() {
+/** Parse the files once; view changes reuse the result. */
+async function loaded(reload) {
+  const key = state.files.map((f) => f.key).join("\n");
+  if (reload || !state.cache || state.cache.key !== key) {
+    const r = await core.loadFiles(state.files.map((f) => ({ name: f.name, bytes: f.bytes })));
+    state.cache = Object.assign({ key, choices: core.viewChoices(r.events, r.rdb) }, r);
+  }
+  return state.cache;
+}
+async function generate(reload) {
   if (!state.files.length) { setStatus("Add some files first"); return; }
   if (busy) return;
   busy = true; setStatus("Analyzing…");
   try {
-    const { events, rdb, errors } = await core.loadFiles(state.files.map((f) => ({ name: f.name, bytes: f.bytes })));
-    const text = core.buildReport(events, rdb, errors, state.files.length, $("comments").value,
-      { sequence: $("optSeq").checked, settings: $("optSet").checked, ser: $("optSer").checked });
+    const { events, rdb, errors, choices } = await loaded(reload !== false);
+    refreshChoices(choices);
+    const opts = currentOpts();
+    state.lastSearch = opts.search;
+    const text = core.buildReport(events, rdb, errors, state.files.length, $("comments").value, opts);
     showReport(text);
     const n = events.filter((e) => e.kind !== "ser").length, nf = state.files.length;
-    setStatus(`${n} event${n === 1 ? "" : "s"} from ${nf} file${nf === 1 ? "" : "s"}` + (errors.length ? `  -  ${errors.length} could not be read` : ""));
+    const m = /^Showing: (\d+) of/m.exec(text);
+    const showing = m ? `showing ${m[1]} of ${n}` : `${n} event${n === 1 ? "" : "s"}`;
+    setStatus(`${showing} from ${nf} file${nf === 1 ? "" : "s"}` + (errors.length ? `  -  ${errors.length} could not be read` : ""));
   } catch (e) {
     setStatus("Something went wrong: " + (e && e.message ? e.message : e));
   } finally { busy = false; }
 }
-$("generate").addEventListener("click", generate);
+$("generate").addEventListener("click", () => generate(true));
 
 // typing into the summary: keep it plain text
 try { out.contentEditable = "plaintext-only"; } catch (e) { /* older browser */ }
@@ -550,7 +634,7 @@ if (out.contentEditable !== "plaintext-only") {
     document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain"));
   });
 }
-out.addEventListener("input", () => { state.empty = out.textContent.length === 0; });
+out.addEventListener("input", () => { state.empty = out.textContent.length === 0; state.edited = true; });
 
 // ---------------------------------------------------------------- copy / export
 async function copyAll() {
@@ -614,6 +698,13 @@ function exportAs(kind) {
   closeMenu();
   if (state.empty) { setStatus("Generate a summary first"); return; }
   const text = summaryText(), name = `Trip summary ${stamp()}`;
+  if (kind === "csv") {
+    if (!state.cache) { setStatus("Generate a summary first"); return; }
+    download(name + ".csv", new Blob(["\ufeff", core.reportCsv(state.cache.events, state.cache.rdb, currentOpts())], { type: "text/csv;charset=utf-8" }));
+    flash($("exportBtn"), "Exported ✓");
+    setStatus("Saved " + name + ".csv to your downloads (one row per event; edits in the summary box aren't included)");
+    return;
+  }
   if (kind === "txt") download(name + ".txt", new Blob([text.replace(/\n/g, "\r\n")], { type: "text/plain;charset=utf-8" }));
   else if (kind === "doc") {
     const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">` +
@@ -704,6 +795,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "F5" || (ctrl && e.key === "Enter")) { e.preventDefault(); generate(); }
   else if (ctrl && e.shiftKey && k === "c") { e.preventDefault(); copyAll(); }
   else if (ctrl && !e.shiftKey && k === "o") { e.preventDefault(); $("pickFiles").click(); }
+  else if (ctrl && !e.shiftKey && k === "f") { e.preventDefault(); $("vSearch").focus(); $("vSearch").select(); }
   else if (ctrl && !e.shiftKey && k === "s") { e.preventDefault(); exportAs("doc"); }
   else if (ctrl && !e.shiftKey && k === "p") { e.preventDefault(); exportAs("pdf"); }
   else if (ctrl && !e.shiftKey && k === "d") { e.preventDefault(); applyTheme(!$("dark").checked); store.set("dark", $("dark").checked); }

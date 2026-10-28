@@ -976,16 +976,15 @@ function eventDatetime(rec) {
 }
 
 function linkDuplicates(events) {
-  const detailed = events.map((e, i) => [i + 1, e, eventDatetime(e)]).filter(([, e]) => e.kind === "event");
+  const detailed = events.filter((e) => e.kind === "event").map((e) => [e, eventDatetime(e)]);
   for (const e of events) {
     if (e.kind !== "history") continue;
     const dt = eventDatetime(e);
     if (dt === null) continue;
-    for (const [i, d, ddt] of detailed) {
+    for (const [d, ddt] of detailed) {
       if (ddt !== null && Math.abs(ddt - dt) / 1e6 <= 1.0 &&
           (!e.relay_id || !d.relay_id || e.relay_id.toUpperCase() === d.relay_id.toUpperCase())) {
-        e.notes.push(`Same event as #${i} (${d.source}), which has more detail.`);
-        e.dup_of = i;
+        e.dup_of = d;
         break;
       }
     }
@@ -997,98 +996,218 @@ function nowStamp(date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-function buildReport(events, rdb, errors, nFiles, comments, opts) {
+// ---------------------------------------------------------------------------
+// View options: filter, sort and detail level
+// ---------------------------------------------------------------------------
+const SHOW_OPTIONS = [["all", "All events"], ["trips", "Trips only"], ["review", "Needs review"],
+  ["faults", "Faults only"], ["notrip", "No-trip events"]];
+const SORT_OPTIONS = [["time", "Oldest first"], ["newest", "Newest first"], ["relay", "By relay"],
+  ["review", "Needs review first"]];
+const DETAIL_OPTIONS = [["summary", "Summary only"], ["standard", "Standard"], ["full", "Full"]];
+const FAULT_GROUPS = [
+  [["single phase-to-ground", "single phase-to-ground"], ["AG", "BG", "CG"]],
+  [["phase-to-phase", "phase-to-phase"], ["AB", "BC", "CA"]],
+  [["two-phase-to-ground", "two-phase-to-ground"], ["ABG", "BCG", "CAG"]],
+  [["three-phase", "three-phase"], ["ABC", "ABCG"]],
+  [["trip without a fault type", "trips without a fault type"], ["TRIP"]],
+];
+const optLabel = (opts, key) => opts.find((o) => o[0] === key)[1];
+const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+const relayKey = (e) => e.relay_id || e.terminal_id || e.source;
+function showMatches(e, a, show) {
+  if (show === "trips") return a.tripped;
+  if (show === "review") return !!(a.checks.length || a.gaps.length);
+  if (show === "faults") return has(FAULT_TYPES, eventCore(e.event_type));
+  if (show === "notrip") return !a.tripped;
+  return true;
+}
+function searchText(e, a) {
+  return [e.relay_id, e.terminal_id, e.source, e.event_type, e.targets, e.date, e.time, e.location, a.desc]
+    .concat(a.cause, a.checks, a.gaps, a.primary).filter(Boolean).join(" ").toUpperCase();
+}
+
+function prepareView(events, rdb, opts) {
   opts = opts || {};
-  comments = comments || "";
-  const showSeq = opts.sequence !== false, showSettings = opts.settings !== false, showSer = opts.ser !== false;
-  const now = opts.now || nowStamp();
   const ev = events.filter((e) => e.kind === "event" || e.kind === "history")
     .map((e, i) => [e, eventDatetime(e), i])
     .sort((a, b) => ((a[1] === null) - (b[1] === null)) || ((a[1] === null ? -Infinity : a[1]) - (b[1] === null ? -Infinity : b[1])) || (a[2] - b[2]))
     .map((x) => x[0]);
   for (const e of ev) { e.notes = e.notes.filter((n) => !n.startsWith("Same event as")); e.dup_of = null; }
   linkDuplicates(ev);
-  const ser = events.filter((e) => e.kind === "ser");
-
-  const analyses = ev.map((e) => {
-    const [sRdb, label, how] = matchSettings(e, rdb);
+  const items = ev.map((e, i) => {
+    const [sRdb, lbl, how] = matchSettings(e, rdb);
     const s = Object.assign({}, e.settings, sRdb);
-    return [e, s, label, how, analyzeEvent(e, s, how, label)];
+    return { e, s, label: lbl, how, a: analyzeEvent(e, s, how, lbl), order: i };
   });
-  const nItems = analyses.reduce((t, x) => t + x[4].checks.length + x[4].gaps.length, 0);
-  const nEv = analyses.filter((x) => x[4].checks.length || x[4].gaps.length).length;
+  const show = opts.show || "all";
+  const relay = strip(opts.relay || "").toUpperCase();
+  const search = strip(opts.search || "").toUpperCase();
+  const hideDups = !!opts.hide_duplicates;
+  let shown = [], nDups = 0;
+  for (const it of items) {
+    if (!showMatches(it.e, it.a, show)) continue;
+    if (relay && strip(relayKey(it.e)).toUpperCase() !== relay) continue;
+    if (search && !searchText(it.e, it.a).includes(search)) continue;
+    if (hideDups && it.e.dup_of !== null) { nDups++; continue; }
+    shown.push(it);
+  }
+  const sort = opts.sort || "time";
+  if (sort === "newest") {
+    const dated = shown.filter((it) => eventDatetime(it.e) !== null);
+    shown = dated.reverse().concat(shown.filter((it) => eventDatetime(it.e) === null));
+  } else if (sort === "relay") {
+    shown.sort((x, y) => cmp(relayKey(x.e).toUpperCase(), relayKey(y.e).toUpperCase()) || x.order - y.order);
+  } else if (sort === "review") {
+    const n = (it) => it.a.checks.length + it.a.gaps.length;
+    shown.sort((x, y) => n(y) - n(x) || x.order - y.order);
+  }
+  return { items, shown, nDups };
+}
+
+/** Counts for the Show options and the relays present, for labelling the view controls. */
+function viewChoices(events, rdb) {
+  const { items } = prepareView(events, rdb);
+  const counts = {};
+  for (const [key] of SHOW_OPTIONS) counts[key] = items.filter((it) => showMatches(it.e, it.a, key)).length;
+  const relays = new Map();
+  for (const it of items) { const k = relayKey(it.e); relays.set(k, (relays.get(k) || 0) + 1); }
+  return { counts, relays: [...relays].sort((a, b) => cmp(a[0].toUpperCase(), b[0].toUpperCase())) };
+}
+
+function describeView(opts, nDups) {
+  opts = opts || {};
+  const parts = [];
+  const show = opts.show || "all";
+  if (show !== "all") parts.push(optLabel(SHOW_OPTIONS, show).toLowerCase());
+  if (strip(opts.relay || "")) parts.push(`relay ${strip(opts.relay)}`);
+  const sort = opts.sort || "time";
+  if (sort !== "time") parts.push(optLabel(SORT_OPTIONS, sort).toLowerCase());
+  if (strip(opts.search || "")) parts.push(`matching "${strip(opts.search)}"`);
+  if (nDups) parts.push(`${nDups} duplicate history row${nDups !== 1 ? "s" : ""} hidden`);
+  return parts.join("; ");
+}
+
+function overviewLines(shown) {
+  const trips = shown.filter((it) => it.a.tripped).length;
+  const lines = [`  Events      : ${shown.length} - ${trips} trip${trips !== 1 ? "s" : ""}, ${shown.length - trips} no trip`];
+  const cats = [], known = new Set();
+  for (const [[one, many], codes] of FAULT_GROUPS) {
+    const n = shown.filter((it) => codes.includes(eventCore(it.e.event_type))).length;
+    codes.forEach((c) => known.add(c));
+    if (n) cats.push(`${n} ${n === 1 ? one : many}`);
+  }
+  const other = shown.filter((it) => !known.has(eventCore(it.e.event_type))).length;
+  if (other) cats.push(`${other} other event${other !== 1 ? "s" : ""} (no fault)`);
+  lines.push("  Fault types : " + cats.join(", "));
+  const relays = new Map();
+  for (const it of shown) { const k = relayKey(it.e); relays.set(k, (relays.get(k) || 0) + 1); }
+  const ordered = [...relays].sort((a, b) => (b[1] - a[1]) || cmp(a[0].toUpperCase(), b[0].toUpperCase()));
+  lines.push("  Relays      : " + ordered.map(([k, n]) => `${k} (${n})`).join(", "));
+  lines.push("  Confidence  : " + ["High", "Medium", "Low"]
+    .map((c) => [c, shown.filter((it) => it.a.confidence === c).length]).filter(([, n]) => n).map(([c, n]) => `${n} ${c}`).join(", "));
+  return lines;
+}
+
+function buildReport(events, rdb, errors, nFiles, comments, opts) {
+  opts = opts || {};
+  comments = comments || "";
+  const detail = opts.detail || "full";
+  const showSeq = detail === "full" && opts.sequence !== false;
+  const showSettings = detail === "full" && opts.settings !== false;
+  const showSer = detail === "full" && opts.ser !== false;
+  const now = opts.now || nowStamp();
+  const { items, shown, nDups } = prepareView(events, rdb, opts);
+  const ser = events.filter((e) => e.kind === "ser");
+  const nItems = shown.reduce((t, it) => t + it.a.checks.length + it.a.gaps.length, 0);
+  const nEv = shown.filter((it) => it.a.checks.length || it.a.gaps.length).length;
+  const number = new Map(shown.map((it, i) => [it.e, i + 1]));
+  const dupNote = (e) => {
+    const d = e.dup_of;
+    if (d === null) return [];
+    if (number.has(d)) return [`Same event as #${number.get(d)} (${d.source}), which has more detail.`];
+    return [`Same event as the detailed report in ${d.source} (not shown in this view).`];
+  };
 
   const out = [];
   out.push("SEL TRIP EVENT SUMMARY", "=".repeat(60), `Generated: ${now}`,
-           `Files analyzed: ${nFiles}   Events found: ${ev.length}   Settings databases: ${rdb.size}`);
-  if (ev.length)
-    out.push(`Needs review: ${nItems} item(s) to check across ${nEv} of ${ev.length} event(s)` + (nItems ? " - see the CHECK lines" : ""));
+           `Files analyzed: ${nFiles}   Events found: ${items.length}   Settings databases: ${rdb.size}`);
+  const view = describeView(opts, nDups);
+  if (items.length && (view || shown.length !== items.length))
+    out.push(`Showing: ${shown.length} of ${items.length} events` + (view ? ` (${view})` : ""));
+  if (shown.length)
+    out.push(`Needs review: ${nItems} item(s) to check across ${nEv} of ${shown.length} event(s)` + (nItems ? " - see the CHECK lines" : ""));
   out.push("");
-  if (strip(comments)) { out.push("ANALYST COMMENTS / NOTES", "-".repeat(60), ...splitlines(strip(comments)), ""); }
+  if (strip(comments)) out.push("ANALYST COMMENTS / NOTES", "-".repeat(60), ...splitlines(strip(comments)), "");
 
-  if (!ev.length && !ser.length) out.push("No event data recognized in the loaded files.");
+  if (!items.length && !ser.length) out.push("No event data recognized in the loaded files.");
   else {
+    if (shown.length >= 2) out.push("OVERVIEW", "-".repeat(60), ...overviewLines(shown), "");
     out.push("QUICK SUMMARY", "-".repeat(60));
-    analyses.forEach(([e, s, , , a], idx) => {
+    if (items.length && !shown.length) out.push("No events match the current Show / Relay / Search options.");
+    shown.forEach((it, idx) => {
+      const e = it.e;
       const when = strip(`${e.date} ${e.time}`) || "date n/a";
-      const who = e.relay_id || e.terminal_id || e.source;
-      out.push(`${String(idx + 1).padStart(2)}. ${when} | ${who} | ${e.event_type || "?"} | ${shortCause(e, s, a)}`);
+      out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${e.event_type || "?"} | ${shortCause(e, it.s, it.a)}`);
     });
-    out.push("", "EVENT DETAILS", "-".repeat(60));
-    const shown = new Map();
-    analyses.forEach(([e, s, label, , a], idx) => {
-      const n = idx + 1;
-      out.push(`Event ${n} of ${ev.length}  (${e.kind === "history" ? "history row" : "event report"})`);
-      out.push(`  Source file : ${e.source}`);
-      const relay = [e.relay_id, e.terminal_id].filter(Boolean).join(" / ");
-      if (relay) out.push(`  Relay       : ${relay}`);
-      if (e.fid) out.push(`  Firmware    : ${e.fid}`);
-      if (e.date || e.time) out.push(`  Date / Time : ${e.date} ${e.time}`);
-      if (e.event_type) out.push(`  Event type  : ${e.event_type}  (${a.desc})`);
-      if (e.location) out.push(`  Fault loc.  : ${fmtLoc(e.location, s)}`);
-      if (e.targets) out.push(`  Targets     : ${e.targets}`);
-      if (e.freq) out.push(`  Frequency   : ${e.freq} Hz`);
-      if (e.shot) out.push(`  Shot        : ${e.shot}`);
-      for (const x of e.extra) out.push(`  ${x}`);
-      if (e.currents.size) {
-        const parts = [...e.currents].map(([k, [pre, post]]) => `${k} ${fc(post, 0)}` + (pre !== null ? ` (pre ${fc(pre, 0)})` : ""));
-        const est = e.sequence.length || [...e.currents.values()].some(([p]) => p !== null) ? ", estimated from samples" : "";
-        out.push("  Currents    : " + parts.join("; ") + `  [A, max during fault${est}]`);
-      }
-      if (e.voltages.size) {
-        const parts = [...e.voltages].map(([k, [pre, post]]) => `${k} ${fc(pre, 2)} -> ${fc(post, 2)}`);
-        out.push("  Voltages    : " + parts.join("; ") + "  [prefault -> min during fault]");
-      }
-      const nChk = a.checks.length + a.gaps.length;
-      out.push(`  Confidence  : ${a.confidence} (${a.basis})` + (nChk ? ` - ${nChk} item(s) to check` : ""));
-      out.push("  Probable cause:");
-      for (const c of a.cause) out.push(`    - ${c}`);
-      if (nChk) { out.push("  Check before relying on this:"); for (const c of a.checks.concat(a.gaps)) out.push(`    - CHECK: ${c}`); }
-      if (showSeq && e.sequence.length) {
-        out.push("  Element sequence (cycles from start of record):");
-        const rel = e.sequence.filter((x) => elementClass(x[1]));
-        const rest = e.sequence.length - rel.length;
-        for (const [cyc, el, st] of rel.slice(0, 40))
-          out.push(`    ${fx(cyc, 2).padStart(6)}  ${el.padEnd(10)} ${st === "pre" ? "already asserted at start" : "asserted"}  (${elementClass(el)})`);
-        if (rel.length > 40) out.push(`    ... ${rel.length - 40} more`);
-        if (rest) out.push(`    (${rest} other relay word bits changed - not listed)`);
-      }
-      if (showSettings && Object.keys(s).length) {
-        const keys = ["TR", "TRCOMM", "TRSOTF", "DTT", "LL", "CTR", "PTR", "Z1MAG", "Z1P", "Z1MG", "50P1P", "50G1P", "51PP", "51GP", "ER"]
-          .filter((k) => k in s);
-        if (keys.length) {
-          const src = label ? `RDB: ${label}` : "event file";
-          const sig = JSON.stringify([src, keys.map((k) => [k, s[k]])]);
-          if (shown.has(sig)) out.push(`  Settings    : same as Event ${shown.get(sig)} (${src})`);
-          else {
-            shown.set(sig, n);
-            out.push(`  Settings context (${src}):`);
-            for (const k of keys) out.push(`    ${k} := ${s[k]}`);
+    out.push("");
+    if (detail !== "summary" && !(items.length && !shown.length)) {
+      out.push("EVENT DETAILS", "-".repeat(60));
+      const shownSettings = new Map();
+      shown.forEach((it, idx) => {
+        const n = idx + 1, e = it.e, s = it.s, a = it.a, lbl = it.label;
+        out.push(`Event ${n} of ${shown.length}  (${e.kind === "history" ? "history row" : "event report"})`);
+        out.push(`  Source file : ${e.source}`);
+        const relay = [e.relay_id, e.terminal_id].filter(Boolean).join(" / ");
+        if (relay) out.push(`  Relay       : ${relay}`);
+        if (e.fid) out.push(`  Firmware    : ${e.fid}`);
+        if (e.date || e.time) out.push(`  Date / Time : ${e.date} ${e.time}`);
+        if (e.event_type) out.push(`  Event type  : ${e.event_type}  (${a.desc})`);
+        if (e.location) out.push(`  Fault loc.  : ${fmtLoc(e.location, s)}`);
+        if (e.targets) out.push(`  Targets     : ${e.targets}`);
+        if (e.freq) out.push(`  Frequency   : ${e.freq} Hz`);
+        if (e.shot) out.push(`  Shot        : ${e.shot}`);
+        for (const x of e.extra) out.push(`  ${x}`);
+        if (e.currents.size) {
+          const parts = [...e.currents].map(([k, [pre, post]]) => `${k} ${fc(post, 0)}` + (pre !== null ? ` (pre ${fc(pre, 0)})` : ""));
+          const est = e.sequence.length || [...e.currents.values()].some(([p]) => p !== null) ? ", estimated from samples" : "";
+          out.push("  Currents    : " + parts.join("; ") + `  [A, max during fault${est}]`);
+        }
+        if (e.voltages.size) {
+          const parts = [...e.voltages].map(([k, [pre, post]]) => `${k} ${fc(pre, 2)} -> ${fc(post, 2)}`);
+          out.push("  Voltages    : " + parts.join("; ") + "  [prefault -> min during fault]");
+        }
+        const nChk = a.checks.length + a.gaps.length;
+        out.push(`  Confidence  : ${a.confidence} (${a.basis})` + (nChk ? ` - ${nChk} item(s) to check` : ""));
+        out.push("  Probable cause:");
+        for (const c of a.cause.concat(dupNote(e))) out.push(`    - ${c}`);
+        if (nChk) { out.push("  Check before relying on this:"); for (const c of a.checks.concat(a.gaps)) out.push(`    - CHECK: ${c}`); }
+        if (showSeq && e.sequence.length) {
+          out.push("  Element sequence (cycles from start of record):");
+          const rel = e.sequence.filter((x) => elementClass(x[1]));
+          const rest = e.sequence.length - rel.length;
+          for (const [cyc, el, st] of rel.slice(0, 40))
+            out.push(`    ${fx(cyc, 2).padStart(6)}  ${el.padEnd(10)} ${st === "pre" ? "already asserted at start" : "asserted"}  (${elementClass(el)})`);
+          if (rel.length > 40) out.push(`    ... ${rel.length - 40} more`);
+          if (rest) out.push(`    (${rest} other relay word bits changed - not listed)`);
+        }
+        if (showSettings && Object.keys(s).length) {
+          const keys = ["TR", "TRCOMM", "TRSOTF", "DTT", "LL", "CTR", "PTR", "Z1MAG", "Z1P", "Z1MG", "50P1P", "50G1P", "51PP", "51GP", "ER"]
+            .filter((k) => k in s);
+          if (keys.length) {
+            const src = lbl ? `RDB: ${lbl}` : "event file";
+            const sig = JSON.stringify([src, keys.map((k) => [k, s[k]])]);
+            if (shownSettings.has(sig)) out.push(`  Settings    : same as Event ${shownSettings.get(sig)} (${src})`);
+            else {
+              shownSettings.set(sig, n);
+              out.push(`  Settings context (${src}):`);
+              for (const k of keys) out.push(`    ${k} := ${s[k]}`);
+            }
           }
         }
-      }
-      out.push("");
-    });
+        out.push("");
+      });
+    }
   }
   if (showSer && ser.length) {
     out.push("SEQUENTIAL EVENTS RECORDER (trip-related lines)", "-".repeat(60));
@@ -1100,14 +1219,40 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
     }
     out.push("");
   }
-  if (rdb.size && !ev.length) {
+  if (rdb.size && !items.length) {
     out.push("SETTINGS LOADED", "-".repeat(60));
-    for (const [label, s] of rdb) out.push(`  ${label}: TR := ${s.TR !== undefined ? s.TR : "n/a"}`);
+    for (const [lbl, s] of rdb) out.push(`  ${lbl}: TR := ${s.TR !== undefined ? s.TR : "n/a"}`);
     out.push("");
   }
-  if (errors.length) { out.push("FILES THAT COULD NOT BE READ", "-".repeat(60), ...errors.map((e) => "  " + e), ""); }
+  if (errors.length) out.push("FILES THAT COULD NOT BE READ", "-".repeat(60), ...errors.map((e) => "  " + e), "");
   out.push("Note: automated interpretation - verify against the relay oscillography and settings.");
   return out.join("\n");
+}
+
+const CSV_COLUMNS = ["#", "Date", "Time", "Relay", "Station", "Event type", "Description", "Tripped",
+  "Tripping elements", "Fault location", "% of line", "Targets", "Max phase current (A)",
+  "Ground current (A)", "Breaker clearing (cycles)", "Confidence", "Items to check",
+  "Check details", "Source file"];
+const csvField = (v) => (/[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+
+/** One row per event (same filter and order as the summary) for Excel. */
+function reportCsv(events, rdb, opts) {
+  const { shown } = prepareView(events, rdb, opts);
+  const rows = [CSV_COLUMNS];
+  shown.forEach((it, idx) => {
+    const e = it.e, s = it.s, a = it.a;
+    const [ph, gnd] = phaseCurrents(e);
+    let peaks = [...ph.values()].map((v) => v[1]);
+    if (!peaks.length) peaks = [...e.currents].filter(([k]) => k === "Fault current").map(([, v]) => v[1]);
+    const loc = strip(e.location || "");
+    const v = fnum(loc), ll = fnum(s.LL !== undefined ? s.LL : "");
+    const clearing = e.trip_cycle !== null && e.open_cycle !== null && e.open_cycle > e.trip_cycle ? fx(e.open_cycle - e.trip_cycle, 2) : "";
+    rows.push([String(idx + 1), e.date, e.time, e.relay_id, e.terminal_id, e.event_type, a.desc,
+      a.tripped ? "Yes" : "No", a.primary.join(", "), loc, v !== null && ll ? fx(100 * v / ll, 0) : "", e.targets,
+      peaks.length ? fx(Math.max(...peaks), 0) : "", gnd !== null ? fx(gnd[1], 0) : "",
+      clearing, a.confidence, String(a.checks.length + a.gaps.length), a.checks.concat(a.gaps).join(" | "), e.source]);
+  });
+  return rows.map((r) => r.map((f) => csvField(String(f))).join(",")).join("\r\n") + "\r\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -1135,7 +1280,7 @@ function parseReportText(text) {
     if (!s) { flush(); continue; }
     if (fullmatch("[=\\-]{6,}", s)) continue;
     if (!blocks.length && !para.length && s.toUpperCase().startsWith("SEL TRIP")) { blocks.push(["title", pyTitle(s).split("Sel ").join("SEL ")]); continue; }
-    if (!section && pmatch("^(Generated|Files analyzed|Needs review)\\b", s)) { add("meta", [s]); continue; }
+    if (!section && pmatch("^(Generated|Files analyzed|Showing|Needs review)\\b", s)) { add("meta", [s]); continue; }
     if (ln === s && fullmatch("[A-Z][A-Z /&\\-]{3,}(\\s*\\(.*\\))?", s)) {
       section = s; subh = "";
       add("h1", pyTitle(s).split("Ser").join("SER").split("Rdb").join("RDB"));
@@ -1165,7 +1310,7 @@ function parseReportText(text) {
       add("note", s); continue;
     }
     m = pmatch(KV_RE, ln);
-    if (m && section === "EVENT DETAILS") { add("kv", [[strip(m[1]), strip(m[2]), false]]); continue; }
+    if (m && (section === "EVENT DETAILS" || section === "OVERVIEW")) { add("kv", [[strip(m[1]), strip(m[2]), false]]); continue; }
     if (section.startsWith("FILES THAT") && ln.startsWith("  ")) { add("bullets", [s]); continue; }
     para.push(s);
   }
@@ -1189,7 +1334,7 @@ function tripRuns(text) {
 }
 
 const api = {
-  loadFiles, buildReport, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
+  loadFiles, buildReport, reportCsv, viewChoices, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
   parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, nowStamp, fx, fc, pyTitle, elementClass,
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;

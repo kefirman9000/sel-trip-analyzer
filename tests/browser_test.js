@@ -10,8 +10,10 @@ const pyOut = (args) => {
   const ci = args.indexOf("--comments");
   const extra = ci >= 0 ? ["--comments", args[ci + 1]] : [];
   const paths = ci >= 0 ? args.slice(0, ci).concat(args.slice(ci + 2)) : args;
-  return execFileSync(process.execPath, [path.join(REPO, "web", "cli.js"), "--now", "X", ...extra, ...paths], { encoding: "utf8" }).trimEnd();
+  return execFileSync(process.execPath, [path.join(REPO, "web", "cli.js"), "--now", "X", ...UI_DEFAULTS, ...extra, ...paths], { encoding: "utf8" }).trimEnd();
 };
+const UI_DEFAULTS = ["--hide-duplicates", "--detail", "standard"];
+const cliRaw = (args) => execFileSync(process.execPath, [path.join(REPO, "web", "cli.js"), "--now", "X", ...args], { encoding: "utf8" });
 const shot = (p, name, opts) => (OUT ? p.screenshot({ path: path.join(OUT, name), ...(opts || {}) }) : Promise.resolve());
 const norm = (t) => t.replace(/^Generated: .*$/m, "Generated: X").trimEnd();
 if (OUT) fs.mkdirSync(OUT, { recursive: true });
@@ -62,6 +64,34 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
     ok("folder upload skips README and matches command-line report", !names.includes("README.txt") &&
        norm(await page.evaluate(() => window.__selApp.summaryText())) === pyOut([path.join(REPO, "sample_files")]), names.length + " files");
   } catch (e) { ok("folder upload", false, e.message.split("\n")[0]); }
+
+  // 4b) view options: filters, search, relay, sort, detail, CSV
+  await page.selectOption("#vShow", "review");
+  await page.waitForFunction(() => /Showing: \d+ of 11 events \(needs review/.test(window.__selApp.summaryText()));
+  const samples = path.join(REPO, "sample_files");
+  ok("Show = Needs review matches command-line", norm(await page.evaluate(() => window.__selApp.summaryText())) ===
+     norm(cliRaw([...UI_DEFAULTS, "--show", "review", samples])));
+  ok("Show menu lists counts", (await page.textContent("#vShow")).includes("Needs review (7)"));
+  await page.selectOption("#vRelay", "FEEDER 12");
+  await page.selectOption("#vSort", "newest");
+  await page.selectOption("#vDetail", "full");
+  await page.fill("#vSearch", "zone");
+  await page.waitForFunction(() => window.__selApp.summaryText().includes('matching "zone"'));
+  const viewArgs = ["--hide-duplicates", "--show", "review", "--relay", "FEEDER 12", "--sort", "newest", "--detail", "full", "--search", "zone"];
+  ok("combined view matches command-line", norm(await page.evaluate(() => window.__selApp.summaryText())) === norm(cliRaw([...viewArgs, samples])));
+  const [dCsv] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => window.__selApp.exportAs("csv"))]);
+  const csv = fs.readFileSync(await dCsv.path(), "utf8").replace(/^\ufeff/, "");
+  ok("CSV export matches command-line", csv === cliRaw([...viewArgs, "--format", "csv", samples]), dCsv.suggestedFilename());
+  await page.evaluate(() => { window.__confirmAsked = 0; window.confirm = () => { window.__confirmAsked++; return false; }; });
+  await page.click("#out"); await page.keyboard.press("Control+End"); await page.keyboard.type(" edited");
+  await page.selectOption("#vShow", "all");
+  ok("view change after editing asks first and keeps edits when declined",
+     (await page.evaluate(() => window.__confirmAsked)) === 1 && (await page.inputValue("#vShow")) === "review" &&
+     (await page.evaluate(() => window.__selApp.summaryText())).endsWith(" edited"));
+  await page.evaluate(() => { window.confirm = () => true; });
+  await page.fill("#vSearch", ""); await page.selectOption("#vShow", "all"); await page.selectOption("#vRelay", "");
+  await page.selectOption("#vSort", "time"); await page.selectOption("#vDetail", "standard");
+  await page.waitForFunction(() => !/^Showing: \d+ of 11 events \((needs|relay)/m.test(window.__selApp.summaryText()));
 
   // 5) edit the summary, then export txt + doc include the edit
   await page.click("#out");

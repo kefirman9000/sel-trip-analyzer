@@ -20,8 +20,10 @@ and why**, ready to paste into an outage report or export to Word or PDF.
   tripped, how fast the breaker opened, and the likely cause.
 - **Flags anything it isn't sure about** with a `CHECK:` line and rates each
   event's confidence High, Medium or Low, so you know what to verify.
+- Lets you **filter, sort and search** the results (trips only, needs review,
+  one relay, newest first…) and choose how much detail to show.
 - Gives you an editable summary you can copy, or export as a formatted Word or
-  PDF report.
+  PDF report, or as a spreadsheet for Excel.
 - Runs entirely on your computer. No install, no account, nothing uploaded.
   Use the Windows program or the [browser version](#browser-version).
 
@@ -134,14 +136,40 @@ then the **Event details**:
 LL). With settings loaded it's also shown as a percentage of the line. `$$$$$`
 means the relay couldn't calculate it.
 
+## Organizing the summary
+
+The row of controls above the summary changes what it shows and in what order.
+The summary always says which view it is showing (for example *Showing: 7 of
+11 events (needs review; newest first)*).
+
+| Control | Choices |
+|---|---|
+| **Show** | All events · Trips only · Needs review · Faults only · No-trip events. Each shows how many events it includes |
+| **Relay** | All relays, or one relay (with its event count) |
+| **Sort** | Oldest first · Newest first · By relay · Needs review first |
+| **Detail** | **Summary only**: overview + one line per event · **Standard**: adds each event's details and CHECKs · **Full**: adds the element timeline, settings and SER |
+| **Hide duplicates** | Skips history rows that repeat an event you also loaded as a detailed report (on by default) |
+| **Search** | Only events whose details contain the text, e.g. a relay, `zone 2`, `81` or `breaker` (`Ctrl+F`) |
+
+When two or more events are shown, the summary starts with an **Overview**:
+counts of trips, fault types, events per relay and confidence levels.
+
+For heavy sorting and filtering, use **Export → Spreadsheet for Excel (.csv)**.
+It gives one row per event (date, relay, event type, cause, tripping elements,
+location and % of line, currents, breaker clearing time, confidence and every
+CHECK), using the same filter and order as the summary.
+
+Changing the view rebuilds the summary. If you've edited the text, the program
+asks first, so copy or export your edits before switching views.
+
 ## Comments, export and feedback
 
 - **Comments & suggestions** box: anything you type is added to the top of the
   summary.
 - The summary box is **fully editable**. Whatever you change is what gets
   copied or exported.
-- **Export** → Word (`.docx`), PDF, or plain text. Word and PDF open
-  automatically once saved. Shortcuts: `Ctrl+S` Word, `Ctrl+P` PDF.
+- **Export** → Word (`.docx`), PDF, spreadsheet (`.csv`), or plain text. Word
+  and PDF open automatically once saved. Shortcuts: `Ctrl+S` Word, `Ctrl+P` PDF.
 - **Feedback on this output**: tell us what was wrong or missing. **Send
   feedback** opens a pre-filled issue on this page (you'll need a free GitHub
   account to submit it), and a copy is always saved on your PC.
@@ -159,8 +187,8 @@ it hasn't been tampered with, and restarts.
 
 Press **F1** (or click **Help**) for the built-in guide.
 
-`Ctrl+O` add files · `F5` generate · `Ctrl+Shift+C` copy · `Ctrl+S` Word ·
-`Ctrl+P` PDF · `Ctrl+D` dark mode · `Delete` remove the selected files
+`Ctrl+O` add files · `F5` generate · `Ctrl+F` search · `Ctrl+Shift+C` copy ·
+`Ctrl+S` Word · `Ctrl+P` PDF · `Ctrl+D` dark mode · `Delete` remove the selected files
 
 ## Troubleshooting
 

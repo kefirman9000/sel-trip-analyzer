@@ -26,14 +26,23 @@ function expand(paths) {
 }
 
 (async () => {
+  // same flags as `python sel_trip_analyzer.py --cli`, plus --now for repeatable output
   const args = process.argv.slice(2);
-  let comments = "", now;
-  for (const flag of ["--comments", "--now"]) {
+  let comments = "", format = "text";
+  const opts = {};
+  for (const [flag, key] of [["--comments", "comments"], ["--now", "now"], ["--show", "show"], ["--relay", "relay"],
+                             ["--sort", "sort"], ["--detail", "detail"], ["--search", "search"], ["--format", "format"]]) {
     const i = args.indexOf(flag);
-    if (i >= 0) { if (flag === "--comments") comments = args[i + 1]; else now = args[i + 1]; args.splice(i, 2); }
+    if (i < 0) continue;
+    const v = args[i + 1];
+    args.splice(i, 2);
+    if (key === "comments") comments = v; else if (key === "format") format = v; else opts[key] = v;
   }
+  const hd = args.indexOf("--hide-duplicates");
+  if (hd >= 0) { args.splice(hd, 1); opts.hide_duplicates = true; }
   const paths = expand(args);
   const files = paths.map((p) => ({ name: path.basename(p), bytes: new Uint8Array(fs.readFileSync(p)) }));
   const { events, rdb, errors } = await core.loadFiles(files);
-  process.stdout.write(core.buildReport(events, rdb, errors, paths.length, comments, { now }) + "\n");
+  if (format === "csv") process.stdout.write(core.reportCsv(events, rdb, opts));
+  else process.stdout.write(core.buildReport(events, rdb, errors, paths.length, comments, opts) + "\n");
 })();

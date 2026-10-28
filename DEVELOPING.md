@@ -104,7 +104,11 @@ workflow**) to trial-build a branch without publishing anything.
    asserted with the trip), and the clearing time. It produces `checks` (things
    that look wrong or ambiguous, which lower confidence) and `gaps` (missing
    data). Both appear as `CHECK:` lines.
-3. **Report** (`build_report`). Events are sorted by time, history rows are
+3. **View** (`prepare_view`). Applies the Show / Relay / Search / Hide
+   duplicates filters and the sort. The report and the CSV (`report_csv`) both
+   use it, so they always agree. The same options exist as `--cli` flags
+   (`--show --relay --sort --detail --search --hide-duplicates --format csv`).
+4. **Report** (`build_report`). Events are sorted by time, history rows are
    linked to matching detailed reports, and the result is plain text. Word and
    PDF export re-parse that text (`parse_report_text`), so user edits carry
    through.

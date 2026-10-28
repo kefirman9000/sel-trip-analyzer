@@ -1047,52 +1047,191 @@ def event_datetime(rec):
 
 
 def link_duplicates(events):
-    """Note when a history row is the same event as a detailed report."""
-    detailed = [(i, e, event_datetime(e)) for i, e in enumerate(events, 1) if e.kind == "event"]
+    """Mark history rows that are the same event as a detailed report (dup_of = that report)."""
+    detailed = [(e, event_datetime(e)) for e in events if e.kind == "event"]
     for e in events:
         if e.kind != "history":
             continue
         dt = event_datetime(e)
         if not dt:
             continue
-        for i, d, ddt in detailed:
+        for d, ddt in detailed:
             if ddt and abs((ddt - dt).total_seconds()) <= 1.0 and \
                     (not e.relay_id or not d.relay_id or e.relay_id.upper() == d.relay_id.upper()):
-                e.notes.append(f"Same event as #{i} ({d.source}), which has more detail.")
-                e.dup_of = i
+                e.dup_of = d
                 break
 
 
-def build_report(events, rdb, errors, files, comments="", opts=None):
+# --------------------------------------------------------------------------
+# View options: filter, sort and detail level
+# --------------------------------------------------------------------------
+SHOW_OPTIONS = (("all", "All events"), ("trips", "Trips only"), ("review", "Needs review"),
+                ("faults", "Faults only"), ("notrip", "No-trip events"))
+SORT_OPTIONS = (("time", "Oldest first"), ("newest", "Newest first"), ("relay", "By relay"),
+                ("review", "Needs review first"))
+DETAIL_OPTIONS = (("summary", "Summary only"), ("standard", "Standard"), ("full", "Full"))
+FAULT_GROUPS = ((("single phase-to-ground",) * 2, ("AG", "BG", "CG")),
+                (("phase-to-phase",) * 2, ("AB", "BC", "CA")),
+                (("two-phase-to-ground",) * 2, ("ABG", "BCG", "CAG")),
+                (("three-phase",) * 2, ("ABC", "ABCG")),
+                (("trip without a fault type", "trips without a fault type"), ("TRIP",)))
+
+
+def relay_key(e):
+    return e.relay_id or e.terminal_id or e.source
+
+
+def show_matches(e, a, show):
+    if show == "trips":
+        return a["tripped"]
+    if show == "review":
+        return bool(a["checks"] or a["gaps"])
+    if show == "faults":
+        return event_core(e.event_type) in FAULT_TYPES
+    if show == "notrip":
+        return not a["tripped"]
+    return True
+
+
+def search_text(e, a):
+    parts = [e.relay_id, e.terminal_id, e.source, e.event_type, e.targets, e.date, e.time, e.location,
+             a["desc"]] + a["cause"] + a["checks"] + a["gaps"] + a["primary"]
+    return " ".join(p for p in parts if p).upper()
+
+
+def prepare_view(events, rdb, opts=None):
+    """Analyze every event, then apply the view options.
+
+    Returns (items, shown, n_dups_hidden). Each item is a dict with e, s (settings),
+    label, how, a (analysis) and order (position in time order)."""
     opts = opts or {}
-    show_seq = opts.get("sequence", True)
-    show_settings = opts.get("settings", True)
-    show_ser = opts.get("ser", True)
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     ev = [e for e in events if e.kind in ("event", "history")]
     ev.sort(key=lambda e: (event_datetime(e) is None, event_datetime(e) or datetime.datetime.min))
     for e in ev:
         e.notes = [n for n in e.notes if not n.startswith("Same event as")]
         e.dup_of = None
     link_duplicates(ev)
-    ser = [e for e in events if e.kind == "ser"]
-
-    analyses = []
-    for e in ev:
+    items = []
+    for i, e in enumerate(ev):
         s_rdb, label, how = match_settings(e, rdb)
         s = {**e.settings, **s_rdb}
-        analyses.append((e, s, label, how, analyze_event(e, s, how, label)))
-    n_items = sum(len(a["checks"]) + len(a["gaps"]) for *_, a in analyses)
-    n_ev = sum(1 for *_, a in analyses if a["checks"] or a["gaps"])
+        items.append({"e": e, "s": s, "label": label, "how": how, "a": analyze_event(e, s, how, label), "order": i})
+
+    show = opts.get("show") or "all"
+    relay = (opts.get("relay") or "").strip().upper()
+    search = (opts.get("search") or "").strip().upper()
+    hide_dups = bool(opts.get("hide_duplicates"))
+    shown, n_dups = [], 0
+    for it in items:
+        e, a = it["e"], it["a"]
+        if not show_matches(e, a, show):
+            continue
+        if relay and relay_key(e).strip().upper() != relay:
+            continue
+        if search and search not in search_text(e, a):
+            continue
+        if hide_dups and e.dup_of is not None:
+            n_dups += 1
+            continue
+        shown.append(it)
+
+    sort = opts.get("sort") or "time"
+    if sort == "newest":
+        dated = [it for it in shown if event_datetime(it["e"]) is not None]
+        shown = dated[::-1] + [it for it in shown if event_datetime(it["e"]) is None]
+    elif sort == "relay":
+        shown.sort(key=lambda it: (relay_key(it["e"]).upper(), it["order"]))
+    elif sort == "review":
+        shown.sort(key=lambda it: (-(len(it["a"]["checks"]) + len(it["a"]["gaps"])), it["order"]))
+    return items, shown, n_dups
+
+
+def view_choices(events, rdb):
+    """Counts for the Show options and the relays present, for labelling the view controls."""
+    items, _, _ = prepare_view(events, rdb)
+    counts = {key: sum(1 for it in items if show_matches(it["e"], it["a"], key)) for key, _ in SHOW_OPTIONS}
+    relays = {}
+    for it in items:
+        k = relay_key(it["e"])
+        relays[k] = relays.get(k, 0) + 1
+    return {"counts": counts, "relays": sorted(relays.items(), key=lambda kv: kv[0].upper())}
+
+
+def describe_view(opts, n_dups):
+    opts = opts or {}
+    parts = []
+    show = opts.get("show") or "all"
+    if show != "all":
+        parts.append(dict(SHOW_OPTIONS)[show].lower())
+    if (opts.get("relay") or "").strip():
+        parts.append(f"relay {opts['relay'].strip()}")
+    sort = opts.get("sort") or "time"
+    if sort != "time":
+        parts.append(dict(SORT_OPTIONS)[sort].lower())
+    if (opts.get("search") or "").strip():
+        parts.append(f'matching "{opts["search"].strip()}"')
+    if n_dups:
+        parts.append(f"{n_dups} duplicate history row{'s' if n_dups != 1 else ''} hidden")
+    return "; ".join(parts)
+
+
+def overview_lines(shown):
+    a_list = [it["a"] for it in shown]
+    trips = sum(1 for a in a_list if a["tripped"])
+    lines = [f"  Events      : {len(shown)} - {trips} trip{'s' if trips != 1 else ''}, {len(shown) - trips} no trip"]
+    cats, known = [], set()
+    for (one, many), codes in FAULT_GROUPS:
+        n = sum(1 for it in shown if event_core(it["e"].event_type) in codes)
+        known.update(codes)
+        if n:
+            cats.append(f"{n} {one if n == 1 else many}")
+    other = sum(1 for it in shown if event_core(it["e"].event_type) not in known)
+    if other:
+        cats.append(f"{other} other event{'s' if other != 1 else ''} (no fault)")
+    lines.append("  Fault types : " + ", ".join(cats))
+    relays = {}
+    for it in shown:
+        k = relay_key(it["e"])
+        relays[k] = relays.get(k, 0) + 1
+    ordered = sorted(relays.items(), key=lambda kv: (-kv[1], kv[0].upper()))
+    lines.append("  Relays      : " + ", ".join(f"{k} ({n})" for k, n in ordered))
+    conf = {c: sum(1 for a in a_list if a["confidence"] == c) for c in ("High", "Medium", "Low")}
+    lines.append("  Confidence  : " + ", ".join(f"{n} {c}" for c, n in conf.items() if n))
+    return lines
+
+
+def build_report(events, rdb, errors, files, comments="", opts=None):
+    opts = opts or {}
+    detail = opts.get("detail") or "full"
+    show_seq = detail == "full" and opts.get("sequence", True)
+    show_settings = detail == "full" and opts.get("settings", True)
+    show_ser = detail == "full" and opts.get("ser", True)
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    items, shown, n_dups = prepare_view(events, rdb, opts)
+    ser = [e for e in events if e.kind == "ser"]
+    n_items = sum(len(it["a"]["checks"]) + len(it["a"]["gaps"]) for it in shown)
+    n_ev = sum(1 for it in shown if it["a"]["checks"] or it["a"]["gaps"])
+    number = {id(it["e"]): n for n, it in enumerate(shown, 1)}
+
+    def dup_note(e):
+        d = e.dup_of
+        if d is None:
+            return []
+        if id(d) in number:
+            return [f"Same event as #{number[id(d)]} ({d.source}), which has more detail."]
+        return [f"Same event as the detailed report in {d.source} (not shown in this view)."]
 
     out = []
     out.append("SEL TRIP EVENT SUMMARY")
     out.append("=" * 60)
     out.append(f"Generated: {now}")
-    out.append(f"Files analyzed: {len(files)}   Events found: {len(ev)}   "
+    out.append(f"Files analyzed: {len(files)}   Events found: {len(items)}   "
                f"Settings databases: {len(rdb)}")
-    if ev:
-        out.append(f"Needs review: {n_items} item(s) to check across {n_ev} of {len(ev)} event(s)"
+    view = describe_view(opts, n_dups)
+    if items and (view or len(shown) != len(items)):
+        out.append(f"Showing: {len(shown)} of {len(items)} events" + (f" ({view})" if view else ""))
+    if shown:
+        out.append(f"Needs review: {n_items} item(s) to check across {n_ev} of {len(shown)} event(s)"
                    + (" - see the CHECK lines" if n_items else ""))
     out.append("")
 
@@ -1102,89 +1241,99 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
         out.extend(comments.strip().splitlines())
         out.append("")
 
-    if not ev and not ser:
+    if not items and not ser:
         out.append("No event data recognized in the loaded files.")
     else:
+        if len(shown) >= 2:
+            out.append("OVERVIEW")
+            out.append("-" * 60)
+            out.extend(overview_lines(shown))
+            out.append("")
+
         out.append("QUICK SUMMARY")
         out.append("-" * 60)
-        for n, (e, s, label, how, a) in enumerate(analyses, 1):
+        if items and not shown:
+            out.append("No events match the current Show / Relay / Search options.")
+        for n, it in enumerate(shown, 1):
+            e, s, a = it["e"], it["s"], it["a"]
             when = f"{e.date} {e.time}".strip() or "date n/a"
-            who = e.relay_id or e.terminal_id or e.source
-            out.append(f"{n:>2}. {when} | {who} | {e.event_type or '?'} | {short_cause(e, s, a)}")
+            out.append(f"{n:>2}. {when} | {relay_key(e)} | {e.event_type or '?'} | {short_cause(e, s, a)}")
         out.append("")
 
-        out.append("EVENT DETAILS")
-        out.append("-" * 60)
-        shown_settings = {}
-        for n, (e, s, label, how, a) in enumerate(analyses, 1):
-            out.append(f"Event {n} of {len(ev)}  ({'history row' if e.kind == 'history' else 'event report'})")
-            out.append(f"  Source file : {e.source}")
-            relay = " / ".join(x for x in (e.relay_id, e.terminal_id) if x)
-            if relay:
-                out.append(f"  Relay       : {relay}")
-            if e.fid:
-                out.append(f"  Firmware    : {e.fid}")
-            if e.date or e.time:
-                out.append(f"  Date / Time : {e.date} {e.time}")
-            if e.event_type:
-                out.append(f"  Event type  : {e.event_type}  ({a['desc']})")
-            if e.location:
-                out.append(f"  Fault loc.  : {fmt_loc(e.location, s)}")
-            if e.targets:
-                out.append(f"  Targets     : {e.targets}")
-            if e.freq:
-                out.append(f"  Frequency   : {e.freq} Hz")
-            if e.shot:
-                out.append(f"  Shot        : {e.shot}")
-            for x in e.extra:
-                out.append(f"  {x}")
-            if e.currents:
-                parts = []
-                for k, (pre, post) in e.currents.items():
-                    parts.append(f"{k} {post:,.0f}" + (f" (pre {pre:,.0f})" if pre is not None else ""))
-                est = ", estimated from samples" if e.sequence or any(p is not None for p, _ in e.currents.values()) else ""
-                out.append("  Currents    : " + "; ".join(parts) + f"  [A, max during fault{est}]")
-            if e.voltages:
-                parts = [f"{k} {pre:,.2f} -> {post:,.2f}" for k, (pre, post) in e.voltages.items()]
-                out.append("  Voltages    : " + "; ".join(parts) + "  [prefault -> min during fault]")
-            n_chk = len(a["checks"]) + len(a["gaps"])
-            out.append(f"  Confidence  : {a['confidence']} ({a['basis']})"
-                       + (f" - {n_chk} item(s) to check" if n_chk else ""))
+        if detail != "summary" and not (items and not shown):
+            out.append("EVENT DETAILS")
+            out.append("-" * 60)
+            shown_settings = {}
+            for n, it in enumerate(shown, 1):
+                e, s, label, a = it["e"], it["s"], it["label"], it["a"]
+                out.append(f"Event {n} of {len(shown)}  ({'history row' if e.kind == 'history' else 'event report'})")
+                out.append(f"  Source file : {e.source}")
+                relay = " / ".join(x for x in (e.relay_id, e.terminal_id) if x)
+                if relay:
+                    out.append(f"  Relay       : {relay}")
+                if e.fid:
+                    out.append(f"  Firmware    : {e.fid}")
+                if e.date or e.time:
+                    out.append(f"  Date / Time : {e.date} {e.time}")
+                if e.event_type:
+                    out.append(f"  Event type  : {e.event_type}  ({a['desc']})")
+                if e.location:
+                    out.append(f"  Fault loc.  : {fmt_loc(e.location, s)}")
+                if e.targets:
+                    out.append(f"  Targets     : {e.targets}")
+                if e.freq:
+                    out.append(f"  Frequency   : {e.freq} Hz")
+                if e.shot:
+                    out.append(f"  Shot        : {e.shot}")
+                for x in e.extra:
+                    out.append(f"  {x}")
+                if e.currents:
+                    parts = []
+                    for k, (pre, post) in e.currents.items():
+                        parts.append(f"{k} {post:,.0f}" + (f" (pre {pre:,.0f})" if pre is not None else ""))
+                    est = ", estimated from samples" if e.sequence or any(p is not None for p, _ in e.currents.values()) else ""
+                    out.append("  Currents    : " + "; ".join(parts) + f"  [A, max during fault{est}]")
+                if e.voltages:
+                    parts = [f"{k} {pre:,.2f} -> {post:,.2f}" for k, (pre, post) in e.voltages.items()]
+                    out.append("  Voltages    : " + "; ".join(parts) + "  [prefault -> min during fault]")
+                n_chk = len(a["checks"]) + len(a["gaps"])
+                out.append(f"  Confidence  : {a['confidence']} ({a['basis']})"
+                           + (f" - {n_chk} item(s) to check" if n_chk else ""))
 
-            out.append("  Probable cause:")
-            for c in a["cause"]:
-                out.append(f"    - {c}")
-            if n_chk:
-                out.append("  Check before relying on this:")
-                for c in a["checks"] + a["gaps"]:
-                    out.append(f"    - CHECK: {c}")
+                out.append("  Probable cause:")
+                for c in a["cause"] + dup_note(e):
+                    out.append(f"    - {c}")
+                if n_chk:
+                    out.append("  Check before relying on this:")
+                    for c in a["checks"] + a["gaps"]:
+                        out.append(f"    - CHECK: {c}")
 
-            if show_seq and e.sequence:
-                out.append("  Element sequence (cycles from start of record):")
-                rel = [x for x in e.sequence if element_class(x[1])]
-                rest = len(e.sequence) - len(rel)
-                for cyc, el, st in rel[:40]:
-                    tag = "already asserted at start" if st == "pre" else "asserted"
-                    out.append(f"    {cyc:6.2f}  {el:<10} {tag}  ({element_class(el)})")
-                if len(rel) > 40:
-                    out.append(f"    ... {len(rel) - 40} more")
-                if rest:
-                    out.append(f"    ({rest} other relay word bits changed - not listed)")
+                if show_seq and e.sequence:
+                    out.append("  Element sequence (cycles from start of record):")
+                    rel = [x for x in e.sequence if element_class(x[1])]
+                    rest = len(e.sequence) - len(rel)
+                    for cyc, el, st in rel[:40]:
+                        tag = "already asserted at start" if st == "pre" else "asserted"
+                        out.append(f"    {cyc:6.2f}  {el:<10} {tag}  ({element_class(el)})")
+                    if len(rel) > 40:
+                        out.append(f"    ... {len(rel) - 40} more")
+                    if rest:
+                        out.append(f"    ({rest} other relay word bits changed - not listed)")
 
-            if show_settings and s:
-                keys = [k for k in ("TR", "TRCOMM", "TRSOTF", "DTT", "LL", "CTR", "PTR", "Z1MAG", "Z1P",
-                                    "Z1MG", "50P1P", "50G1P", "51PP", "51GP", "ER") if k in s]
-                if keys:
-                    src = f"RDB: {label}" if label else "event file"
-                    sig = (src, tuple((k, s[k]) for k in keys))
-                    if sig in shown_settings:
-                        out.append(f"  Settings    : same as Event {shown_settings[sig]} ({src})")
-                    else:
-                        shown_settings[sig] = n
-                        out.append(f"  Settings context ({src}):")
-                        for k in keys:
-                            out.append(f"    {k} := {s[k]}")
-            out.append("")
+                if show_settings and s:
+                    keys = [k for k in ("TR", "TRCOMM", "TRSOTF", "DTT", "LL", "CTR", "PTR", "Z1MAG", "Z1P",
+                                        "Z1MG", "50P1P", "50G1P", "51PP", "51GP", "ER") if k in s]
+                    if keys:
+                        src = f"RDB: {label}" if label else "event file"
+                        sig = (src, tuple((k, s[k]) for k in keys))
+                        if sig in shown_settings:
+                            out.append(f"  Settings    : same as Event {shown_settings[sig]} ({src})")
+                        else:
+                            shown_settings[sig] = n
+                            out.append(f"  Settings context ({src}):")
+                            for k in keys:
+                                out.append(f"    {k} := {s[k]}")
+                out.append("")
 
     if show_ser and ser:
         out.append("SEQUENTIAL EVENTS RECORDER (trip-related lines)")
@@ -1196,7 +1345,7 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
                 out.append(f"    {ln}")
         out.append("")
 
-    if rdb and not ev:
+    if rdb and not items:
         out.append("SETTINGS LOADED")
         out.append("-" * 60)
         for label, s in rdb.items():
@@ -1211,6 +1360,36 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
 
     out.append("Note: automated interpretation - verify against the relay oscillography and settings.")
     return "\n".join(out)
+
+
+CSV_COLUMNS = ["#", "Date", "Time", "Relay", "Station", "Event type", "Description", "Tripped",
+               "Tripping elements", "Fault location", "% of line", "Targets", "Max phase current (A)",
+               "Ground current (A)", "Breaker clearing (cycles)", "Confidence", "Items to check",
+               "Check details", "Source file"]
+
+
+def report_csv(events, rdb, opts=None):
+    """One row per event (same filter and order as the summary) for Excel."""
+    import io
+    _, shown, _ = prepare_view(events, rdb, opts)
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\r\n")
+    w.writerow(CSV_COLUMNS)
+    for n, it in enumerate(shown, 1):
+        e, s, a = it["e"], it["s"], it["a"]
+        ph, gnd = phase_currents(e)
+        peaks = [v[1] for v in ph.values()] or [v[1] for k, v in e.currents.items() if k == "Fault current"]
+        loc = (e.location or "").strip()
+        v, ll = fnum(loc), fnum(s.get("LL", ""))
+        clearing = (f"{e.open_cycle - e.trip_cycle:.2f}" if e.trip_cycle is not None and e.open_cycle is not None
+                    and e.open_cycle > e.trip_cycle else "")
+        w.writerow([str(n), e.date, e.time, e.relay_id, e.terminal_id, e.event_type, a["desc"],
+                    "Yes" if a["tripped"] else "No", ", ".join(a["primary"]), loc,
+                    f"{100 * v / ll:.0f}" if v is not None and ll else "", e.targets,
+                    f"{max(peaks):.0f}" if peaks else "", f"{gnd[1]:.0f}" if gnd is not None else "",
+                    clearing, a["confidence"], str(len(a["checks"]) + len(a["gaps"])),
+                    " | ".join(a["checks"] + a["gaps"]), e.source])
+    return buf.getvalue()
 
 
 # --------------------------------------------------------------------------
@@ -1257,7 +1436,7 @@ def parse_report_text(text):
         if not blocks and not para and s.upper().startswith("SEL TRIP"):
             blocks.append(("title", s.title().replace("Sel ", "SEL ")))
             continue
-        if not section and re.match(r"^(Generated|Files analyzed|Needs review)\b", s):
+        if not section and re.match(r"^(Generated|Files analyzed|Showing|Needs review)\b", s):
             add("meta", [s])
             continue
         if ln == s and re.fullmatch(r"[A-Z][A-Z /&\-]{3,}(\s*\(.*\))?", s):
@@ -1301,7 +1480,7 @@ def parse_report_text(text):
             add("note", s)
             continue
         m = KV_RE.match(ln)
-        if m and section == "EVENT DETAILS":
+        if m and section in ("EVENT DETAILS", "OVERVIEW"):
             add("kv", [(m.group(1).strip(), m.group(2).strip(), False)])
             continue
         if section.startswith("FILES THAT") and ln.startswith("  "):
@@ -1679,6 +1858,18 @@ COMMON TARGETS (front-panel lights)
   81 frequency    SOTF switch-onto-fault    A B C G N faulted phases / ground
   RS recloser reset (ready)    CY recloser cycling    LO recloser locked out
 
+ORGANIZING THE SUMMARY
+  Show      All events, trips only, needs review, faults only, or no-trip events
+            (the numbers are how many events each choice includes)
+  Relay     Only one relay's events
+  Sort      Oldest first, newest first, by relay, or needs review first
+  Detail    Summary only (overview + one line per event), Standard (adds the
+            details and CHECKs), or Full (adds element timeline, settings, SER)
+  Hide duplicates   Skip history rows already covered by a detailed report
+  Search    Only events whose details contain the text (Ctrl+F)
+  The summary states which view it shows. Export > Spreadsheet (.csv) gives one
+  row per event with the same filter and order, ready to sort in Excel.
+
 CONFIDENCE AND CHECKS
   High    element data + settings, and nothing looked wrong
   Medium  element data or targets, settings missing or one item to check
@@ -1693,7 +1884,7 @@ FAULT LOCATION
 
 SHORTCUTS
   Ctrl+O add files    F5 generate    Ctrl+Shift+C copy    Ctrl+S Word    Ctrl+P PDF
-  Ctrl+D dark mode    F1 this help    Delete removes the selected files
+  Ctrl+F search    Ctrl+D dark mode    F1 this help    Delete removes the selected files
 
 The program only reads your files. Nothing is uploaded, except feedback you choose
 to send and the update check (which only asks GitHub for the latest version).
@@ -1892,10 +2083,25 @@ def run_gui():
     # ---- action row
     act = ttk.Frame(root, padding=(22, 14, 22, 8))
     act.grid(row=3, column=0, sticky="ew")
-    v_seq, v_set, v_ser = (tk.BooleanVar(value=cfg.get(k, True)) for k in ("seq", "set", "ser"))
-    ttk.Label(act, text="Include:", style="Hint.TLabel").pack(side="left", padx=(0, 8))
-    for txt, var in (("Element timeline", v_seq), ("Settings context", v_set), ("SER lines", v_ser)):
-        ttk.Checkbutton(act, text=txt, variable=var).pack(side="left", padx=(0, 14))
+    view = {"show": cfg.get("show", "all"), "sort": cfg.get("sort", "time"),
+            "detail": cfg.get("detail", "standard"), "relay": ""}
+    for key, options in (("show", SHOW_OPTIONS), ("sort", SORT_OPTIONS), ("detail", DETAIL_OPTIONS)):
+        if view[key] not in dict(options):
+            view[key] = options[0][0] if key != "detail" else "standard"
+
+    def combo(text, width):
+        ttk.Label(act, text=text, style="Hint.TLabel").pack(side="left", padx=(0, 6))
+        cb = ttk.Combobox(act, state="readonly", width=width)
+        cb.pack(side="left", padx=(0, 14))
+        return cb
+
+    show_cb = combo("Show", 16)
+    relay_cb = combo("Relay", 14)
+    sort_cb = combo("Sort", 16)
+    detail_cb = combo("Detail", 11)
+    v_dups = tk.BooleanVar(value=cfg.get("hide_dups", True))
+    dups_cb = ttk.Checkbutton(act, text="Hide duplicates", variable=v_dups)
+    dups_cb.pack(side="left")
     gen_btn = ttk.Button(act, text="Generate summary", style="Accent.TButton")
     gen_btn.pack(side="right")
 
@@ -1914,6 +2120,10 @@ def run_gui():
     save_btn["menu"] = export_menu
     copy_btn = ttk.Button(oh, text="Copy all")
     copy_btn.pack(side="right", padx=(0, 8))
+    search_var = tk.StringVar()
+    search_entry = ttk.Entry(oh, textvariable=search_var, width=26)
+    search_entry.pack(side="right", padx=(0, 16))
+    ttk.Label(oh, text="Search", style="Hint.TLabel").pack(side="right", padx=(0, 6))
     out = tk.Text(outf, wrap="word", undo=True, relief="flat", bd=0, highlightthickness=1,
                   padx=18, pady=14, font=F["mono"], spacing1=1, spacing3=1)
     out.grid(row=1, column=0, sticky="nsew")
@@ -2079,6 +2289,9 @@ def run_gui():
 
     def clear_all():
         files.clear()
+        st["cache"] = None
+        view["relay"] = ""
+        refresh_choices(None)
         refresh_list()
         show_empty()
         set_status("Cleared")
@@ -2138,22 +2351,101 @@ def run_gui():
                 if k >= 0:
                     out.tag_add(tag, f"{i}.{k}", f"{i}.{k + len(word.rstrip(' -'))}")
 
-    def generate(_=None):
+    # ---- view options (filter / sort / detail)
+    def current_opts():
+        return {"show": view["show"], "relay": view["relay"], "sort": view["sort"], "detail": view["detail"],
+                "hide_duplicates": v_dups.get(), "search": search_var.get().strip()}
+
+    def loaded(reload=False):
+        """Parse the files once; view changes reuse the result."""
+        key = tuple(files)
+        if reload or not st.get("cache") or st["cache"][0] != key:
+            events, rdb, errors = load_files(files)
+            st["cache"] = (key, events, rdb, errors, view_choices(events, rdb))
+        return st["cache"][1:]
+
+    def refresh_choices(choices=None):
+        counts = choices["counts"] if choices else {}
+        show_cb["values"] = [f"{lbl} ({counts[k]})" if choices else lbl for k, lbl in SHOW_OPTIONS]
+        show_cb.current([k for k, _ in SHOW_OPTIONS].index(view["show"]))
+        relays = choices["relays"] if choices else []
+        st["relay_keys"] = [""] + [k for k, _ in relays]
+        relay_cb["values"] = ([f"All relays ({sum(n for _, n in relays)})"] if relays else ["All relays"]) + \
+                             [f"{k} ({n})" for k, n in relays]
+        if view["relay"] not in st["relay_keys"]:
+            view["relay"] = ""
+        relay_cb.current(st["relay_keys"].index(view["relay"]))
+        sort_cb["values"] = [lbl for _, lbl in SORT_OPTIONS]
+        sort_cb.current([k for k, _ in SORT_OPTIONS].index(view["sort"]))
+        detail_cb["values"] = [lbl for _, lbl in DETAIL_OPTIONS]
+        detail_cb.current([k for k, _ in DETAIL_OPTIONS].index(view["detail"]))
+
+    def edits_ok():
+        """Changing the view rebuilds the summary; check before throwing away hand edits."""
+        if st["empty"] or not out.edit_modified():
+            return True
+        return messagebox.askyesno(
+            "Discard your edits?",
+            "Changing the view rebuilds the summary, so the edits you made in the summary box will be lost.\n\n"
+            "Tip: copy or export your edited summary first.\n\nRebuild the summary now?")
+
+    def on_view(kind):
+        keys = {"show": [k for k, _ in SHOW_OPTIONS], "sort": [k for k, _ in SORT_OPTIONS],
+                "detail": [k for k, _ in DETAIL_OPTIONS], "relay": st.get("relay_keys", [""])}[kind]
+        cb = {"show": show_cb, "sort": sort_cb, "detail": detail_cb, "relay": relay_cb}[kind]
+        new = keys[cb.current()] if cb.current() >= 0 else keys[0]
+        if new == view[kind]:
+            return
+        if not edits_ok():
+            cb.current(keys.index(view[kind]))
+            return
+        view[kind] = new
+        if files:
+            generate(reload=False)
+
+    def on_dups():
+        if not edits_ok():
+            v_dups.set(not v_dups.get())
+            return
+        if files:
+            generate(reload=False)
+
+    def on_search(_=None):
+        if st.get("search_job"):
+            root.after_cancel(st["search_job"])
+        st["search_job"] = root.after(350, run_search)
+
+    def run_search():
+        st["search_job"] = None
+        if search_var.get().strip() == st.get("last_search", ""):
+            return
+        if not edits_ok():
+            search_var.set(st.get("last_search", ""))
+            return
+        if files:
+            generate(reload=False)
+
+    def generate(_=None, reload=True):
         if not files:
             set_status("Add some files first")
             return
         root.config(cursor="watch")
         root.update_idletasks()
         try:
-            events, rdb, errors = load_files(files)
-            txt = build_report(events, rdb, errors, files, get_comments(),
-                               {"sequence": v_seq.get(), "settings": v_set.get(), "ser": v_ser.get()})
+            events, rdb, errors, choices = loaded(reload)
+            opts = current_opts()
+            st["last_search"] = opts["search"]
+            refresh_choices(choices)
+            txt = build_report(events, rdb, errors, files, get_comments(), opts)
             out.delete("1.0", "end")
             out.insert("1.0", txt)
+            out.edit_modified(False)
             st["empty"] = False
             highlight()
             n = len([e for e in events if e.kind != "ser"])
-            set_status(f"{n} event{'s' if n != 1 else ''} from {len(files)} file{'s' if len(files) != 1 else ''}"
+            _, shown, _ = prepare_view(events, rdb, opts)
+            showing = f"showing {len(shown)} of {n}" if len(shown) != n else f"{n} event{'s' if n != 1 else ''}"
+            set_status(f"{showing} from {len(files)} file{'s' if len(files) != 1 else ''}"
                        + (f"  -  {len(errors)} could not be read" if errors else ""))
         finally:
             root.config(cursor="")
@@ -2171,7 +2463,7 @@ def run_gui():
         set_status("Summary copied to clipboard")
 
     EXPORT_TYPES = {".docx": ("Word document", "*.docx"), ".pdf": ("PDF", "*.pdf"),
-                    ".txt": ("Text file", "*.txt")}
+                    ".csv": ("Spreadsheet (CSV)", "*.csv"), ".txt": ("Text file", "*.txt")}
 
     def export_as(ext):
         if st["empty"]:
@@ -2190,7 +2482,12 @@ def run_gui():
         root.config(cursor="watch")
         root.update_idletasks()
         try:
-            export_report(out.get("1.0", "end-1c"), p)
+            if ext == ".csv":   # built from the data (same filter and order as the summary)
+                events, rdb, _, _ = loaded()
+                with open(p, "w", encoding="utf-8-sig", newline="") as f:
+                    f.write(report_csv(events, rdb, current_opts()))
+            else:
+                export_report(out.get("1.0", "end-1c"), p)
         except PermissionError:
             messagebox.showerror("Export failed", f"Couldn't write {os.path.basename(p)}.\n"
                                                   "Is it open in Word or a PDF viewer? Close it and try again.")
@@ -2201,7 +2498,7 @@ def run_gui():
         finally:
             root.config(cursor="")
         flash(save_btn, "Exported ✓", "Export")
-        set_status(f"Saved {p}")
+        set_status(f"Saved {p}" + ("  (one row per event; edits in the summary box aren't included)" if ext == ".csv" else ""))
         if ext != ".txt" and sys.platform == "win32":
             try:
                 os.startfile(p)  # open it in Word / the PDF viewer
@@ -2395,7 +2692,8 @@ def run_gui():
 
     def on_close(save_only=False):
         save_settings({"dark": st["dark"], "geometry": root.geometry(), "export_dir": cfg.get("export_dir"),
-                       "seq": v_seq.get(), "set": v_set.get(), "ser": v_ser.get()})
+                       "show": view["show"], "sort": view["sort"], "detail": view["detail"],
+                       "hide_dups": v_dups.get()})
         if not save_only:
             root.destroy()
 
@@ -2406,9 +2704,15 @@ def run_gui():
     gen_btn.config(command=generate)
     copy_btn.config(command=copy_all)
     for ext, label in ((".docx", "Word document (.docx)"), (".pdf", "PDF (.pdf)"),
-                       (".txt", "Plain text (.txt)")):
+                       (".csv", "Spreadsheet for Excel (.csv)"), (".txt", "Plain text (.txt)")):
         export_menu.add_command(label=label, command=lambda e=ext: export_as(e))
     send_btn.config(command=send_feedback)
+    for kind, cb in (("show", show_cb), ("relay", relay_cb), ("sort", sort_cb), ("detail", detail_cb)):
+        cb.bind("<<ComboboxSelected>>", lambda e, k=kind: (on_view(k), e.widget.selection_clear()))
+    dups_cb.config(command=on_dups)
+    search_entry.bind("<KeyRelease>", on_search)
+    search_entry.bind("<Escape>", lambda e: (search_var.set(""), on_search()))
+    root.bind("<Control-f>", lambda e: (search_entry.focus_set(), search_entry.select_range(0, "end"), "break")[-1])
     feedback.bind("<FocusIn>", lambda e: fb_placeholder(False))
     feedback.bind("<FocusOut>", lambda e: fb_placeholder(True))
     feedback.bind("<Control-a>", lambda e: (e.widget.tag_add("sel", "1.0", "end"), "break")[1])
@@ -2464,6 +2768,7 @@ def run_gui():
     root.protocol("WM_DELETE_WINDOW", on_close)
 
     apply_theme()
+    refresh_choices(None)
     fb_placeholder(True)
     show_placeholder()
     show_empty()
@@ -2485,22 +2790,38 @@ def run_gui():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--cli":
-        # --cli <files/folders> [--comments "text"] [--out report.docx|.pdf|.txt ...]
-        args, outs, note = sys.argv[2:], [], ""
+        # --cli <files/folders> [--comments TEXT] [--out FILE.docx|.pdf|.txt|.csv ...]
+        #       [--show all|trips|review|faults|notrip] [--relay NAME] [--sort time|newest|relay|review]
+        #       [--detail summary|standard|full] [--search TEXT] [--hide-duplicates] [--format text|csv]
+        args, outs, note, opts, fmt = sys.argv[2:], [], "", {}, "text"
         while "--out" in args:
             i = args.index("--out")
             outs.append(args[i + 1])
             del args[i:i + 2]
-        if "--comments" in args:
-            i = args.index("--comments")
-            note = args[i + 1]
-            del args[i:i + 2]
+        for flag, key in (("--comments", None), ("--show", "show"), ("--relay", "relay"), ("--sort", "sort"),
+                          ("--detail", "detail"), ("--search", "search"), ("--format", "format")):
+            if flag in args:
+                i = args.index(flag)
+                if key is None:
+                    note = args[i + 1]
+                elif key == "format":
+                    fmt = args[i + 1]
+                else:
+                    opts[key] = args[i + 1]
+                del args[i:i + 2]
+        if "--hide-duplicates" in args:
+            args.remove("--hide-duplicates")
+            opts["hide_duplicates"] = True
         paths = expand_paths(args)
         ev, rdb, err = load_files(paths)
-        report = build_report(ev, rdb, err, paths, note)
+        report = build_report(ev, rdb, err, paths, note, opts)
         for o in outs:
-            export_report(report, o)
+            if o.lower().endswith(".csv"):
+                with open(o, "w", encoding="utf-8-sig", newline="") as f:
+                    f.write(report_csv(ev, rdb, opts))
+            else:
+                export_report(report, o)
         if sys.stdout is not None:  # the windowed .exe has no console
-            print(report)
+            print(report_csv(ev, rdb, opts) if fmt == "csv" else report, end="" if fmt == "csv" else "\n")
     else:
         run_gui()
