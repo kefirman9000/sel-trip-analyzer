@@ -340,6 +340,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .evt td.act { white-space: nowrap; }
 .evt td.act button { min-height: 28px; padding: 2px 9px; margin: 0 4px 4px 0; }
 .evt .evt-empty { color: var(--muted); padding: 24px; text-align: center; }
+.watchbar[hidden] { display: none; }
+.watchbar { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+.watchbar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+.watchbar.paused .dot { background: var(--warn); }
+.watchbar b { color: var(--text); }
+.watchbar button { min-height: 24px; padding: 0 9px; font-size: 12px; }
 .evt tr.why > td { background: var(--surface-2); padding: 10px 14px 12px 40px; }
 .evt tr.why:hover { background: transparent; }
 .why-h { font-weight: 600; margin-bottom: 6px; }
@@ -448,9 +454,11 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
       <div class="row">
         <button id="addFiles" title="Ctrl+O">Add files</button>
         <button id="addFolder">Add folder</button>
+        <button id="watchBtn" hidden title="Keep checking a folder and add new event files as they arrive (Chrome and Edge)">Watch folder…</button>
         <button id="clear">Clear</button>
         <button id="samples">Try samples</button>
       </div>
+      <div class="watchbar" id="watchBar" hidden><span class="dot" aria-hidden="true"></span><span id="watchText"></span><button id="watchStop">Stop</button></div>
     </section>
     <section class="glance" id="glance" aria-label="At a glance">
       <div class="glance-empty hint">Load event files (or click <b>Try samples</b>) to see the events here.</div>
@@ -5428,6 +5436,108 @@ async function addFiles(list) {
   else if (list.length) setStatus("No new SEL files found in what was added.");
 }
 
+// ---------------------------------------------------------------- watch a folder (Chrome / Edge: File System Access)
+const WATCH_MS = 10000;
+let watch = null;               // { handle, seen: Map(path -> "size|modified"), timer, added, checked }
+const idb = (mode, fn) => new Promise((resolve) => {
+  try {
+    const req = indexedDB.open("sel-trip", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("kv");
+    req.onsuccess = () => {
+      try { const tx = req.result.transaction("kv", mode); const r = fn(tx.objectStore("kv")); tx.oncomplete = () => resolve(r && r.result); tx.onerror = () => resolve(null); }
+      catch (e) { resolve(null); }       // e.g. a handle the browser can't store
+    };
+    req.onerror = () => resolve(null);
+  } catch (e) { resolve(null); }
+});
+async function listDir(handle, prefix, out) {
+  for await (const [name, h] of handle.entries()) {
+    if (h.kind === "file") { if (allowed(name)) out.push({ path: prefix + name, h }); }
+    else if (h.kind === "directory" && !name.startsWith(".")) await listDir(h, prefix + name + "/", out);
+  }
+  return out;
+}
+function watchStatus(extra) {
+  const bar = $("watchBar");
+  bar.hidden = !watch;
+  if (!watch) return;
+  bar.classList.toggle("paused", !!watch.paused);
+  const t = watch.checked ? watch.checked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+  $("watchText").innerHTML = watch.paused ? `Paused: allow access to <b>${esc(watch.handle.name)}</b> again to keep watching` :
+    `Watching <b>${esc(watch.handle.name)}</b>` + (t ? ` · checked ${t}` : "") + (watch.added ? ` · ${watch.added} new file${watch.added === 1 ? "" : "s"} picked up` : "") + (extra ? ` · ${esc(extra)}` : "");
+  $("watchStop").textContent = watch.paused ? "Resume" : "Stop";
+}
+/** Look for new or changed files. A file is taken once it hasn't changed for one check (so half-copied files wait). */
+async function pollWatch(first) {
+  if (!watch || watch.busy || watch.paused) return;
+  watch.busy = true;
+  try {
+    const list = (await listDir(watch.handle, watch.handle.name + "/", [])).sort(folderOrder);
+    const fresh = [];
+    for (const { path, h } of list) {
+      let f; try { f = await h.getFile(); } catch (e) { continue; }
+      const sig = f.size + "|" + f.lastModified;
+      if (watch.seen.get(path) === sig) continue;
+      if (!first && watch.waiting.get(path) !== sig) { watch.waiting.set(path, sig); continue; }   // still settling
+      watch.waiting.delete(path);
+      if (watch.seen.has(path)) state.files = state.files.filter((x) => x.path !== path);      // changed: replace it
+      watch.seen.set(path, sig);
+      fresh.push({ file: f, path, fromFolder: true });
+    }
+    watch.checked = new Date();
+    if (fresh.length) {
+      if (!first) { watch.added += fresh.length; newSinceFocus += fresh.length; badgeTitle(); }
+      await addFiles(fresh);
+    }
+    watchStatus(first ? `${list.length} file${list.length === 1 ? "" : "s"} loaded` : "");
+  } catch (e) {
+    watch.paused = true; watchStatus();          // folder gone or permission withdrawn
+  } finally { if (watch) watch.busy = false; }
+}
+async function startWatch(handle) {
+  stopWatch(true);
+  watch = { handle, seen: new Map(), waiting: new Map(), timer: null, added: 0, checked: null, busy: false, paused: false };
+  idb("readwrite", (st) => st.put(handle, "watchDir"));
+  watchStatus();
+  await pollWatch(true);
+  watch.timer = setInterval(() => pollWatch(false), WATCH_MS);
+  setStatus(`Watching ${handle.name}: new event files will be added as they arrive`);
+}
+function stopWatch(silent) {
+  if (watch && watch.timer) clearInterval(watch.timer);
+  watch = null;
+  if (!silent) { idb("readwrite", (st) => st.delete("watchDir")); setStatus("Stopped watching the folder"); }
+  watchStatus();
+}
+let newSinceFocus = 0;
+const baseTitle = document.title;
+function badgeTitle() { document.title = newSinceFocus && document.hidden ? `(${newSinceFocus} new) ${baseTitle}` : baseTitle; if (!document.hidden) newSinceFocus = 0; }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { newSinceFocus = 0; badgeTitle(); } });
+async function canUse(handle, ask) {
+  try {
+    if ((await handle.queryPermission({ mode: "read" })) === "granted") return true;
+    return ask && (await handle.requestPermission({ mode: "read" })) === "granted";
+  } catch (e) { return false; }
+}
+if (typeof window.showDirectoryPicker === "function") {
+  $("watchBtn").hidden = false;
+  $("watchBtn").addEventListener("click", async () => {
+    let h; try { h = await window.showDirectoryPicker({ id: "sel-watch", mode: "read" }); } catch (e) { return; }   // cancelled
+    startWatch(h);
+  });
+  // the folder watched last time: carry on if the browser still allows it, otherwise offer to resume
+  idb("readonly", (st) => st.get("watchDir")).then(async (h) => {
+    if (!h || watch) return;
+    if (await canUse(h, false)) startWatch(h);
+    else { watch = { handle: h, seen: new Map(), waiting: new Map(), added: 0, paused: true }; watchStatus(); }
+  });
+}
+$("watchStop").addEventListener("click", async () => {
+  if (watch && watch.paused) { const h = watch.handle; if (await canUse(h, true)) startWatch(h); return; }
+  stopWatch(false);
+});
+window.__selWatch = { startWatch, pollWatch, stopWatch, state: () => watch };
+
 /** Order folder files like the desktop version: each folder's files (sorted) before its subfolders. */
 function folderOrder(a, b) {
   const pa = a.path.split("/"), pb = b.path.split("/");
@@ -6388,7 +6498,8 @@ if (DESK) {
         const bin = atob(f.b64), bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         const key = f.path + "|" + bytes.length;
-        if (state.files.some((x) => x.key === key)) continue;
+        if (f.changed) state.files = state.files.filter((x) => x.path !== f.path);    // a watched file changed: replace it
+        else if (state.files.some((x) => x.key === key)) continue;
         state.files.push({ key, name: f.name, path: f.path, bytes }); added++;
       }
       renderFiles();
@@ -6397,6 +6508,12 @@ if (DESK) {
   };
   setInterval(takePending, 1500);
   takePending();
+  desk("/api/watch").then((r) => {     // started with --watch: say so where the folder watcher would
+    if (!r || !r.folders || !r.folders.length) return;
+    $("watchBar").hidden = false;
+    $("watchText").innerHTML = "Watching " + r.folders.map((f) => `<b>${esc(f)}</b>`).join(", ") + " (started with --watch)";
+    $("watchStop").hidden = true;
+  }).catch(() => {});
 }
 $("updBtn").addEventListener("click", () => (state.update ? getUpdate() : checkUpdates(true)));
 $("bannerGet").addEventListener("click", getUpdate);
