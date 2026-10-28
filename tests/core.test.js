@@ -198,3 +198,18 @@ test("real-file fixtures (tests/fixtures/<case>/expected.json)", async (t) => {
     });
   }
 });
+
+test("export options: leave sections and lines out, choose CSV columns", async () => {
+  const { events, rdb, errors } = await load();
+  const t = core.buildReport(events, rdb, errors, 16, "hello", { detail: "full", now: "X" });
+  assert.equal(core.filterReportText(t, {}), t.replace(/\n{3,}/g, "\n\n"));
+  const f = core.filterReportText(t, { checks: false, sequence: false, overview: false, relations: false, ser: false, comments: false, quick: false });
+  for (const gone of ["CHECK:", "[2 to check]", "Needs review:", "Element sequence", "Settings context", "OVERVIEW", "TWO-ENDED", "INCIDENTS",
+                      "REPEAT TRIPS", "SEQUENTIAL EVENTS", "ANALYST COMMENTS", "QUICK SUMMARY"]) assert.ok(!f.includes(gone), gone);
+  for (const kept of ["SEL TRIP EVENT SUMMARY", "EVENT DETAILS", "Probable cause:", "Event 3 of"]) assert.ok(f.includes(kept), kept);
+  const edited = t.replace("EVENT DETAILS", "EVENT DETAILS\n------------------------------------------------------------\nMy own line").replace(/(EVENT DETAILS\n-+\n)My own line\n-+\n/, "$1");
+  assert.ok(core.filterReportText(edited, { checks: false }).includes("EVENT DETAILS"));
+  const csv = core.reportCsv(events, rdb, { columns: ["Relay", "Weather"] }).split("\r\n");
+  assert.equal(csv[0], "Relay,Weather");
+  assert.equal(csv[1].split(",").length, 2);
+});

@@ -100,15 +100,38 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   const [dTxt] = await Promise.all([page.waitForEvent("download"), page.evaluate(() => window.__selApp.exportAs("txt"))]);
   const txt = fs.readFileSync(await dTxt.path(), "utf8");
   ok("txt export includes hand edit", txt.includes("EDITED BY HAND") && txt.includes("\r\n"), dTxt.suggestedFilename());
-  const [dDoc] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Control+s")]);
+  await page.keyboard.press("Control+s");
+  await page.waitForSelector("#expDlg[open]");
+  ok("Ctrl+S opens the export options", (await page.locator("#expBody input[type=checkbox]").count()) >= 10);
+  const [dDoc] = await Promise.all([page.waitForEvent("download"), page.click("#expGo")]);
   const doc = fs.readFileSync(await dDoc.path()).toString("latin1");
   if (OUT) fs.writeFileSync(path.join(OUT, "web_export.docx"), fs.readFileSync(await dDoc.path()));
   ok("Word export via Ctrl+S: real .docx with tables, pictures and the edit", doc.startsWith("PK") && doc.includes("EDITED BY HAND") &&
      doc.includes("<w:tbl>") && doc.includes("word/media/image1.png") && dDoc.suggestedFilename().endsWith(".docx"), dDoc.suggestedFilename());
 
+  // 5b) export options: leave out the CHECK lines and the pictures
+  await page.click("#exportBtn"); await page.click('[data-exp="docx"]');
+  await page.waitForSelector("#expDlg[open]");
+  await page.uncheck('#expBody input[data-key="checks"]');
+  await page.selectOption('#expBody select[data-key="pictures"]', "none");
+  const [dOpt] = await Promise.all([page.waitForEvent("download"), page.click("#expGo")]);
+  const optDoc = fs.readFileSync(await dOpt.path()).toString("latin1");
+  ok("export options leave out CHECK lines and pictures", optDoc.includes("EDITED BY HAND") && !optDoc.includes("CHECK:") && !optDoc.includes("word/media/"));
+  await page.click("#exportBtn"); await page.click('[data-exp="csv"]');
+  await page.waitForSelector("#expDlg[open]");
+  await page.click('#expBody legend button:has-text("none")');
+  await page.check('#expBody input[data-key="col:Relay"]'); await page.check('#expBody input[data-key="col:Cause"]').catch(() => {});
+  await page.check('#expBody input[data-key="col:Event type"]');
+  const [dCols] = await Promise.all([page.waitForEvent("download"), page.click("#expGo")]);
+  const colsHead = fs.readFileSync(await dCols.path(), "utf8").replace(/^\ufeff/, "").split("\r\n")[0];
+  ok("CSV with chosen columns", colsHead === "Relay,Event type", colsHead);
+  // put the defaults back for the rest of the test
+  await page.evaluate(() => { localStorage.removeItem("sel-trip:exp.summary"); });
+
   // 6) PDF/print view
   await page.evaluate(() => { window.print = () => { window.__printed = true; }; });
   await page.keyboard.press("Control+p");
+  await page.waitForSelector("#expDlg[open]"); await page.click("#expGo");
   await page.waitForFunction(() => window.__printed === true, null, { timeout: 3000 }).catch(() => {});
   ok("Ctrl+P builds print view", await page.evaluate(() => window.__printed === true && document.getElementById("print-root").innerHTML.includes("Quick Summary")));
   await page.emulateMedia({ media: "print" });
@@ -170,7 +193,9 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   ok("drag zooms in", after < before * 0.6, `${before} ms -> ${after} ms`);
   await page.click("#wAdv");
   ok("advanced view shows angles", (await page.textContent("#wPhTable")).includes("Angle"));
-  const [dW] = await Promise.all([page.waitForEvent("download"), page.click("#wExportBtn").then(() => page.click('[data-wexp="docx"]'))]);
+  await page.click("#wExportBtn"); await page.click('[data-wexp="docx"]');
+  await page.waitForSelector("#expDlg[open]");
+  const [dW] = await Promise.all([page.waitForEvent("download"), page.click("#expGo")]);
   const wdoc = fs.readFileSync(await dW.path()).toString("latin1");
   ok("waveform Word report has the graph, phasors and the note", wdoc.startsWith("PK") && wdoc.includes("Arc restrikes here") && wdoc.includes("word/media/image2.png"), dW.suggestedFilename());
   await shot(page, "web_wave_light.png", { fullPage: true });

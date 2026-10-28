@@ -1457,6 +1457,7 @@ const csvField = (v) => (/[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' 
 /** One row per event (same filter and order as the summary) for Excel. */
 function reportCsv(events, rdb, opts) {
   const { shown } = prepareView(events, rdb, opts);
+  const keep = opts && opts.columns ? CSV_COLUMNS.map((c) => opts.columns.includes(c)) : null;
   const number = new Map(shown.map((it, i) => [it.e, i + 1]));
   const rows = [CSV_COLUMNS];
   shown.forEach((it, idx) => {
@@ -1474,7 +1475,7 @@ function reportCsv(events, rdb, opts) {
       it.pair ? `${number.has(it.pair.other.e) ? "#" + number.get(it.pair.other.e) + " " : ""}${relayKey(it.pair.other.e)}` : "",
       it.incident ? String(it.incident.n) : "", strip(it.note || ""), it.weather ? it.weather.text : "", e.source]);
   });
-  return rows.map((r) => r.map((f) => csvField(String(f))).join(",")).join("\r\n") + "\r\n";
+  return rows.map((r) => (keep ? r.filter((f, j) => keep[j]) : r).map((f) => csvField(String(f))).join(",")).join("\r\n") + "\r\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -1540,6 +1541,53 @@ function parseReportText(text) {
   return blocks;
 }
 
+/**
+ * Leave parts out of a (possibly hand-edited) report before exporting it.
+ * inc: {comments, overview, quick, relations, details, checks, notes, weather, sequence, ser, settings, errors}
+ * (missing keys count as true).
+ */
+const SECTION_KEYS = [["ANALYST COMMENTS", "comments"], ["OVERVIEW", "overview"], ["QUICK SUMMARY", "quick"], ["TWO-ENDED EVENTS", "relations"],
+  ["INCIDENTS", "relations"], ["REPEAT TRIPS", "relations"], ["EVENT DETAILS", "details"], ["SEQUENTIAL EVENTS RECORDER", "ser"],
+  ["SETTINGS LOADED", "settings"], ["FILES THAT COULD NOT BE READ", "errors"]];
+function filterReportText(text, inc) {
+  inc = inc || {};
+  const on = (k) => inc[k] !== false;
+  const lines = text.split("\r\n").join("\n").split("\n");
+  const out = [];
+  let dropSection = false, dropSub = false, inDetails = false;
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i], s = strip(ln);
+    const isHeader = ln === s && /^[A-Z]{3}/.test(s) && /^[=\-]{6,}$/.test(strip(lines[i + 1] || ""));
+    if (isHeader) {
+      const hit = SECTION_KEYS.find(([h]) => s.startsWith(h));
+      dropSection = hit ? !on(hit[1]) : false;
+      inDetails = s.startsWith("EVENT DETAILS");
+      dropSub = false;
+      if (dropSection) continue;
+      out.push(ln); continue;
+    }
+    if (dropSection) continue;
+    if (/^Needs review:/.test(s) && !on("checks")) continue;
+    if (!on("checks") && /\[\d+ to check\]\s*$/.test(ln)) { out.push(ln.replace(/\s*\[\d+ to check\]\s*$/, "")); continue; }
+    if (inDetails) {
+      if (/^Event \d+ of \d+/.test(ln)) { dropSub = false; out.push(ln); continue; }
+      const sub = /^ {2}(\S.*?):\s*$/.exec(ln);
+      if (sub) {
+        const name = sub[1];
+        dropSub = (name.startsWith("Check before") && !on("checks")) || ((name.startsWith("Element sequence") || name.startsWith("Settings context")) && !on("sequence"));
+        if (dropSub) continue;
+      } else if (dropSub && (ln.startsWith("   ") || !s)) { if (!s) dropSub = false; else continue; }
+      else if (/^ {2}\S/.test(ln)) dropSub = false;
+      if (/^ {2}Notes {7}:/.test(ln) && !on("notes")) continue;
+      if ((/^ {2}Weather {5}:/.test(ln) || /^ {4}- Weather: /.test(ln)) && !on("weather")) continue;
+      if (/^ {4}- CHECK: /.test(ln) && !on("checks")) continue;
+    }
+    out.push(ln);
+  }
+  // no double blank lines left behind
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
 /** Split a cause string so TRIP / No trip / CHECK prefixes and [n to check] can be coloured. */
 function tripRuns(text) {
   let runs = [[text, null]];
@@ -1556,7 +1604,7 @@ function tripRuns(text) {
 }
 
 const api = {
-  loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
+  loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
   parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, nowStamp, eventDatetime, eventCore,
   interpretEventType, interpretTargets, extractSettings, splitWS, strip, splitlines, csvLine, latin1, FAULT_TYPES, fx, fc, pyTitle, elementClass,
 };
