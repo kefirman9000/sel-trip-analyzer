@@ -1,0 +1,60 @@
+name: Screenshots
+
+# Renders the app on a real Windows desktop and commits the images used in the README.
+on:
+  push:
+    branches: [main]
+    paths:
+      - sel_trip_analyzer.py
+      - scripts/screenshots.py
+      - sample_files/**
+      - .github/workflows/screenshots.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Use a 1080p desktop
+        continue-on-error: true
+        shell: pwsh
+        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
+
+      - name: Install packages
+        run: python -m pip install sv-ttk tkinterdnd2 olefile pillow
+
+      - name: Capture
+        run: |
+          New-Item -ItemType Directory -Force docs/screenshots | Out-Null
+          python scripts/screenshots.py empty docs/screenshots/empty.png
+          python scripts/screenshots.py light docs/screenshots/light.png
+          python scripts/screenshots.py dark docs/screenshots/dark.png
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: docs/screenshots/*.png
+
+      - name: Commit updated screenshots
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Update screenshots"
+          git pull --rebase origin main
+          git push origin HEAD:main

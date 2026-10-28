@@ -915,9 +915,87 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
 # --------------------------------------------------------------------------
 # GUI
 # --------------------------------------------------------------------------
+PALETTES = {
+    "light": dict(bg="#fafafa", surface="#ffffff", text="#1b1b1b", muted="#616161",
+                  border="#d9d9d9", accent="#005fb8", drop="#f4f8fd", drop_hover="#e3eefb",
+                  drop_line="#9fb9d9", sel="#cce4f7", trip="#c42b1c", ok="#0f7b0f"),
+    "dark": dict(bg="#1c1c1c", surface="#252525", text="#e9e9e9", muted="#9e9e9e",
+                 border="#3a3a3a", accent="#4cc2ff", drop="#20262d", drop_hover="#22344a",
+                 drop_line="#4d6a8b", sel="#264f78", trip="#ff8f85", ok="#6ccb5f"),
+}
+
+PLACEHOLDER = ("Notes to include at the top of the summary, e.g.\n"
+               "Crew found a cracked insulator at pole 47. Recommend checking Z1 reach.")
+EMPTY_HINT = ("Drop SEL event files or a folder above and the trip summary will appear here.\n\n"
+              "Everything in this box is editable before you copy or save it.")
+
+
+def settings_path():
+    base = (os.environ.get("APPDATA") or os.environ.get("XDG_CONFIG_HOME")
+            or os.path.join(os.path.expanduser("~"), ".config"))
+    return os.path.join(base, "SEL Trip Analyzer", "settings.json")
+
+
+def load_settings():
+    import json
+    try:
+        with open(settings_path(), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_settings(data):
+    import json
+    try:
+        os.makedirs(os.path.dirname(settings_path()), exist_ok=True)
+        with open(settings_path(), "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+
+def system_prefers_dark():
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+            return winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
+    except Exception:
+        return False
+
+
+def set_windows_titlebar(root, dark):
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        root.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        val = ctypes.c_int(1 if dark else 0)
+        for attr in (20, 19):  # DWMWA_USE_IMMERSIVE_DARK_MODE (new, old builds)
+            if ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, attr, ctypes.byref(val), ctypes.sizeof(val)) == 0:
+                break
+    except Exception:
+        pass
+
+
 def run_gui():
+    import threading
     import tkinter as tk
-    from tkinter import ttk, filedialog, messagebox, scrolledtext
+    import tkinter.font as tkfont
+    from tkinter import ttk, filedialog, messagebox
+    from types import SimpleNamespace
+
+    if sys.platform == "win32":  # crisp text on high-DPI screens
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:
+            pass
 
     try:
         from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -926,81 +1004,229 @@ def run_gui():
     except Exception:
         root = tk.Tk()
         dnd_ok = False
-
-    root.title(f"{APP_NAME} v{VERSION}")
-    root.geometry("1100x820")
-    root.minsize(820, 600)
     try:
-        ttk.Style().theme_use("vista" if sys.platform == "win32" else "clam")
-    except tk.TclError:
-        pass
+        import sv_ttk
+    except Exception:
+        sv_ttk = None
 
-    files = []
-    ACCENT, IDLE, HOVER = "#1f6feb", "#eef3fb", "#dbe8ff"
+    cfg = load_settings()
+    st = {"dark": cfg.get("dark", system_prefers_dark()), "update": None, "hover": False,
+          "placeholder": True, "empty": True, "pal": None}
 
-    main = ttk.Frame(root, padding=10)
-    main.pack(fill="both", expand=True)
+    root.title(APP_NAME)
+    root.geometry(cfg.get("geometry", "1180x860"))
+    root.minsize(920, 660)
+
+    # ---- fonts: Segoe UI Variable on Windows 11, sensible fallbacks elsewhere
+    fams = set(tkfont.families(root))
+
+    def pick(*names):
+        return next((n for n in names if n in fams), tkfont.nametofont("TkDefaultFont").actual("family"))
+
+    UI = pick("Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", "DejaVu Sans", "Inter")
+    UI_SEMI = pick("Segoe UI Variable Display Semibold", "Segoe UI Semibold", "Inter Display SemiBold", UI)
+    MONO = pick("Cascadia Mono", "Cascadia Code", "Consolas", "JetBrains Mono", "DejaVu Sans Mono")
+    F = {
+        "body": (UI, 10), "small": (UI, 9), "cap": (UI, 9, "bold"),
+        "title": (UI_SEMI, 17, "bold" if UI_SEMI == UI else "normal"),
+        "drop": (UI_SEMI, 13, "bold" if UI_SEMI == UI else "normal"),
+        "mono": (MONO, 10), "mono_b": (MONO, 10, "bold"), "mono_h": (MONO, 12, "bold"),
+    }
+
+    style = ttk.Style(root)
+
+    # ================= layout =================
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(4, weight=1)
+
+    # ---- header
+    hdr = ttk.Frame(root, padding=(22, 16, 22, 10))
+    hdr.grid(row=0, column=0, sticky="ew")
+    hdr.columnconfigure(0, weight=1)
+    ttk.Label(hdr, text=APP_NAME, style="Title.TLabel").grid(row=0, column=0, sticky="w")
+    ttk.Label(hdr, text="Trip-cause summaries from SEL relay event reports and QuickSet settings",
+              style="Sub.TLabel").grid(row=1, column=0, sticky="w", pady=(2, 0))
+    v_dark = tk.BooleanVar(value=st["dark"])
+    dark_sw = ttk.Checkbutton(hdr, text="Dark mode", variable=v_dark,
+                              style="Switch.TCheckbutton" if sv_ttk else "TCheckbutton")
+    dark_sw.grid(row=0, column=1, rowspan=2, padx=(0, 18))
+    upd_btn = ttk.Button(hdr, text="Check for updates")
+    upd_btn.grid(row=0, column=2, rowspan=2)
 
     # ---- drop zone
-    drop = tk.Label(
-        main, bg=IDLE, fg="#1d2b3a", relief="groove", bd=2, cursor="hand2", height=4,
-        font=("Segoe UI", 12),
-        text=("Drag & drop SEL event files (.CEV .EVE .TXT .SUM .HIS .SER .HDR) and .RDB files here\n"
-              "or click to browse - multiple files and folders OK"
-              + ("" if dnd_ok else "\n(drag-and-drop unavailable: pip install tkinterdnd2)")))
-    drop.pack(fill="x")
+    drop = tk.Canvas(root, height=122, highlightthickness=0, bd=0, cursor="hand2")
+    drop.grid(row=1, column=0, sticky="ew", padx=22, pady=(4, 0))
 
-    mid = ttk.Frame(main)
-    mid.pack(fill="x", pady=(8, 0))
+    # ---- files + comments
+    mid = ttk.Frame(root, padding=(22, 16, 22, 0))
+    mid.grid(row=2, column=0, sticky="ew")
+    mid.columnconfigure(0, weight=1, uniform="mid")
+    mid.columnconfigure(1, weight=1, uniform="mid")
 
-    # ---- file list
-    lf = ttk.LabelFrame(mid, text="Loaded files", padding=6)
-    lf.pack(side="left", fill="both", expand=True)
-    lb = tk.Listbox(lf, height=7, selectmode="extended", font=("Consolas", 9))
-    lb.pack(side="left", fill="both", expand=True)
-    sb = ttk.Scrollbar(lf, command=lb.yview)
-    sb.pack(side="left", fill="y")
-    lb.config(yscrollcommand=sb.set)
-    fbtn = ttk.Frame(lf)
-    fbtn.pack(side="left", fill="y", padx=(6, 0))
+    left = ttk.Frame(mid)
+    left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+    left.columnconfigure(0, weight=1)
+    ttk.Label(left, text="FILES", style="Cap.TLabel").grid(row=0, column=0, sticky="w")
+    count_lbl = ttk.Label(left, text="none loaded", style="Hint.TLabel")
+    count_lbl.grid(row=0, column=1, sticky="e")
+    lb = tk.Listbox(left, height=6, selectmode="extended", activestyle="none", relief="flat",
+                    bd=0, highlightthickness=1, font=F["body"])
+    lb.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(6, 8))
+    fb = ttk.Frame(left)
+    fb.grid(row=2, column=0, columnspan=2, sticky="w")
 
-    # ---- comments
-    cf = ttk.LabelFrame(mid, text="Custom comments / suggestions for the output", padding=6)
-    cf.pack(side="left", fill="both", expand=True, padx=(8, 0))
-    comments = tk.Text(cf, height=7, wrap="word", font=("Segoe UI", 10))
-    comments.pack(fill="both", expand=True)
+    right = ttk.Frame(mid)
+    right.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+    right.columnconfigure(0, weight=1)
+    right.rowconfigure(1, weight=1)
+    ttk.Label(right, text="COMMENTS & SUGGESTIONS", style="Cap.TLabel").grid(row=0, column=0, sticky="w")
+    ttk.Label(right, text="added to the top of the summary", style="Hint.TLabel").grid(row=0, column=1, sticky="e")
+    comments = tk.Text(right, height=6, wrap="word", relief="flat", bd=0, highlightthickness=1,
+                       padx=10, pady=8, font=F["body"], undo=True)
+    comments.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(6, 0))
 
-    # ---- options + actions
-    bar = ttk.Frame(main)
-    bar.pack(fill="x", pady=8)
-    v_seq, v_set, v_ser = tk.BooleanVar(value=True), tk.BooleanVar(value=True), tk.BooleanVar(value=True)
-    ttk.Checkbutton(bar, text="Element sequence", variable=v_seq).pack(side="left")
-    ttk.Checkbutton(bar, text="Settings context", variable=v_set).pack(side="left", padx=8)
-    ttk.Checkbutton(bar, text="SER lines", variable=v_ser).pack(side="left")
-    status = ttk.Label(bar, text="Ready.", foreground="#555")
-    status.pack(side="left", padx=16)
+    # ---- action row
+    act = ttk.Frame(root, padding=(22, 14, 22, 8))
+    act.grid(row=3, column=0, sticky="ew")
+    v_seq, v_set, v_ser = (tk.BooleanVar(value=cfg.get(k, True)) for k in ("seq", "set", "ser"))
+    ttk.Label(act, text="Include:", style="Hint.TLabel").pack(side="left", padx=(0, 8))
+    for txt, var in (("Element timeline", v_seq), ("Settings context", v_set), ("SER lines", v_ser)):
+        ttk.Checkbutton(act, text=txt, variable=var).pack(side="left", padx=(0, 14))
+    gen_btn = ttk.Button(act, text="Generate summary", style="Accent.TButton")
+    gen_btn.pack(side="right")
 
     # ---- output
-    of = ttk.LabelFrame(main, text="Trip summary (editable - copy/paste anywhere)", padding=6)
-    of.pack(fill="both", expand=True)
-    out = scrolledtext.ScrolledText(of, wrap="word", font=("Consolas", 10), undo=True)
-    out.pack(fill="both", expand=True)
-    obtn = ttk.Frame(main)
-    obtn.pack(fill="x", pady=(6, 0))
+    outf = ttk.Frame(root, padding=(22, 4, 22, 0))
+    outf.grid(row=4, column=0, sticky="nsew")
+    outf.columnconfigure(0, weight=1)
+    outf.rowconfigure(1, weight=1)
+    oh = ttk.Frame(outf)
+    oh.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+    ttk.Label(oh, text="TRIP SUMMARY", style="Cap.TLabel").pack(side="left")
+    ttk.Label(oh, text="  editable", style="Hint.TLabel").pack(side="left")
+    save_btn = ttk.Button(oh, text="Save .txt")
+    save_btn.pack(side="right")
+    copy_btn = ttk.Button(oh, text="Copy all")
+    copy_btn.pack(side="right", padx=(0, 8))
+    out = tk.Text(outf, wrap="word", undo=True, relief="flat", bd=0, highlightthickness=1,
+                  padx=18, pady=14, font=F["mono"], spacing1=1, spacing3=1)
+    out.grid(row=1, column=0, sticky="nsew")
+    osb = ttk.Scrollbar(outf, orient="vertical", command=out.yview)
+    osb.grid(row=1, column=1, sticky="ns", padx=(4, 0))
+    out.configure(yscrollcommand=osb.set)
+
+    # ---- status bar
+    sbar = ttk.Frame(root, padding=(22, 8, 22, 12))
+    sbar.grid(row=5, column=0, sticky="ew")
+    status = ttk.Label(sbar, text="Ready" + ("" if dnd_ok else "  -  drag-and-drop unavailable, use Add files"),
+                       style="Hint.TLabel")
+    status.pack(side="left")
+    ttk.Label(sbar, text=f"v{VERSION}", style="Hint.TLabel").pack(side="right")
+
+    # ================= theme =================
+    def round_rect(c, x1, y1, x2, y2, r, **kw):
+        pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
+               x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
+        return c.create_polygon(pts, smooth=True, **kw)
+
+    def draw_drop(_=None):
+        pal = st["pal"]
+        drop.delete("all")
+        drop.configure(bg=pal["bg"])
+        w, h = max(drop.winfo_width(), 200), int(drop["height"])
+        hov = st["hover"]
+        round_rect(drop, 2, 2, w - 2, h - 2, 16, fill=pal["drop_hover"] if hov else pal["drop"],
+                   outline=pal["accent"] if hov else pal["drop_line"], dash=(7, 5), width=1.6)
+        cx, ic = w // 2, pal["accent"]
+        drop.create_line(cx, 18, cx, 42, fill=ic, width=2.4, arrow="last", arrowshape=(9, 10, 5))
+        drop.create_line(cx - 15, 36, cx - 15, 47, cx + 15, 47, cx + 15, 36, fill=ic, width=2.4,
+                         capstyle="round", joinstyle="round")
+        drop.create_text(cx, 72, text="Drop SEL event files or folders here", font=F["drop"], fill=pal["text"])
+        drop.create_text(cx, 98, font=F["small"], fill=pal["muted"],
+                         text="CEV  ·  EVE  ·  TXT  ·  SUM  ·  HIS  ·  SER  ·  HDR  ·  RDB        or click to browse")
+
+    def style_text(w, pal):
+        w.configure(highlightthickness=1, relief="flat", bd=0, bg=pal["surface"], fg=pal["text"], insertbackground=pal["text"],
+                    selectbackground=pal["sel"], selectforeground=pal["text"],
+                    highlightbackground=pal["border"], highlightcolor=pal["accent"])
+
+    def apply_theme():
+        dark = st["dark"]
+        pal = st["pal"] = PALETTES["dark" if dark else "light"]
+        if sv_ttk:
+            sv_ttk.set_theme("dark" if dark else "light")
+            if "Segoe UI Variable Text" not in fams:  # off Windows 11: map theme fonts
+                for name in ("SunValleyCaptionFont", "SunValleyBodyFont", "SunValleyBodyStrongFont",
+                             "SunValleyBodyLargeFont", "SunValleySubtitleFont", "SunValleyTitleFont"):
+                    try:
+                        tkfont.nametofont(name).configure(family=UI)
+                    except Exception:
+                        pass
+        else:
+            style.theme_use("clam")
+            style.configure(".", background=pal["bg"], foreground=pal["text"], font=F["body"],
+                            bordercolor=pal["border"], focuscolor=pal["accent"])
+            style.configure("TButton", background=pal["surface"], padding=(12, 5), relief="flat")
+            style.map("TButton", background=[("active", pal["drop_hover"])])
+            style.configure("Accent.TButton", background=pal["accent"],
+                            foreground="#000000" if dark else "#ffffff")
+            style.map("Accent.TButton", background=[("active", pal["accent"])])
+            style.configure("TCheckbutton", background=pal["bg"], foreground=pal["text"],
+                            indicatorbackground=pal["surface"], indicatorforeground=pal["accent"])
+            style.map("TCheckbutton", background=[("active", pal["bg"])])
+            style.configure("TScrollbar", background=pal["surface"], troughcolor=pal["bg"],
+                            arrowcolor=pal["muted"])
+        style.configure("Title.TLabel", font=F["title"], foreground=pal["text"])
+        style.configure("Sub.TLabel", font=F["body"], foreground=pal["muted"])
+        style.configure("Cap.TLabel", font=F["cap"], foreground=pal["muted"])
+        style.configure("Hint.TLabel", font=F["small"], foreground=pal["muted"])
+        root.configure(bg=pal["bg"])
+        restyle_widgets()
+        root.after(60, restyle_widgets)  # the theme re-colours plain Tk widgets on <<ThemeChanged>>
+        draw_drop()
+        set_windows_titlebar(root, dark)
+
+    def restyle_widgets():
+        pal = st["pal"]
+        comments.configure(font=F["body"])
+        out.configure(font=F["mono"])
+        lb.configure(font=F["body"], highlightthickness=1, relief="flat", bd=0)
+        style_text(comments, pal)
+        style_text(out, pal)
+        lb.configure(bg=pal["surface"], fg=pal["text"], selectbackground=pal["sel"],
+                     selectforeground=pal["text"], highlightbackground=pal["border"],
+                     highlightcolor=pal["accent"])
+        comments.tag_configure("ph", foreground=pal["muted"])
+        out.tag_configure("h1", font=F["mono_h"], foreground=pal["text"])
+        out.tag_configure("h2", font=F["mono_b"], foreground=pal["accent"])
+        out.tag_configure("rule", foreground=pal["border"])
+        out.tag_configure("label", foreground=pal["muted"])
+        out.tag_configure("trip", font=F["mono_b"], foreground=pal["trip"])
+        out.tag_configure("notrip", font=F["mono_b"], foreground=pal["ok"])
+        out.tag_configure("bold", font=F["mono_b"])
+        out.tag_configure("hint", font=F["body"], foreground=pal["muted"])
+
+    # ================= behaviour =================
+    files = []
+
+    def set_status(text):
+        status.config(text=text)
 
     def refresh_list():
         lb.delete(0, "end")
         for p in files:
-            lb.insert("end", os.path.basename(p) + "    " + os.path.dirname(p))
-        status.config(text=f"{len(files)} file(s) loaded.")
+            lb.insert("end", f"  {os.path.basename(p)}")
+        count_lbl.config(text=f"{len(files)} loaded" if files else "none loaded")
 
     def add_paths(paths):
-        new = [p for p in expand_paths(paths)
-               if os.path.normcase(os.path.abspath(p)) not in {os.path.normcase(os.path.abspath(f)) for f in files}]
+        known = {os.path.normcase(os.path.abspath(f)) for f in files}
+        new = [p for p in expand_paths(paths) if os.path.normcase(os.path.abspath(p)) not in known]
         files.extend(new)
         refresh_list()
         if new:
             generate()
+        elif paths:
+            set_status("No new SEL files found in what was dropped.")
 
     def browse(_=None):
         sel = filedialog.askopenfilenames(
@@ -1010,70 +1236,133 @@ def run_gui():
         if sel:
             add_paths(list(sel))
 
-    def on_drop(event):
-        drop.config(bg=IDLE)
-        add_paths(list(root.tk.splitlist(event.data)))
-        return event.action
+    def browse_folder():
+        d = filedialog.askdirectory(title="Select a folder of SEL files")
+        if d:
+            add_paths([d])
 
     def remove_sel():
         for i in reversed(lb.curselection()):
             files.pop(i)
         refresh_list()
+        if files:
+            generate()
 
     def clear_all():
         files.clear()
         refresh_list()
-        out.delete("1.0", "end")
+        show_empty()
+        set_status("Cleared")
 
-    def generate():
+    def get_comments():
+        return "" if st["placeholder"] else comments.get("1.0", "end-1c")
+
+    def show_placeholder():
+        if not comments.get("1.0", "end-1c").strip():
+            comments.delete("1.0", "end")
+            comments.insert("1.0", PLACEHOLDER, "ph")
+            st["placeholder"] = True
+
+    def hide_placeholder(_=None):
+        if st["placeholder"]:
+            comments.delete("1.0", "end")
+            st["placeholder"] = False
+
+    def show_empty():
+        out.delete("1.0", "end")
+        out.insert("1.0", EMPTY_HINT, "hint")
+        st["empty"] = True
+
+    def highlight():
+        for tag in ("h1", "h2", "rule", "label", "trip", "notrip", "bold"):
+            out.tag_remove(tag, "1.0", "end")
+        for i, ln in enumerate(out.get("1.0", "end-1c").split("\n"), 1):
+            s = ln.strip()
+            if not s:
+                continue
+            if i == 1 and s.startswith("SEL TRIP"):
+                out.tag_add("h1", f"{i}.0", f"{i}.end")
+            elif re.fullmatch(r"[=\-]{10,}", s):
+                out.tag_add("rule", f"{i}.0", f"{i}.end")
+            elif ln == s and re.fullmatch(r"[A-Z][A-Z /&()\-]{3,}", s):
+                out.tag_add("h2", f"{i}.0", f"{i}.end")
+            elif re.match(r"Event \d+ of \d+", ln):
+                out.tag_add("bold", f"{i}.0", f"{i}.end")
+            elif s.startswith("Probable cause"):
+                out.tag_add("bold", f"{i}.0", f"{i}.end")
+            else:
+                m = re.match(r"^(\s{2}[A-Za-z][A-Za-z ./]{2,12}:)", ln)
+                if m:
+                    out.tag_add("label", f"{i}.0", f"{i}.{len(m.group(1))}")
+            for word, tag in (("TRIP - ", "trip"), ("Relay TRIPPED", "trip"),
+                              ("No trip - ", "notrip"), ("No trip recorded", "notrip")):
+                k = ln.find(word)
+                if k >= 0:
+                    out.tag_add(tag, f"{i}.{k}", f"{i}.{k + len(word.rstrip(' -'))}")
+
+    def generate(_=None):
         if not files:
-            status.config(text="Add some files first.")
+            set_status("Add some files first")
             return
         root.config(cursor="watch")
         root.update_idletasks()
         try:
             events, rdb, errors = load_files(files)
-            txt = build_report(events, rdb, errors, files, comments.get("1.0", "end"),
+            txt = build_report(events, rdb, errors, files, get_comments(),
                                {"sequence": v_seq.get(), "settings": v_set.get(), "ser": v_ser.get()})
             out.delete("1.0", "end")
             out.insert("1.0", txt)
+            st["empty"] = False
+            highlight()
             n = len([e for e in events if e.kind != "ser"])
-            status.config(text=f"{n} event(s) from {len(files)} file(s)" + (f", {len(errors)} error(s)" if errors else ""))
+            set_status(f"{n} event{'s' if n != 1 else ''} from {len(files)} file{'s' if len(files) != 1 else ''}"
+                       + (f"  -  {len(errors)} could not be read" if errors else ""))
         finally:
             root.config(cursor="")
 
-    def copy_all():
+    def flash(btn, text, original):
+        btn.config(text=text)
+        root.after(1600, lambda: btn.config(text=original))
+
+    def copy_all(_=None):
+        if st["empty"]:
+            return
         root.clipboard_clear()
         root.clipboard_append(out.get("1.0", "end-1c"))
-        status.config(text="Summary copied to clipboard.")
+        flash(copy_btn, "Copied ✓", "Copy all")
+        set_status("Summary copied to clipboard")
 
     def save_txt():
+        if st["empty"]:
+            return
         p = filedialog.asksaveasfilename(defaultextension=".txt", initialfile="trip_summary.txt",
                                          filetypes=[("Text", "*.txt"), ("All files", "*.*")])
         if p:
             with open(p, "w", encoding="utf-8") as f:
                 f.write(out.get("1.0", "end-1c"))
-            status.config(text=f"Saved {p}")
+            flash(save_btn, "Saved ✓", "Save .txt")
+            set_status(f"Saved {p}")
 
-    ttk.Button(fbtn, text="Add...", command=browse).pack(fill="x")
-    ttk.Button(fbtn, text="Remove", command=remove_sel).pack(fill="x", pady=4)
-    ttk.Button(fbtn, text="Clear all", command=clear_all).pack(fill="x")
-
-    ttk.Button(obtn, text="Generate / Refresh summary", command=generate).pack(side="left")
-    ttk.Button(obtn, text="Copy all", command=copy_all).pack(side="left", padx=6)
-    ttk.Button(obtn, text="Save as .txt", command=save_txt).pack(side="left")
+    def toggle_dark(_=None):
+        if _ is not None:  # keyboard shortcut
+            v_dark.set(not v_dark.get())
+        st["dark"] = v_dark.get()
+        apply_theme()
 
     # ---- updater
-    import threading
-
     def run_bg(work, done):
         def worker():
             try:
                 res, err = work(), None
-            except Exception as e:  # network errors, permissions, etc.
+            except Exception as e:
                 res, err = None, e
             root.after(0, lambda: done(res, err))
         threading.Thread(target=worker, daemon=True).start()
+
+    def show_update_available(info):
+        st["update"] = info
+        upd_btn.config(text=f"Update to v{info['version']}", style="Accent.TButton")
+        set_status(f"Version {info['version']} is available")
 
     def check_updates(silent=False):
         if "OWNER/" in GITHUB_REPO:
@@ -1082,30 +1371,34 @@ def run_gui():
             return
         upd_btn.config(state="disabled")
         if not silent:
-            status.config(text="Checking GitHub for updates...")
+            set_status("Checking GitHub for updates...")
 
         def done(info, err):
             upd_btn.config(state="normal")
             if err:
                 if not silent:
-                    status.config(text="Update check failed.")
+                    set_status("Update check failed")
                     messagebox.showerror("Updates", f"Could not reach GitHub:\n{err}")
                 return
             if not info:
                 if not silent:
-                    status.config(text=f"You're on the latest version ({VERSION}).")
+                    set_status(f"You're on the latest version (v{VERSION})")
                     messagebox.showinfo("Updates", f"You're up to date (v{VERSION}).")
                 return
-            status.config(text=f"Update available: v{info['version']}")
-            notes = info["notes"][:1200] or "(no release notes)"
-            if messagebox.askyesno(
-                    "Update available",
-                    f"Version {info['version']} is available (you have {VERSION}).\n\n"
-                    f"What's new:\n{notes}\n\nDownload and install it now?\n"
-                    "The program will restart when finished."):
-                do_install(info)
+            show_update_available(info)
+            if not silent:
+                prompt_update(info)
 
         run_bg(check_for_update, done)
+
+    def prompt_update(info):
+        notes = info["notes"][:1200] or "(no release notes)"
+        if messagebox.askyesno(
+                "Update available",
+                f"Version {info['version']} is available (you have {VERSION}).\n\n"
+                f"What's new:\n{notes}\n\nDownload and install it now?\n"
+                "The program will restart when finished."):
+            do_install(info)
 
     def do_install(info):
         upd_btn.config(state="disabled")
@@ -1113,45 +1406,102 @@ def run_gui():
         def progress(done_b, total):
             msg = (f"Downloading update... {100 * done_b // total}%" if total
                    else f"Downloading update... {done_b // 1024} KB")
-            root.after(0, lambda: status.config(text=msg))
+            root.after(0, lambda: set_status(msg))
 
         def done(finish, err):
             upd_btn.config(state="normal")
             if err:
-                status.config(text="Update failed.")
+                set_status("Update failed")
                 messagebox.showerror("Update failed", str(err))
                 return
-            status.config(text="Update installed - restarting...")
+            set_status("Update installed - restarting...")
+            on_close(save_only=True)
             finish()
             root.destroy()
 
         run_bg(lambda: install_update(info, progress), done)
 
-    upd_btn = ttk.Button(obtn, text="Check for updates", command=check_updates)
-    upd_btn.pack(side="right")
-    ttk.Label(obtn, text=f"v{VERSION}", foreground="#777").pack(side="right", padx=8)
-    root.after(1500, lambda: check_updates(silent=True))  # quiet check at startup
+    def on_update_click():
+        if st["update"]:
+            prompt_update(st["update"])
+        else:
+            check_updates(silent=False)
 
+    def on_close(save_only=False):
+        save_settings({"dark": st["dark"], "geometry": root.geometry(),
+                       "seq": v_seq.get(), "set": v_set.get(), "ser": v_ser.get()})
+        if not save_only:
+            root.destroy()
+
+    # ---- wiring
+    upd_btn.config(command=on_update_click)
+    dark_sw.config(command=toggle_dark)
+    gen_btn.config(command=generate)
+    copy_btn.config(command=copy_all)
+    save_btn.config(command=save_txt)
+    for txt, cmd in (("Add files", browse), ("Add folder", browse_folder),
+                     ("Remove", remove_sel), ("Clear", clear_all)):
+        ttk.Button(fb, text=txt, command=cmd).pack(side="left", padx=(0, 6))
+
+    drop.bind("<Configure>", draw_drop)
     drop.bind("<Button-1>", browse)
+    drop.bind("<Enter>", lambda e: (st.update(hover=True), draw_drop()))
+    drop.bind("<Leave>", lambda e: (st.update(hover=False), draw_drop()))
+    comments.bind("<FocusIn>", hide_placeholder)
+    comments.bind("<FocusOut>", lambda e: show_placeholder())
+    lb.bind("<Delete>", lambda e: remove_sel())
+
     if dnd_ok:
-        for w in (drop, lb, root):
+        def on_drop(event):
+            st["hover"] = False
+            draw_drop()
+            add_paths(list(root.tk.splitlist(event.data)))
+            return event.action
+
+        def on_enter(event):
+            st["hover"] = True
+            draw_drop()
+            return event.action
+
+        def on_leave(event):
+            st["hover"] = False
+            draw_drop()
+            return event.action
+
+        for w in (drop, lb, out, root):
             w.drop_target_register(DND_FILES)
             w.dnd_bind("<<Drop>>", on_drop)
-        drop.dnd_bind("<<DropEnter>>", lambda e: (drop.config(bg=HOVER), e.action)[1])
-        drop.dnd_bind("<<DropLeave>>", lambda e: (drop.config(bg=IDLE), e.action)[1])
+        drop.dnd_bind("<<DropEnter>>", on_enter)
+        drop.dnd_bind("<<DropLeave>>", on_leave)
 
     def select_all(e):
         e.widget.tag_add("sel", "1.0", "end")
         return "break"
+
     out.bind("<Control-a>", select_all)
     comments.bind("<Control-a>", select_all)
-    root.bind("<Control-Return>", lambda e: generate())
-    root.bind("<F5>", lambda e: generate())
+    root.bind("<Control-o>", browse)
+    root.bind("<Control-Return>", generate)
+    root.bind("<F5>", generate)
+    root.bind("<Control-d>", toggle_dark)
+    root.bind("<Control-Shift-C>", copy_all)
+    root.protocol("WM_DELETE_WINDOW", on_close)
 
-    # files passed on the command line (e.g. dropped onto the .exe icon)
-    if len(sys.argv) > 1:
-        root.after(100, lambda: add_paths(sys.argv[1:]))
+    apply_theme()
+    show_placeholder()
+    show_empty()
+    refresh_list()
 
+    # hooks used by scripts/screenshots.py
+    root.app = SimpleNamespace(add_paths=add_paths, comments=comments, hide_placeholder=hide_placeholder,
+                               generate=generate, toggle_dark=toggle_dark, v_dark=v_dark,
+                               show_update_available=show_update_available)
+
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if args:  # files dropped onto the .exe icon
+        root.after(150, lambda: add_paths(args))
+    if os.environ.get("SEL_TRIP_NO_UPDATE_CHECK") != "1":
+        root.after(1500, lambda: check_updates(silent=True))
     root.mainloop()
 
 
