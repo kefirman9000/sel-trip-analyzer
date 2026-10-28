@@ -1,0 +1,6 @@
+FEEDER 7                         Date: 10/26/26    Time: 08:14:02.113
+APEX SUB
+
+Event: TRIP      Location: $$$$$    Shot:  1  Frequency: 59.98
+Targets: COMM
+Currents (A Pri), ABCNGQ:   210  205  198  12  10  4
