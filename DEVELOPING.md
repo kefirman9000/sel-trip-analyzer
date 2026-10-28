@@ -60,8 +60,10 @@ the command line.
 upload, folder upload, edits, Word/text/print export, feedback, the update
 banner, dark mode, help and the phone layout. CI runs it on every push.
 
-`.github/workflows/pages.yml` publishes the page to GitHub Pages once Pages is
-enabled for the repo (Settings → Pages → Source: **GitHub Actions**).
+The online copy is served by GitHub Pages from the `gh-pages` branch
+(Settings → Pages → Source: **Deploy from a branch**, `gh-pages`, `/ (root)`).
+`.github/workflows/pages.yml` rebuilds the page and updates that branch whenever
+the app changes on `main`; don't edit `gh-pages` by hand.
 
 ## Building the .exe
 
