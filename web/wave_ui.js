@@ -12,9 +12,9 @@ const PHASE = {
   light: { A: "#d0392b", B: "#0e8a74", C: "#3a5fd9" },
   dark: { A: "#e8604f", B: "#1fa385", C: "#6f8cf5" },
 };
-const LIGHT = { bg: "#ffffff", ink: "#1b1b1b", muted: "#616161", grid: "#e6e6e6", axis: "#c9c9c9", accent: "#005fb8",
+const LIGHT = { ok: "#0f7b0f", bg: "#ffffff", ink: "#1b1b1b", muted: "#616161", grid: "#e6e6e6", axis: "#c9c9c9", accent: "#005fb8",
                 trip: "#c42b1c", warn: "#9a5800", shade: "rgba(0,95,184,0.06)", zoom: "rgba(0,95,184,0.14)", pin: "#9a5800" };
-const DARK = { bg: "#252525", ink: "#e9e9e9", muted: "#9e9e9e", grid: "#333333", axis: "#474747", accent: "#4cc2ff",
+const DARK = { ok: "#6ccb5f", bg: "#252525", ink: "#e9e9e9", muted: "#9e9e9e", grid: "#333333", axis: "#474747", accent: "#4cc2ff",
                trip: "#ff8f85", warn: "#ffb74d", shade: "rgba(76,194,255,0.07)", zoom: "rgba(76,194,255,0.18)", pin: "#ffb74d" };
 const FONT = '"Segoe UI Variable Text","Segoe UI",Inter,system-ui,-apple-system,Arial,sans-serif';
 
@@ -266,22 +266,49 @@ function draw(ctx, m, W, theme, opts) {
   for (const v of xticks) ctx.fillText(fmt(Math.abs(v) < step / 1000 ? 0 : v, step < 1 ? (step < 0.1 ? 2 : 1) : 0), X(tOf(v)), bottom + 10);
   ctx.textAlign = "right";
   ctx.fillText(unitMs ? "ms" : "cycles", L - 6, bottom + 10);
-  // graph notes (pins)
+  // graph notes: on any graph, a point or a time span, coloured, with or without a line
+  const NOTE_COLORS = { amber: P.pin, red: P.trip, blue: P.accent, green: P.ok, gray: P.muted };
+  lay.pinBoxes = [];
   (m.pins || []).forEach((pin, i) => {
-    const x = Math.round(X(pin.t)) + 0.5;
-    if (x < L || x > L + plotW) return;
-    ctx.strokeStyle = P.pin; ctx.lineWidth = 1.2; ctx.setLineDash([2, 2]);
-    ctx.beginPath();
-    for (const p of lay.panels) { ctx.moveTo(x, p.y); ctx.lineTo(x, p.y + p.h); }
-    ctx.stroke(); ctx.setLineDash([]);
-    const label = `${i + 1}${opts.pinText !== false ? "  " + (pin.text.length > 34 ? pin.text.slice(0, 33) + "…" : pin.text) : ""}`;
+    const p = lay.panels.find((q) => q.kind === pin.panel) || lay.panels[0];
+    if (!p) return;
+    const col = NOTE_COLORS[pin.color] || P.pin;
+    const span = pin.t2 !== undefined && pin.t2 !== null;
+    const ta = span ? Math.min(pin.t, pin.t2) : pin.t, tb = span ? Math.max(pin.t, pin.t2) : pin.t;
+    const xa = X(ta), xb = X(tb);
+    if (xb < L || xa > L + plotW) return;
+    const where = pin.line === "panel" || pin.line === "none" ? [p] : lay.panels;
+    if (span) {
+      ctx.fillStyle = col; ctx.globalAlpha = 0.13;
+      for (const q of where) ctx.fillRect(clamp(xa, L, L + plotW), q.y, clamp(xb, L, L + plotW) - clamp(xa, L, L + plotW), q.h);
+      ctx.globalAlpha = 1;
+    }
+    if (pin.line !== "none") {
+      ctx.strokeStyle = col; ctx.lineWidth = 1.3; ctx.setLineDash([3, 2]);
+      ctx.beginPath();
+      for (const xx of span ? [xa, xb] : [xa]) {
+        if (xx < L || xx > L + plotW) continue;
+        const xr = Math.round(xx) + 0.5;
+        for (const q of where) { ctx.moveTo(xr, q.y); ctx.lineTo(xr, q.y + q.h); }
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    const label = `${i + 1}${opts.pinText !== false ? "  " + (pin.text.length > 40 ? pin.text.slice(0, 39) + "…" : pin.text) : ""}`;
     ctx.font = `600 11px ${FONT}`;
-    const w = ctx.measureText(label).width + 12;
-    const bx = x + w + 4 > L + plotW ? x - w - 2 : x + 2, by = top + 4 + (i % 3) * 22;
-    ctx.fillStyle = P.bg; ctx.strokeStyle = P.pin; ctx.lineWidth = 1.2;
-    roundRect(ctx, bx, by, w, 18, 4); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = P.ink; ctx.textAlign = "left"; ctx.fillText(label, bx + 6, by + 9.5);
+    const w = ctx.measureText(label).width + 12, h = 18;
+    const anchor = clamp(xa, L, L + plotW);
+    const bx = clamp(anchor + w + 4 > L + plotW ? anchor - w - 2 : anchor + 2, L, L + plotW - w);
+    const by = p.y + 3 + clamp(pin.y === undefined ? (i % 3) * 0.14 : pin.y, 0, 1) * Math.max(0, p.h - h - 6);
+    if (pin.line === "none") {          // a short pointer from the label to the moment
+      ctx.strokeStyle = col; ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(Math.round(anchor) + 0.5, by + h / 2 - 7); ctx.lineTo(Math.round(anchor) + 0.5, by + h / 2 + 7); ctx.stroke();
+    }
+    ctx.fillStyle = P.bg; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+    roundRect(ctx, bx, by, w, h, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = col; roundRect(ctx, bx + 1, by + 1, 3, h - 2, 1.5); ctx.fill();
+    ctx.fillStyle = P.ink; ctx.textAlign = "left"; ctx.fillText(label, bx + 7, by + h / 2 + 0.5);
     ctx.font = `11px ${FONT}`;
+    lay.pinBoxes.push({ id: pin.id, x: bx, y: by, w, h });
   });
   // cursor
   if (opts.cursor !== false && m.cursorIdx !== null && m.cursorIdx !== undefined) {
@@ -545,6 +572,7 @@ function create(ctx) {
     const g = canvas.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     lay = draw(g, m, W, themeNow());
+    st.lay = lay;
     clearOverlay();
     // scrollbar
     const rec = st.rec, full = rec.t[rec.n - 1] - rec.t[0], span = st.view.t1 - st.view.t0;
@@ -565,13 +593,34 @@ function create(ctx) {
   function localXY(e) { const r = overlay.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   overlay.addEventListener("pointerdown", (e) => {
     if (!st.rec || e.button > 1) return;
-    const [x] = localXY(e);
+    const [x, y] = localXY(e);
     overlay.setPointerCapture(e.pointerId);
-    st.drag = { x0: x, x, pan: e.shiftKey || e.button === 1, t0: st.view.t0, moved: false };
+    const hit = e.button === 0 ? pinAt(x, y) : null;
+    if (hit) {
+      const pin = pins().find((p) => p.id === hit.id);
+      st.drag = { pin: pin, x0: x, y0: y, offX: x - hit.x, offY: y - hit.y, t: pin.t, t2: pin.t2, moved: false };
+      return;
+    }
+    st.drag = { x0: x, x, y0: y, pan: e.shiftKey || e.button === 1, t0: st.view.t0, moved: false };
   });
   overlay.addEventListener("pointermove", (e) => {
     if (!st.rec || !lay) return;
     const [x, y] = localXY(e);
+    if (st.drag && st.drag.pin) {
+      const d = st.drag;
+      if (Math.abs(x - d.x0) + Math.abs(y - d.y0) > 3) d.moved = true;
+      if (!d.moved) return;
+      const dt = tAtX(x) - tAtX(d.x0), p = panelAt(y) || lay.panels.find((q) => q.kind === d.pin.panel) || lay.panels[0];
+      const list = pins(), k = list.findIndex((q) => q.id === d.pin.id);
+      if (k < 0) return;
+      list[k].t = d.t + dt;
+      if (d.t2 !== undefined) list[k].t2 = d.t2 + dt;
+      list[k].panel = p.kind;
+      list[k].y = clamp((y - d.offY - p.y - 3) / Math.max(1, p.h - 24), 0, 1);
+      savePins(list); redraw();
+      overlay.style.cursor = "grabbing";
+      return;
+    }
     if (st.drag) {
       st.drag.x = x;
       if (Math.abs(x - st.drag.x0) > 4) st.drag.moved = true;
@@ -589,12 +638,27 @@ function create(ctx) {
         return;
       }
     }
+    if (pinAt(x, y)) { overlay.style.cursor = "grab"; clearOverlay(); tip.hidden = true; return; }
+    overlay.style.cursor = st.noteMode ? "copy" : "crosshair";
     hover(x, y, e);
   });
   overlay.addEventListener("pointerup", (e) => {
     if (!st.drag) return;
     const d = st.drag; st.drag = null;
-    const [x] = localXY(e);
+    const [x, y] = localXY(e);
+    if (d.pin) {
+      overlay.style.cursor = "grab";
+      if (d.moved) { renderPins(); ctx.setStatus("Note moved"); }
+      else askNote(d.pin.t, { id: d.pin.id });
+      return;
+    }
+    if (d.moved && !d.pan && st.noteMode) {        // drag in note mode: a note on a span of time
+      const a = tAtX(clamp(Math.min(d.x0, x), L, L + lay.plotW)), b = tAtX(clamp(Math.max(d.x0, x), L, L + lay.plotW));
+      const p = panelAt(d.y0) || lay.panels[0];
+      clearOverlay();
+      askNote(a, { t2: b, panel: p.kind, y: clamp((d.y0 - p.y - 12) / Math.max(1, p.h - 24), 0, 1) });
+      return;
+    }
     if (d.moved && !d.pan) {
       const a = tAtX(clamp(Math.min(d.x0, x), L, L + lay.plotW)), b = tAtX(clamp(Math.max(d.x0, x), L, L + lay.plotW));
       if (b - a > 0.25 / st.rec.freq) { st.view = { t0: a, t1: b }; redraw(); }
@@ -604,11 +668,15 @@ function create(ctx) {
     if (d.moved) return;
     if (x < L || x > L + lay.plotW) return;
     const idx = idxAt(st.rec, tAtX(x));
-    if (st.noteMode) { askNote(idx, e); return; }
+    if (st.noteMode) {
+      const p = panelAt(y) || lay.panels[0];
+      askNote(st.rec.t[idx], { panel: p.kind, y: clamp((y - p.y - 12) / Math.max(1, p.h - 24), 0, 1) });
+      return;
+    }
     setCursor(idx);
   });
   overlay.addEventListener("pointerleave", () => { if (!st.drag) { clearOverlay(); tip.hidden = true; } });
-  overlay.addEventListener("dblclick", () => { fitFault(); redraw(); });
+  overlay.addEventListener("dblclick", (e) => { const [x, y] = localXY(e); if (pinAt(x, y)) return; fitFault(); redraw(); });
   overlay.addEventListener("wheel", (e) => {
     if (!st.rec) return;
     if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoom(e.deltaY > 0 ? 1.25 : 0.8, tAtX(localXY(e)[0])); }
@@ -623,7 +691,7 @@ function create(ctx) {
     else if (e.key === "-") zoom(1.4);
     else if (e.key === "0") { fitAll(); redraw(); }
     else if (e.key === "f" || e.key === "F") { fitFault(); redraw(); }
-    else if (e.key === "n" || e.key === "N") { e.preventDefault(); askNote(st.cursor, null); }
+    else if (e.key === "n" || e.key === "N") { e.preventDefault(); askNote(st.rec.t[st.cursor], {}); }
   });
 
   function hover(x, y) {
@@ -672,34 +740,68 @@ function create(ctx) {
 
   // ---------------- notes on the graph
   const pinsAll = () => ctx.store.get("pins", {});
-  function pins() { return (pinsAll()[st.recKey] || []).slice().sort((a, b) => a.t - b.t); }
+  let pinSeq = 0;
+  function pins() {
+    const raw = pinsAll()[st.recKey] || [];
+    if (raw.some((p) => !p.id)) {                 // notes saved by an older version: give them ids once
+      raw.forEach((p) => { if (!p.id) p.id = `p${Date.now().toString(36)}${pinSeq++}`; });
+      const all = pinsAll(); all[st.recKey] = raw; ctx.store.set("pins", all);
+    }
+    return raw.map((p) => Object.assign({ color: "amber", line: "all" }, p)).sort((a, b) => a.t - b.t);
+  }
   function savePins(list) { const all = pinsAll(); if (list.length) all[st.recKey] = list; else delete all[st.recKey]; ctx.store.set("pins", all); }
-  function askNote(idx, e) {
-    const box = $("wNoteAsk"), t = st.rec.t[idx];
+  const PANEL_NAMES = { I: "Currents", V: "Voltages", other: "Other analogs", D: "Relay elements" };
+  /** Open the note editor: a new note (t, optional t2, panel, y) or an existing one (by id). */
+  function askNote(t, opt) {
+    opt = opt || {};
+    const box = $("wNoteAsk");
+    const existing = opt.id ? pins().find((p) => p.id === opt.id) : null;
+    const d = existing ? Object.assign({}, existing) : { t, t2: opt.t2, panel: opt.panel || (lay && lay.panels[0] ? lay.panels[0].kind : "I"), y: opt.y === undefined ? 0 : opt.y,
+                                                         color: ctx.store.get("w.noteColor", "amber"), line: ctx.store.get("w.noteLine", "all"), text: "" };
+    st.noteDraft = d;
+    const f = st.rec.freq;
+    const when = d.t2 !== undefined && d.t2 !== null ? `${fmt(Math.min(d.t, d.t2) * f, 2)} to ${fmt(Math.max(d.t, d.t2) * f, 2)} cycles` : `${fmt(d.t * f, 2)} cycles`;
+    $("wNoteAt").textContent = `${existing ? "Edit note" : "Note"} at ${when}`;
+    $("wNoteText").value = d.text || "";
+    for (const r of box.querySelectorAll('input[name="wNoteColor"]')) r.checked = r.value === d.color;
+    $("wNoteLine").value = d.line;
+    const ps = $("wNotePanel"); ps.textContent = "";
+    for (const p of lay.panels) { const o = document.createElement("option"); o.value = p.kind; o.textContent = PANEL_NAMES[p.kind] || p.kind; ps.appendChild(o); }
+    ps.value = lay.panels.some((p) => p.kind === d.panel) ? d.panel : lay.panels[0].kind;
+    $("wNoteDelete").hidden = !existing;
+    $("wNoteSave").textContent = existing ? "Save" : "Pin note";
     box.hidden = false;
-    $("wNoteAt").textContent = `Note at ${fmt(t * st.rec.freq, 2)} cycles`;
-    $("wNoteText").value = "";
-    box.dataset.t = String(t);
-    const x = xAtT(t);
-    box.style.left = clamp(x - 140, 0, Math.max(0, overlay.clientWidth - 300)) + "px";
-    box.style.top = "40px";
+    const x = xAtT(Math.min(d.t, d.t2 === undefined || d.t2 === null ? d.t : d.t2));
+    box.style.left = clamp(x - 150, 0, Math.max(0, overlay.clientWidth - 320)) + "px";
+    const pnl = lay.panels.find((p) => p.kind === ps.value) || lay.panels[0];
+    box.style.top = clamp(pnl.y + 10, 0, Math.max(0, overlay.clientHeight - 190)) + "px";
     $("wNoteText").focus();
   }
   function addPin() {
-    const box = $("wNoteAsk"), text = $("wNoteText").value.trim();
+    const box = $("wNoteAsk"), text = $("wNoteText").value.trim(), d = st.noteDraft;
     box.hidden = true;
-    if (!text) return;
-    const list = pins(); list.push({ t: parseFloat(box.dataset.t), text });
+    if (!text || !d) return;
+    const color = (box.querySelector('input[name="wNoteColor"]:checked') || {}).value || "amber", line = $("wNoteLine").value;
+    ctx.store.set("w.noteColor", color); ctx.store.set("w.noteLine", line);
+    const note = { id: d.id || `p${Date.now().toString(36)}${pinSeq++}`, t: d.t, text, panel: $("wNotePanel").value, y: d.y || 0, color, line };
+    if (d.t2 !== undefined && d.t2 !== null) note.t2 = d.t2;
+    const list = pins().filter((p) => p.id !== note.id); list.push(note);
     savePins(list); setNoteMode(false); redraw(); renderPins();
-    ctx.setStatus("Note pinned to the graph. It's saved in this browser and included when you export.");
+    ctx.setStatus(d.id ? "Note updated" : "Note pinned. Drag it to move it (also onto another graph); click it to edit. It's included when you export.");
   }
   $("wNoteSave").addEventListener("click", addPin);
   $("wNoteCancel").addEventListener("click", () => { $("wNoteAsk").hidden = true; });
+  $("wNoteDelete").addEventListener("click", () => {
+    const d = st.noteDraft; $("wNoteAsk").hidden = true;
+    if (d && d.id) { savePins(pins().filter((p) => p.id !== d.id)); redraw(); renderPins(); ctx.setStatus("Note deleted"); }
+  });
   $("wNoteText").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addPin(); } else if (e.key === "Escape") $("wNoteAsk").hidden = true; });
+  const pinAt = (x, y) => (lay && lay.pinBoxes ? lay.pinBoxes.slice().reverse().find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) : null);
+  const panelAt = (y) => (lay ? lay.panels.find((p) => y >= p.y - 12 && y <= p.y + p.h + 6) : null);
   function setNoteMode(on) {
     st.noteMode = on; $("wNoteMode").setAttribute("aria-pressed", String(on));
     overlay.style.cursor = on ? "copy" : "crosshair";
-    if (on) ctx.setStatus("Click on the graph where the note should go (Esc to cancel)");
+    if (on) ctx.setStatus("Click on any graph where the note should go, or drag across a stretch of time to mark a span (Esc to cancel)");
   }
   $("wNoteMode").addEventListener("click", () => setNoteMode(!st.noteMode));
   function renderPins() {
@@ -708,14 +810,19 @@ function create(ctx) {
     if (!list.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "No notes yet. Use “Add note” and click on the graph."; ul.appendChild(li); }
     list.forEach((p, i) => {
       const li = document.createElement("li");
-      const n = document.createElement("span"); n.className = "pin-n"; n.textContent = i + 1;
-      const at = document.createElement("button"); at.className = "linkish"; at.textContent = `${fmt(p.t * st.rec.freq, 2)} cyc`; at.title = "Move the cursor here";
+      const n = document.createElement("span"); n.className = "pin-n pin-" + (p.color || "amber"); n.textContent = i + 1;
+      n.title = PANEL_NAMES[p.panel] || "";
+      const at = document.createElement("button"); at.className = "linkish";
+      at.textContent = p.t2 !== undefined ? `${fmt(Math.min(p.t, p.t2) * st.rec.freq, 1)}–${fmt(Math.max(p.t, p.t2) * st.rec.freq, 1)} cyc` : `${fmt(p.t * st.rec.freq, 2)} cyc`;
+      at.title = "Move the cursor here";
       at.addEventListener("click", () => setCursor(idxAt(st.rec, p.t), true));
       const tx = document.createElement("input"); tx.value = p.text; tx.setAttribute("aria-label", `Note ${i + 1}`);
-      tx.addEventListener("change", () => { const l = pins(); const k = l.findIndex((q) => q.t === p.t && q.text === p.text); if (k >= 0) { l[k].text = tx.value.trim() || l[k].text; savePins(l); redraw(); } });
+      tx.addEventListener("change", () => { const l = pins(); const k = l.findIndex((q) => q.id === p.id); if (k >= 0) { l[k].text = tx.value.trim() || l[k].text; savePins(l); redraw(); } });
+      const ed = document.createElement("button"); ed.className = "x"; ed.textContent = "✎"; ed.title = "Edit colour, line and graph"; ed.setAttribute("aria-label", `Edit note ${i + 1}`);
+      ed.addEventListener("click", () => { if (p.t < st.view.t0 || p.t > st.view.t1) { const span = st.view.t1 - st.view.t0; st.view = { t0: p.t - span / 2, t1: p.t + span / 2 }; redraw(); } askNote(p.t, { id: p.id }); });
       const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Delete note"; x.setAttribute("aria-label", `Delete note ${i + 1}`);
-      x.addEventListener("click", () => { savePins(pins().filter((q) => !(q.t === p.t && q.text === p.text))); redraw(); renderPins(); });
-      li.append(n, at, tx, x); ul.appendChild(li);
+      x.addEventListener("click", () => { savePins(pins().filter((q) => q.id !== p.id)); redraw(); renderPins(); });
+      li.append(n, at, tx, ed, x); ul.appendChild(li);
     });
     $("wPinCount").textContent = list.length ? `${list.length} note${list.length === 1 ? "" : "s"}` : "";
   }
