@@ -87,7 +87,8 @@ def main():
     frames[256].save(os.path.join(OUT, "icon.ico"), format="ICO",
                      sizes=[(s, s) for s in sizes], append_images=[frames[s] for s in sizes if s != 256])
     tile(512).save(os.path.join(OUT, "icon.png"))
-    print("wrote", os.path.join(OUT, "icon.ico"), "and icon.png")
+    tile(128).save(os.path.join(OUT, "icon-128.png"), optimize=True)   # embedded in the browser version
+    print("wrote", os.path.join(OUT, "icon.ico"), "icon.png and icon-128.png")
 
 
 if __name__ == "__main__":

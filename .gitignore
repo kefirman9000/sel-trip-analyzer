@@ -6,3 +6,5 @@ dist/
 *.bak
 *.new
 *.zip
+node_modules/
+site/
