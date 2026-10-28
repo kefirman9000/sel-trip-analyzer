@@ -355,7 +355,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
       <path d="M17 4v16M11 14.5 17 20.5 23 14.5"/><path d="M5 20v7h24v-7"/>
     </svg>
     <div class="big">Drop SEL event files or folders here</div>
-    <div class="formats">CEV · EVE · TXT · SUM · HIS · SER · HDR · RDB · COMTRADE (CFG + DAT) &nbsp;&nbsp; or click to browse</div>
+    <div class="formats">CEV · EVE · TXT · SUM · HIS · SER · HDR · RDB · COMTRADE · ZIP &nbsp;&nbsp; or click to browse</div>
   </div>
   <input type="file" id="pickFiles" multiple hidden>
   <input type="file" id="pickFolder" webkitdirectory directory multiple hidden>
@@ -594,6 +594,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
       <tr><td>.SUM .HDR</td><td>Event summary / COMTRADE header written by the relay</td></tr>
       <tr><td>.HIS</td><td>Event history list: one line per event, least detail</td></tr>
       <tr><td>.SER</td><td>Sequential events recorder: element on/off times</td></tr>
+      <tr><td>.CFG + .DAT, .CFF</td><td>COMTRADE waveform record, from any relay or recorder (SEL, GE, ABB, Siemens, DFRs …)</td></tr>
+      <tr><td>.SET, .TXT</td><td>Settings saved as text (the SHO command output, or a QuickSet text export)</td></tr>
+      <tr><td>.ZIP</td><td>A zip of any of the above; it's opened and everything inside is read</td></tr>
+      <tr><td>.LOG .CHI</td><td>Saved terminal logs and event history</td></tr>
     </table>
     <p>To get a CEV, download the event from the relay with AcSELerator QuickSet and choose the compressed (CEV) format, or save the output of the <code>CEV</code> command from a terminal session.</p>
     <h3>Waveform analysis page</h3>

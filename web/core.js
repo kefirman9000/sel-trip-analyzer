@@ -701,20 +701,76 @@ async function parseRdb(bytes, fileName) {
 // ---------------------------------------------------------------------------
 const EVENT_EXTS = [".cev", ".eve", ".txt", ".sum", ".his", ".ser", ".hdr", ".log", ".chi"];
 const SETTINGS_EXTS = [".rdb"];
+const SETTINGS_TEXT_EXTS = [".set"];                // settings saved as text (SHO command output); .txt works too
+const ARCHIVE_EXTS = [".zip"];
 const COMTRADE_EXTS = [".cfg", ".dat", ".cff"];   // waveform records, read by analysis.js
-const ALL_EXTS = EVENT_EXTS.concat(SETTINGS_EXTS, COMTRADE_EXTS);
+const ALL_EXTS = EVENT_EXTS.concat(SETTINGS_EXTS, SETTINGS_TEXT_EXTS, COMTRADE_EXTS, ARCHIVE_EXTS);
+
+/** Files inside a .zip (stored or deflated), sorted by path; folders and Mac metadata skipped. */
+async function unzip(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("not a zip file");
+  const n = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("damaged zip file");
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+    const local = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nlen)).replace(/\\/g, "/");
+    p += 46 + nlen + xlen + clen;
+    if (name.endsWith("/") || name.startsWith("__MACOSX/") || /(^|\/)\./.test(name)) continue;
+    const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    const data = bytes.subarray(start, start + csize);
+    let content;
+    if (method === 0) content = data.slice();
+    else if (method === 8) {
+      if (typeof DecompressionStream === "undefined") throw new Error("this browser can't open compressed zip files; unzip it first");
+      const ds = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      content = new Uint8Array(await new Response(ds).arrayBuffer());
+    } else throw new Error(`${name}: unsupported zip compression`);
+    out.push({ name: name.split("/").pop(), path: name, bytes: content });
+  }
+  return out.sort((a, b) => cmp(a.path, b.path));
+}
+
+/** Settings from a text file (SHO output, QuickSet text export) when it holds no event. */
+function settingsFromText(text, name) {
+  const s = extractSettings(text);
+  const keys = Object.keys(s);
+  if (!(s.RID || s.TID) || keys.length < 3) return null;
+  return [String(s.RID || s.TID || name), Object.assign(s, { __method__: "text", __file__: name })];
+}
 const extOf = (name) => { const m = /(\.[^.\\/]*)$/.exec(name); return m ? m[1].toLowerCase() : ""; };
 
 /** files: [{name, bytes: Uint8Array}] in load order. */
 async function loadFiles(files) {
   const events = [], rdb = new Map(), errors = [], comtrade = [];
-  for (const f of files) {
+  const queue = files.slice();
+  while (queue.length) {
+    const f = queue.shift();
     const ext = extOf(f.name);
     try {
-      if (COMTRADE_EXTS.includes(ext)) comtrade.push(f);
+      if (ARCHIVE_EXTS.includes(ext)) {
+        const inner = (await unzip(f.bytes)).filter((x) => ALL_EXTS.includes(extOf(x.name)) && !x.name.toUpperCase().startsWith("README"));
+        if (!inner.length) errors.push(`${f.name}: no SEL or COMTRADE files inside`);
+        queue.unshift(...inner);
+      } else if (COMTRADE_EXTS.includes(ext)) comtrade.push(f);
       else if (SETTINGS_EXTS.includes(ext)) for (const [k, v] of await parseRdb(f.bytes, f.name)) rdb.set(k, v);
       else if (ext === ".cev") events.push(...parseCev(readText(f.bytes), f.name));
-      else events.push(...parseText(readText(f.bytes), f.name));
+      else {
+        const text = readText(f.bytes);
+        let evs = [], err = null;
+        if (!SETTINGS_TEXT_EXTS.includes(ext)) { try { evs = parseText(text, f.name); } catch (e) { err = e; } }
+        if (evs.length) { events.push(...evs); continue; }
+        const st = settingsFromText(text, f.name);
+        if (st) rdb.set(st[0], st[1]);
+        else if (err) throw err;
+        else throw new Error("no event data or settings recognized");
+      }
     } catch (e) {
       errors.push(`${f.name}: ${e && e.message ? e.message : e}`);
     }
@@ -1347,7 +1403,7 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
           const keys = ["TR", "TRCOMM", "TRSOTF", "DTT", "LL", "CTR", "PTR", "Z1MAG", "Z1P", "Z1MG", "50P1P", "50G1P", "51PP", "51GP", "ER"]
             .filter((k) => k in s);
           if (keys.length) {
-            const src = lbl ? `RDB: ${lbl}` : "event file";
+            const src = lbl ? (s.__method__ === "text" ? `settings file ${s.__file__ || lbl}` : `RDB: ${lbl}`) : "event file";
             const sig = JSON.stringify([src, keys.map((k) => [k, s[k]])]);
             if (shownSettings.has(sig)) out.push(`  Settings    : same as Event ${shownSettings.get(sig)} (${src})`);
             else {
@@ -1605,7 +1661,7 @@ function tripRuns(text) {
 
 const api = {
   loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
-  parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, nowStamp, eventDatetime, eventCore,
+  parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, ARCHIVE_EXTS, SETTINGS_TEXT_EXTS, unzip, settingsFromText, nowStamp, eventDatetime, eventCore,
   interpretEventType, interpretTargets, extractSettings, splitWS, strip, splitlines, csvLine, latin1, FAULT_TYPES, fx, fc, pyTitle, elementClass,
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
