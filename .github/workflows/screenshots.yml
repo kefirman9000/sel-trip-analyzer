@@ -1,12 +1,12 @@
 name: Screenshots
 
-# Renders the app on a real Windows desktop and commits the images used in the README.
+# Renders the app (dark mode) and commits the images used in the README.
 on:
   push:
     branches: [main]
     paths:
-      - sel_trip_analyzer.py
-      - scripts/screenshots.py
+      - web/**
+      - scripts/screenshots.js
       - sample_files/**
       - .github/workflows/screenshots.yml
   workflow_dispatch:
@@ -20,37 +20,29 @@ concurrency:
 
 jobs:
   capture:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Use a 1080p desktop
-        continue-on-error: true
-        shell: pwsh
-        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
-
-      - name: Install packages
-        run: python -m pip install sv-ttk tkinterdnd2 olefile pillow
-
-      - name: Capture
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the page
+        run: python scripts/build_html.py
+      - name: Install Playwright
+        working-directory: tests
         run: |
-          New-Item -ItemType Directory -Force docs/screenshots | Out-Null
-          Remove-Item docs/screenshots/*.png -ErrorAction SilentlyContinue
-          python scripts/screenshots.py main docs/screenshots/main.png
-          python scripts/screenshots.py update docs/screenshots/update.png
-          python scripts/screenshots.py empty docs/screenshots/empty.png
-
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Capture
+        run: NODE_PATH=tests/node_modules node scripts/screenshots.js docs/screenshots
       - uses: actions/upload-artifact@v4
         with:
           name: screenshots
           path: docs/screenshots/*.png
-
       - name: Commit updated screenshots
-        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

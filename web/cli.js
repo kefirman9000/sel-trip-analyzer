@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-/* Command-line runner for the browser core, used by the parity tests:
+/* Command-line version of the analysis (the same code the app runs), used by the tests:
  *   node web/cli.js [--comments TEXT] [--now STAMP] <files or folders>
- * Folders are expanded the same way as the Python version (sorted, README skipped). */
+ * Folders are expanded like the app does (sorted, README skipped). */
 "use strict";
 const fs = require("fs"), path = require("path");
 const core = require("./core.js");
@@ -26,7 +26,7 @@ function expand(paths) {
 }
 
 (async () => {
-  // same flags as `python sel_trip_analyzer.py --cli`, plus --now for repeatable output
+  // --show --relay --sort --detail --search --hide-duplicates --format csv --comments, plus --now for repeatable output
   const args = process.argv.slice(2);
   let comments = "", format = "text";
   const opts = {};

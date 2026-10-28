@@ -1,6 +1,4 @@
-tkinterdnd2>=0.4
-olefile>=0.47
-sv-ttk>=2.6
-python-docx>=1.1
-reportlab>=4.0
+# The desktop launcher uses only the Python standard library.
+# Building the .exe needs PyInstaller; regenerating the sample files needs olefile.
 pyinstaller>=6.0
+olefile>=0.47

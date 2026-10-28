@@ -37,13 +37,22 @@ def main():
         with open(os.path.join(folder, name), "rb") as f:
             samples.append({"name": name, "b64": base64.b64encode(f.read()).decode()})
 
-    if "</script" in core.lower():
-        raise SystemExit("core.js must not contain '</script'")
     page = (page.replace("{{VERSION}}", version).replace("{{REPO}}", repo).replace("{{ICON}}", icon)
                 .replace("{{SAMPLES_JSON}}", json.dumps(samples).replace("</", "<\\/")))
-    if "/*{{CORE_JS}}*/" not in page:
-        raise SystemExit("placeholder missing in web/app.html")
-    page = page.replace("/*{{CORE_JS}}*/", core)
+    scripts = {"CORE_JS": core}
+    for key, name in [("ANALYSIS_JS", "analysis.js"), ("REFERENCE_JS", "reference.js"), ("DOCX_JS", "docx.js"),
+                      ("WAVE_JS", "wave_ui.js"), ("WEATHER_JS", "weather.js")]:
+        path = os.path.join(ROOT, "web", name)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                scripts[key] = f.read()
+    for key, code in scripts.items():
+        if "</script" in code.lower():
+            raise SystemExit(f"{key} must not contain '</script'")
+        marker = "/*{{%s}}*/" % key
+        if marker not in page:
+            raise SystemExit(f"placeholder {marker} missing in web/app.html")
+        page = page.replace(marker, code)
     left = re.findall(r"\{\{[A-Z_]+\}\}", page)
     if left:
         raise SystemExit(f"unfilled placeholders: {left}")
