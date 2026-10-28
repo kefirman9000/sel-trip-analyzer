@@ -1027,9 +1027,23 @@ function create(ctx) {
 
   function exportPng(v) {
     const fig = currentFigure(v);
-    fig.canvas.toBlob((b) => { ctx.download(`Waveform ${fileSafe(titleText())}.png`, b); ctx.setStatus("Saved the graph picture (with your notes)"); }, "image/png");
+    fig.canvas.toBlob((b) => { ctx.download(`${(v && v.fileName) || fileNameFor("png")}.png`, b); ctx.setStatus("Saved the graph picture (with your notes)"); }, "image/png");
   }
   const fileSafe = (s) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80);
+  /** e.g. "FEEDER 3 2026-10-21 14-22-05 CG" or "Reference - CT saturation during a ground fault" */
+  function baseName() {
+    const rec = st.rec;
+    if (st.item.refInfo) return fileSafe(`Reference - ${st.item.refInfo.title}`);
+    const dt = core.eventDatetime({ date: rec.date || "", time: rec.time || "" });
+    let when = "";
+    if (dt !== null) {
+      const d = new Date(dt / 1000), p2 = (x) => String(x).padStart(2, "0");
+      when = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}-${p2(d.getUTCMinutes())}-${p2(d.getUTCSeconds())}`;
+    }
+    const code = st.an.cls.code === "NONE" ? "no fault" : st.an.cls.code;
+    return fileSafe(`${rec.relay || rec.station || rec.source} ${when} ${code}`);
+  }
+  const fileNameFor = (f) => `${baseName()} ${f === "docx" ? "waveform analysis" : f === "png" ? "graph" : "samples"}`;
   function exportCsv(v) {
     const rec = st.rec;
     const vw = v && v.csvRange === "view" ? st.view : null;
@@ -1042,7 +1056,7 @@ function create(ctx) {
       if (!v || v.csvDigitals !== false) for (const d of rec.digitals) row.push(d.values[k]);
       lines.push(row.join(","));
     }
-    ctx.download(`Samples ${fileSafe(titleText())}.csv`, new Blob([lines.join("\r\n")], { type: "text/csv" }));
+    ctx.download(`${(v && v.fileName) || fileNameFor("csv")}.csv`, new Blob([lines.join("\r\n")], { type: "text/csv" }));
     ctx.setStatus("Saved the samples as a spreadsheet (primary units)");
   }
   function exportDocx(v) {
@@ -1109,7 +1123,7 @@ function create(ctx) {
     }
     blocks.push(["note", "Automated analysis from the recorded waveforms. Confirm against the relay's own event report and settings."]);
     const bytes = DOCX.build(blocks, { title: "Waveform analysis", footer: `SEL Trip Event Analyzer v${ctx.version}`, runs: core.tripRuns, paper: v.paper });
-    ctx.download(`Waveform analysis ${fileSafe(titleText())}.docx`, new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    ctx.download(`${v.fileName || fileNameFor("docx")}.docx`, new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
     ctx.setStatus("Saved the waveform analysis as a Word document");
   }
   const WAVE_EXPORT = {
@@ -1133,6 +1147,7 @@ function create(ctx) {
         { key: "csvDigitals", label: "Relay element columns (0/1)", def: true }] },
     ],
     hint: (f) => (f === "csv" ? "Primary amps and kV, one row per sample." : "Uses the channels, mode and notes you have on screen."),
+    fileName: (f) => fileNameFor(f),
     go: (f, v) => ({ docx: exportDocx, png: exportPng, csv: exportCsv })[f](v),
   };
   $("wExportMenu").addEventListener("click", (e) => {

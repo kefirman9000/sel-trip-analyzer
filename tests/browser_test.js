@@ -108,6 +108,7 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   if (OUT) fs.writeFileSync(path.join(OUT, "web_export.docx"), fs.readFileSync(await dDoc.path()));
   ok("Word export via Ctrl+S: real .docx with tables, pictures and the edit", doc.startsWith("PK") && doc.includes("EDITED BY HAND") &&
      doc.includes("<w:tbl>") && doc.includes("word/media/image1.png") && dDoc.suggestedFilename().endsWith(".docx"), dDoc.suggestedFilename());
+  ok("export file is named after the relays and dates", /relays trip summary \d{4}-\d\d-\d\d to \d{4}-\d\d-\d\d \(\d+ events\)\.docx$/.test(dDoc.suggestedFilename()));
 
   // 5b) export options: leave out the CHECK lines and the pictures
   await page.click("#exportBtn"); await page.click('[data-exp="docx"]');
