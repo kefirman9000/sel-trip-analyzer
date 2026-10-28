@@ -38,9 +38,10 @@ The interpretation is automated, so confirm it against the oscillography.
 ## Releasing a new version
 
 1. Bump `VERSION` in `sel_trip_analyzer.py` (e.g. `1.0.1`) and commit.
-2. Tag and push: `git tag v1.0.1 && git push origin main v1.0.1`
-3. GitHub Actions builds the `.exe` on Windows and attaches it to a new release.
-   Installed copies will offer the update.
+2. On GitHub, go to **Releases > Draft a new release**, create tag `v1.0.1`,
+   write what changed (users see these notes in the update prompt), and publish.
+3. GitHub Actions builds the `.exe` on Windows (about 3 minutes) and attaches it
+   to that release. Installed copies will then offer the update.
 
 ## Building locally
 
