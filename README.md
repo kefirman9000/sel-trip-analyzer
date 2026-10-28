@@ -9,7 +9,6 @@ and why**, ready to paste into an outage report or export to Word or PDF.
 |---|---|
 | **[⬇ Windows program](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.exe)** | `SEL_Trip_Analyzer.exe`: download and double-click, no install |
 | **[▶ Browser version](https://kefirman9000.github.io/sel-trip-analyzer/)** | Opens in your browser on any computer, nothing to install. [Download it](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html) to use offline |
-| **[⬇ Sample files](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_sample_files.zip)** | Made-up SEL events in every supported format, to try it out |
 
 Latest version: see [Releases](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest) · [Report a problem or suggest something](https://github.com/kefirman9000/sel-trip-analyzer/issues/new)
 
