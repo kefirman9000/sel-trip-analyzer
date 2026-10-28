@@ -22,17 +22,24 @@ SAMPLES = os.path.join(ROOT, "sample_files")
 NODE = shutil.which("node")
 
 
-def python_report(paths, comments=""):
+def python_report(paths, comments="", opts=None, fmt="text"):
     paths = app.expand_paths(paths)
     events, rdb, err = app.load_files(paths)
-    text = app.build_report(events, rdb, err, paths, comments)
+    if fmt == "csv":
+        return app.report_csv(events, rdb, opts)
+    text = app.build_report(events, rdb, err, paths, comments, opts)
     return "\n".join("Generated: X" if ln.startswith("Generated: ") else ln for ln in text.split("\n"))
 
 
-def js_report(paths, comments=""):
-    out = subprocess.run([NODE, os.path.join(ROOT, "web", "cli.js"), "--now", "X", "--comments", comments] + paths,
-                         capture_output=True, text=True, encoding="utf-8", check=True)
-    return out.stdout.rstrip("\n")
+def js_report(paths, comments="", opts=None, fmt="text"):
+    flags = []
+    for k, v in (opts or {}).items():
+        flags += ["--hide-duplicates"] if k == "hide_duplicates" and v else ["--" + k, v] if v and k != "hide_duplicates" else []
+    out = subprocess.run([NODE, os.path.join(ROOT, "web", "cli.js"), "--now", "X", "--comments", comments,
+                          "--format", fmt] + flags + paths,
+                         capture_output=True, check=True)
+    text = out.stdout.decode("utf-8")
+    return text if fmt == "csv" else text.replace("\r\n", "\n").rstrip("\n")
 
 
 def load_make_samples():
@@ -104,10 +111,10 @@ class WebParity(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def check(self, *names, comments=""):
+    def check(self, *names, comments="", opts=None, fmt="text"):
         paths = [n if os.path.isabs(n) else (os.path.join(self.tmp, n) if os.path.exists(os.path.join(self.tmp, n))
                                              else os.path.join(SAMPLES, n)) for n in names]
-        py, js = python_report(paths, comments), js_report(paths, comments)
+        py, js = python_report(paths, comments, opts, fmt), js_report(paths, comments, opts, fmt)
         if py != js:
             import difflib
             diff = "\n".join(difflib.unified_diff(py.split("\n"), js.split("\n"), "python", "javascript", lineterm=""))
@@ -126,6 +133,25 @@ class WebParity(unittest.TestCase):
         self.check("Feeder12_history.his", "Feeder12_AG_Zone1.cev", "Feeder12_settings.rdb")
         self.check("Feeder14_underfrequency.txt", "Feeder12_settings.rdb")    # settings assumed
         self.check("Feeder3_CG_51G.eve", "Other.rdb")                         # settings mismatch
+
+    def test_view_options(self):
+        combos = [
+            {"show": "trips"}, {"show": "review", "sort": "review"}, {"show": "faults", "sort": "relay"},
+            {"show": "notrip"}, {"sort": "newest"}, {"hide_duplicates": True},
+            {"relay": "FEEDER 12", "sort": "newest", "hide_duplicates": True, "search": "zone", "detail": "standard"},
+            {"relay": "line 5"}, {"search": "check"}, {"search": "no such text"}, {"detail": "summary"},
+            {"detail": "standard", "show": "review"},
+        ]
+        for opts in combos:
+            with self.subTest(opts=opts):
+                self.check(SAMPLES, opts=opts)
+        self.check(self.tmp, opts={"sort": "review", "detail": "standard"})
+
+    def test_csv(self):
+        for opts in ({}, {"show": "review", "sort": "newest", "hide_duplicates": True}, {"relay": "FEEDER 12"}):
+            with self.subTest(opts=opts):
+                self.check(SAMPLES, opts=opts, fmt="csv")
+        self.check(self.tmp, fmt="csv")
 
     def test_edge_cases(self):
         self.check("Edge_8spc.cev")

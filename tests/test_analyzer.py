@@ -275,6 +275,75 @@ class ReportAndExport(unittest.TestCase):
                 app.export_report(junk, os.path.join(d, "j" + ext))
 
 
+class ViewOptions(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.events, cls.rdb, cls.err, cls.paths = load()
+
+    def view(self, **opts):
+        _, shown, n_dups = app.prepare_view(self.events, self.rdb, opts)
+        return shown, n_dups
+
+    def test_filters(self):
+        self.assertEqual(len(self.view()[0]), 11)
+        self.assertTrue(all(it["a"]["tripped"] for it in self.view(show="trips")[0]))
+        self.assertEqual([it["e"].event_type for it in self.view(show="notrip")[0]], ["ER"])
+        review = self.view(show="review")[0]
+        self.assertTrue(review and all(it["a"]["checks"] or it["a"]["gaps"] for it in review))
+        self.assertTrue(all(app.event_core(it["e"].event_type) in app.FAULT_TYPES for it in self.view(show="faults")[0]))
+        self.assertTrue(all(app.relay_key(it["e"]) == "FEEDER 12" for it in self.view(relay="feeder 12")[0]))
+        self.assertEqual([it["e"].source for it in self.view(search="ptrx")[0]], ["Line5_BC_Zone2_POTT.cev"])
+        self.assertEqual(len(self.view(search="pott")[0]), 2)     # the POTT trip + the COMM-target transfer trip
+
+    def test_duplicates_hidden(self):
+        shown, n = self.view(hide_duplicates=True)
+        self.assertEqual((len(shown), n), (10, 1))
+        self.assertFalse(any(it["e"].dup_of is not None for it in shown))
+
+    def test_sorts(self):
+        oldest = [it["order"] for it in self.view()[0]]
+        self.assertEqual(oldest, sorted(oldest))
+        newest = self.view(sort="newest")[0]
+        self.assertEqual([it["order"] for it in newest], sorted(oldest, reverse=True))
+        relays = [app.relay_key(it["e"]).upper() for it in self.view(sort="relay")[0]]
+        self.assertEqual(relays, sorted(relays))
+        counts = [len(it["a"]["checks"]) + len(it["a"]["gaps"]) for it in self.view(sort="review")[0]]
+        self.assertEqual(counts, sorted(counts, reverse=True))
+
+    def test_report_states_the_view(self):
+        text = app.build_report(self.events, self.rdb, self.err, self.paths, "",
+                                {"show": "trips", "relay": "FEEDER 12", "hide_duplicates": True, "detail": "summary"})
+        self.assertIn("Showing: 3 of 11 events (trips only; relay FEEDER 12; 1 duplicate history row hidden)", text)
+        self.assertIn("OVERVIEW", text)
+        self.assertNotIn("EVENT DETAILS", text)
+        none = app.build_report(self.events, self.rdb, self.err, self.paths, "", {"search": "zzz"})
+        self.assertIn("No events match", none)
+
+    def test_duplicate_note_when_target_hidden(self):
+        text = app.build_report(self.events, self.rdb, self.err, self.paths, "", {"search": "Feeder12_history"})
+        self.assertIn("Same event as the detailed report in Feeder12_AG_Zone1.cev (not shown in this view).", text)
+
+    def test_detail_levels(self):
+        std = app.build_report(self.events, self.rdb, self.err, self.paths, "", {"detail": "standard"})
+        self.assertIn("EVENT DETAILS", std)
+        self.assertNotIn("Element sequence", std)
+        self.assertNotIn("Settings context", std)
+        self.assertNotIn("SEQUENTIAL EVENTS RECORDER", std)
+
+    def test_csv(self):
+        import csv as _csv
+        rows = list(_csv.reader(io.StringIO(app.report_csv(self.events, self.rdb, {"show": "review"}))))
+        self.assertEqual(rows[0], app.CSV_COLUMNS)
+        self.assertEqual(len(rows) - 1, len(self.view(show="review")[0]))
+        f9 = next(r for r in rows[1:] if r[3] == "FEEDER 9")
+        self.assertEqual((f9[10], f9[12], f9[14], f9[15], f9[16]), ("116", "3689", "8.00", "Low", "5"))
+
+    def test_choices(self):
+        c = app.view_choices(self.events, self.rdb)
+        self.assertEqual((c["counts"]["all"], c["counts"]["notrip"]), (11, 1))
+        self.assertIn(("FEEDER 12", 5), c["relays"])
+
+
 class Updater(unittest.TestCase):
     def test_version_compare(self):
         self.assertGreater(app.version_tuple("v1.10.0"), app.version_tuple("1.9.9"))
