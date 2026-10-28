@@ -238,7 +238,20 @@ button[aria-pressed="true"].tog { background: var(--accent); color: var(--on-acc
 .tip .muted, .muted { color: var(--muted); }
 .note-ask { position: absolute; z-index: 6; width: 300px; background: var(--surface); border: 1px solid var(--accent); border-radius: 8px;
   box-shadow: var(--shadow); padding: 10px; }
-.note-ask input { width: 100%; margin: 6px 0; }
+.note-ask { width: 320px; }
+.note-ask input[type="text"] { width: 100%; margin: 6px 0; }
+.note-ask .row .grow { flex: 1; }
+.note-opts { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 8px; }
+.note-opts select { min-height: 28px; padding: 2px 4px; max-width: 150px; }
+.swatches { display: inline-flex; gap: 4px; }
+.swatches label { cursor: pointer; }
+.swatches input { position: absolute; opacity: 0; width: 0; height: 0; }
+.swatches i { display: block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; }
+.swatches input:checked + i { border-color: var(--text); }
+.swatches input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pin-amber { background: #c98a1c; } .pin-red { background: var(--trip); } .pin-blue { background: var(--accent); } .pin-green { background: var(--ok); } .pin-gray { background: var(--muted); }
+.pin-n.pin-amber, .pin-n.pin-red, .pin-n.pin-blue, .pin-n.pin-green, .pin-n.pin-gray { background: transparent; }
+.pin-n.pin-red { border-color: var(--trip); } .pin-n.pin-blue { border-color: var(--accent); } .pin-n.pin-green { border-color: var(--ok); } .pin-n.pin-gray { border-color: var(--muted); }
 input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0; }
 .wv-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .grid-t { border-collapse: collapse; width: 100%; font-size: 12.5px; }
@@ -259,7 +272,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .wv-lower > .card, .wv-els { min-width: 0; }
 .wv-els { margin-top: 12px; }
 #wPins { list-style: none; margin: 0; padding: 0; }
-#wPins li { display: grid; grid-template-columns: 24px auto 1fr auto; gap: 8px; align-items: center; padding: 3px 0; }
+#wPins li { display: grid; grid-template-columns: 24px auto 1fr auto auto; gap: 8px; align-items: center; padding: 3px 0; }
 #wPins li.empty { display: block; color: var(--muted); }
 .pin-n { width: 20px; height: 20px; border-radius: 4px; border: 1.2px solid var(--warn); text-align: center; font-size: 12px; font-weight: 700; line-height: 18px; }
 .linkish { border: 0; background: transparent; color: var(--accent); padding: 0 4px; min-height: 24px; text-decoration: underline; }
@@ -294,6 +307,49 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .exp-items .field select { max-width: 100%; min-width: 0; }
 .exp-group .tools { margin-left: 8px; }
 .exp-group .tools button { min-height: 22px; padding: 0 6px; font-size: 12px; }
+/* events page */
+.ev-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 20px; margin-top: 16px; }
+.glance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-content: start; padding-top: 24px; }
+.glance-empty { grid-column: 1 / -1; padding: 30px 10px; text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
+.gcard { display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left; white-space: normal; padding: 10px 12px; border-radius: 10px; min-height: 0; }
+.gcard .gn { font: 700 24px/1.1 "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.gcard .gl { font-weight: 600; }
+.gcard .gs { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.gcard.warn .gn { color: var(--warn); }
+.ev-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 18px 0 8px; }
+.ev-tools .grow { flex: 1; }
+.ev-tools select { max-width: 220px; }
+.evt-wrap { overflow: auto; max-height: 70vh; }
+.evt { border-collapse: collapse; width: 100%; font-size: 13px; }
+.evt thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted);
+  padding: 8px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; user-select: none; }
+.evt th.sortable { cursor: pointer; }
+.evt th.sortable:hover { color: var(--text); }
+.evt th.asc::after { content: " ▲"; font-size: 9px; } .evt th.desc::after { content: " ▼"; font-size: 9px; }
+.evt td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.evt tbody tr:hover { background: var(--surface-2); }
+.evt td.n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.evt td.when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.evt td.type, .evt td.relay b { white-space: nowrap; font-weight: 600; }
+.evt td.cause { min-width: 220px; }
+.evt td.cause b.trip { color: var(--trip); } .evt td.cause b.ok { color: var(--ok); } .evt td.cause b.warn { color: var(--warn); }
+.evt td.wx { font-size: 12px; color: var(--muted); max-width: 190px; }
+.evt td.wx.storm { color: var(--warn); font-weight: 600; }
+.evt td.note { min-width: 170px; }
+.evt td.note input { width: 100%; }
+.evt td.act { white-space: nowrap; }
+.evt td.act button { min-height: 28px; padding: 2px 9px; margin: 0 4px 4px 0; }
+.evt .evt-empty { color: var(--muted); padding: 24px; text-align: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chip2 { font-size: 11px; border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; color: var(--muted); background: var(--surface-2); }
+.chip2.warn { color: var(--warn); border-color: var(--warn); }
+.badge-w { display: inline-block; min-width: 22px; text-align: center; border-radius: 11px; padding: 1px 6px; font-weight: 700; font-size: 12px;
+  color: var(--warn); border: 1px solid var(--warn); }
+.okmark { color: var(--ok); font-weight: 700; }
+.sum-comments { margin-bottom: 4px; }
+.sum-comments #comments { height: 70px; }
+dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
+#stDlg .dlg-head h2 .hint { font-weight: 400; margin-left: 8px; }
 #print-root { display: none; }
 @media (max-width: 760px) {
   .wrap { padding: 14px 16px 10px; }
@@ -303,6 +359,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
   .wv-main, .wv-lower { grid-template-columns: minmax(0, 1fr); }
   .evlist li { grid-template-columns: 28px 1fr; }
   .evlist li > input, .evlist li > button { grid-column: 2; }
+  .ev-top { grid-template-columns: 1fr; }
+  .glance { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 0; }
   .wx-relays { grid-template-columns: auto 1fr auto; }
   .wx-relays > b { grid-column: 2 / -1; }
   .wx-relays .st { grid-column: 2 / -1; }
@@ -332,6 +390,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
       <div class="sub">Trip-cause summaries from SEL relay event reports and QuickSet settings</div>
     </div>
     <div class="head-actions">
+      <button id="stationsBtn" title="Where each relay is, and the weather at each event">Stations &amp; weather</button>
       <button id="helpBtn" title="Help (F1)">Help</button>
       <label class="switch" title="Dark mode (Ctrl+D)"><input type="checkbox" id="dark"> Dark mode</label>
       <button id="updBtn">Check for updates</button>
@@ -345,11 +404,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
   </div>
 
   <nav class="tabs" role="tablist" aria-label="Pages">
-    <button role="tab" id="tabSummary" aria-selected="true" aria-controls="pageSummary">Trip summary</button>
-    <button role="tab" id="tabWave" aria-selected="false" aria-controls="pageWave" title="Graphs, phasors, harmonics and relay elements (Ctrl+G)">Waveform analysis<span class="badge" id="waveBadge">9 examples</span></button>
+    <button role="tab" id="tabEvents" aria-selected="true" aria-controls="pageEvents" title="Load files and see every event (Alt+1)">Events<span class="badge" id="evBadge">no files</span></button>
+    <button role="tab" id="tabSummary" aria-selected="false" aria-controls="pageSummary" title="The written trip summary to copy or export (Alt+2)">Summary</button>
+    <button role="tab" id="tabWave" aria-selected="false" aria-controls="pageWave" title="Graphs, phasors, harmonics and relay elements (Alt+3 or Ctrl+G)">Waveforms<span class="badge" id="waveBadge">9 examples</span></button>
   </nav>
 
-  <div id="pageSummary" role="tabpanel" aria-labelledby="tabSummary">
+  <div id="pageEvents" role="tabpanel" aria-labelledby="tabEvents">
   <div class="drop" id="drop" role="button" tabindex="0" aria-label="Add SEL event files: drop them here or press Enter to browse">
     <svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M17 4v16M11 14.5 17 20.5 23 14.5"/><path d="M5 20v7h24v-7"/>
@@ -360,8 +420,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
   <input type="file" id="pickFiles" multiple hidden>
   <input type="file" id="pickFolder" webkitdirectory directory multiple hidden>
 
-  <div class="grid">
-    <section>
+  <div class="ev-top">
+    <section class="ev-files">
       <div class="bar"><span class="cap">Files</span><span class="hint" id="count">none loaded</span></div>
       <ul class="files box" id="files" aria-label="Loaded files"></ul>
       <div class="row">
@@ -371,12 +431,33 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
         <button id="samples">Try samples</button>
       </div>
     </section>
-    <section>
-      <div class="bar"><label class="cap" for="comments">Comments &amp; suggestions</label><span class="hint">added to the top of the summary</span></div>
-      <textarea id="comments" placeholder="Notes to include at the top of the summary, e.g.&#10;Crew found a cracked insulator at pole 47. Recommend checking Z1 reach."></textarea>
+    <section class="glance" id="glance" aria-label="At a glance">
+      <div class="glance-empty hint">Load event files (or click <b>Try samples</b>) to see the events here.</div>
     </section>
   </div>
 
+  <div class="ev-tools">
+    <span class="cap">Events</span><span class="hint" id="evCount"></span>
+    <span class="grow"></span>
+    <input type="search" id="evSearch" placeholder="Filter events" aria-label="Filter events">
+    <select id="evShow" aria-label="Which events">
+      <option value="all">All events</option><option value="trips">Trips only</option><option value="review">Needs review</option>
+      <option value="wave">With waveforms</option><option value="notes">With notes</option><option value="weather">Weather could explain it</option><option value="related">Two-ended or incident</option>
+    </select>
+    <label class="check hint"><input type="checkbox" id="evDups" checked> Hide duplicates</label>
+    <button id="stationsBtn2" title="Where each relay is, and the weather at each event">Stations &amp; weather…</button>
+    <button class="accent" id="toSummary" title="The written summary (Alt+2)">Summary ›</button>
+  </div>
+  <div class="box evt-wrap"><table class="evt" id="evTable" aria-label="Events"></table></div>
+  <p class="hint">Click a column heading to sort. Notes are saved in this browser and added to the event in the summary and exports.
+    <b>Details</b> jumps to the event in the summary; <b>Waveforms</b> opens its graphs.</p>
+  </div><!-- /pageEvents -->
+
+  <div id="pageSummary" role="tabpanel" aria-labelledby="tabSummary" hidden>
+  <section class="sum-comments">
+      <div class="bar"><label class="cap" for="comments">Comments &amp; suggestions</label><span class="hint">added to the top of the summary</span></div>
+      <textarea id="comments" placeholder="Notes to include at the top of the summary, e.g.&#10;Crew found a cracked insulator at pole 47. Recommend checking Z1 reach."></textarea>
+  </section>
   <div class="actions" aria-label="View options">
     <label class="field"><span class="hint">Show</span><select id="vShow"></select></label>
     <label class="field"><span class="hint">Relay</span><select id="vRelay"></select></label>
@@ -403,37 +484,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
     </div>
   </div>
   <div id="out" class="box mono" spellcheck="false" aria-label="Trip summary, editable"
-       data-placeholder="Drop SEL event files or a folder above and the trip summary will appear here.&#10;New here? Click &quot;Try samples&quot; (under the file list) to load example files.&#10;&#10;Everything in this box is editable before you copy or export it."></div>
-
-  <details class="notes-panel" id="wxPanel">
-    <summary><span class="cap">Station locations &amp; weather</span><span class="hint" id="wxHint">optional: weather at the time of each event</span></summary>
-    <div class="box wx-box">
-      <p class="hint" style="margin-top:0">Enter where each relay is (a town such as <i>Ocala, FL</i>, or <i>latitude, longitude</i>), then look up the weather.
-        Thunderstorms, high wind, ice and heavy rain are added to the probable cause. Only the location and the event date and hour are sent to
-        <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (a free weather service); your files stay on this computer.</p>
-      <div class="wx-bulk" role="group" aria-label="Set a location for several relays">
-        <label class="check"><input type="checkbox" id="wxAll"> Select all</label>
-        <input type="text" id="wxBulkText" placeholder="One location for the ticked relays, e.g. Ocala, FL" aria-label="Location for the ticked relays">
-        <button id="wxBulkApply">Apply to ticked</button>
-        <button id="wxBulkAll" title="Use this location for every relay">Apply to all</button>
-      </div>
-      <div id="wxRelays" class="wx-relays"></div>
-      <div class="row">
-        <button class="accent" id="wxGo">Look up weather</button>
-        <label class="field"><span class="hint">Units</span><select id="wxUnits"><option value="us">°F, mph, in</option><option value="metric">°C, km/h, mm</option></select></label>
-        <label class="check"><input type="checkbox" id="wxOn" checked> Show weather in the summary</label>
-        <button id="wxToNotes" title="Copy the weather into each event's notes, so it stays with the event even if you edit it">Add weather to event notes</button>
-        <button id="wxClear">Clear weather</button>
-      </div>
-      <p class="hint" id="wxStatus" aria-live="polite"></p>
-    </div>
-  </details>
-
-  <details class="notes-panel" id="notesPanel">
-    <summary><span class="cap">Event notes &amp; waveforms</span><span class="hint" id="notesHint">generate a summary first</span></summary>
-    <ul class="evlist box" id="evList" aria-label="Events"></ul>
-    <p class="hint">Notes are saved in this browser and added to the event in the summary and exports. Events with recorded waveforms have a "Waveforms" button.</p>
-  </details>
+       data-placeholder="Load event files on the Events page (or drop them anywhere on this window) and the trip summary will appear here.&#10;New here? Click &quot;Try samples&quot; on the Events page to load example files.&#10;&#10;Everything in this box is editable before you copy or export it."></div>
 
   <div class="feedback">
     <div>
@@ -498,16 +549,28 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
           <button id="wZoomOut" title="Zoom out (-)" aria-label="Zoom out">−</button>
           <button id="wZoomIn" title="Zoom in (+)" aria-label="Zoom in">+</button>
           <button id="wFit" title="Whole record (0)">All</button>
-          <button id="wNoteMode" class="tog" aria-pressed="false" title="Pin a note to the graph (N)">✎ Add note</button>
+          <button id="wNoteMode" class="tog" aria-pressed="false" title="Click a graph to pin a note, or drag to mark a span of time (N)">✎ Add note</button>
         </div>
         <div class="chartwrap">
           <canvas id="wCanvas" aria-hidden="true"></canvas>
           <canvas id="wOverlay" tabindex="0" aria-label="Waveform graph. Left and right arrows move the cursor; Shift moves a cycle. Plus and minus zoom."></canvas>
           <div class="tip" id="wTip" hidden></div>
-          <div class="note-ask" id="wNoteAsk" hidden>
+          <div class="note-ask" id="wNoteAsk" hidden role="dialog" aria-label="Note on the graph">
             <div class="cap" id="wNoteAt">Note</div>
             <input type="text" id="wNoteText" placeholder="e.g. Recloser trips here; arc extinguishes" maxlength="200">
-            <div class="row" style="margin:0"><button class="accent" id="wNoteSave">Pin note</button><button id="wNoteCancel">Cancel</button></div>
+            <div class="note-opts">
+              <span class="swatches" role="radiogroup" aria-label="Colour">
+                <label title="Amber"><input type="radio" name="wNoteColor" value="amber"><i class="pin-amber"></i></label>
+                <label title="Red"><input type="radio" name="wNoteColor" value="red"><i class="pin-red"></i></label>
+                <label title="Blue"><input type="radio" name="wNoteColor" value="blue"><i class="pin-blue"></i></label>
+                <label title="Green"><input type="radio" name="wNoteColor" value="green"><i class="pin-green"></i></label>
+                <label title="Gray"><input type="radio" name="wNoteColor" value="gray"><i class="pin-gray"></i></label>
+              </span>
+              <label class="field"><span class="hint">On</span><select id="wNotePanel" aria-label="Which graph"></select></label>
+              <label class="field"><span class="hint">Line</span><select id="wNoteLine" aria-label="Line">
+                <option value="all">Across all graphs</option><option value="panel">This graph only</option><option value="none">No line</option></select></label>
+            </div>
+            <div class="row" style="margin:0"><button class="accent" id="wNoteSave">Pin note</button><button id="wNoteCancel">Cancel</button><span class="grow"></span><button id="wNoteDelete" hidden>Delete</button></div>
           </div>
         </div>
         <input type="range" id="wScroll" min="0" max="1000" value="0" aria-label="Scroll through the record">
@@ -581,10 +644,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
   <div class="dlg-body">
     <h3>Quick start</h3>
     <ol>
-      <li>Drag your relay's event files (or a whole folder) onto the drop zone. Best: the <b>.CEV</b> event report plus the relay's <b>.RDB</b> settings file.</li>
-      <li>Read the summary. Lines marked <b style="color:var(--warn)">CHECK</b> are things the program is unsure about.</li>
-      <li>Edit the text if needed, then <b>Copy all</b> or <b>Export</b> to Word or PDF.</li>
+      <li>Drag your relay's event files (or a folder, or a .zip) onto the window. Best: the <b>.CEV</b> event report plus the relay's <b>.RDB</b> settings file.</li>
+      <li>On <b>Events</b>, scan the table: what tripped, items to check, weather, notes.</li>
+      <li>On <b>Summary</b>, read the report. Lines marked <b style="color:var(--warn)">CHECK</b> are things the program is unsure about. Edit the text if needed, then <b>Copy all</b> or <b>Export</b>.</li>
+      <li>On <b>Waveforms</b>, look inside any CEV or COMTRADE record.</li>
     </ol>
+    <table>
+      <tr><td>Events (Alt+1)</td><td>Load files; at-a-glance counts (click one to filter); one row per event with tags for two-ended, incident and repeat trips; type a note; Details jumps to the summary, Waveforms opens the graphs</td></tr>
+      <tr><td>Summary (Alt+2)</td><td>The written trip summary: view options, editing, copy and export</td></tr>
+      <tr><td>Waveforms (Alt+3)</td><td>Graphs, phasors, harmonics, settings check, relay elements, reference library</td></tr>
+      <tr><td>Stations &amp; weather</td><td>Top right: where each relay is, and the weather at each event</td></tr>
+    </table>
     <p>Your files are read inside this browser tab and are never uploaded. Nothing is installed.</p>
     <h3>Which files to use</h3>
     <table>
@@ -600,8 +670,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
       <tr><td>.LOG .CHI</td><td>Saved terminal logs and event history</td></tr>
     </table>
     <p>To get a CEV, download the event from the relay with AcSELerator QuickSet and choose the compressed (CEV) format, or save the output of the <code>CEV</code> command from a terminal session.</p>
-    <h3>Waveform analysis page</h3>
-    <p>Open the <b>Waveform analysis</b> tab (<kbd>Ctrl</kbd>+<kbd>G</kbd>) to look inside a <b>.CEV</b> or <b>COMTRADE</b> record (.CFG + .DAT, or .CFF),
+    <h3>Waveforms page</h3>
+    <p>Open the <b>Waveforms</b> tab (<kbd>Alt</kbd>+<kbd>3</kbd> or <kbd>Ctrl</kbd>+<kbd>G</kbd>) to look inside a <b>.CEV</b> or <b>COMTRADE</b> record (.CFG + .DAT, or .CFF),
        or step through the built-in <b>reference waveforms</b> (normal load, each fault type, high-impedance fault, inrush, CT saturation, evolving fault)
        with ◀ ▶ or <kbd>Page Up</kbd>/<kbd>Page Down</kbd>.</p>
     <table>
@@ -613,12 +683,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
       <tr><td>Harmonics</td><td>2nd = inrush, 3rd = arcing/saturation, 5th = transformers; plus THD and DC offset</td></tr>
       <tr><td>Overcurrent</td><td>Each 50/51 element's pickup vs. the measured current, and the 51 curve time vs. when it actually timed out</td></tr>
       <tr><td>Elements</td><td>Every relay element in the record with a plain-English meaning and on/off times; tick to add it to the graph</td></tr>
-      <tr><td>Notes</td><td>"Add note" pins a note to a point on the graph; notes go into the picture and Word exports</td></tr>
+      <tr><td>Notes</td><td>"Add note", then click any graph (or drag across it to mark a span of time). Pick a colour, which graph it sits on and whether it draws a line. Drag a note to move it, even onto another graph; click it to edit. Notes go into the picture and Word exports.</td></tr>
       <tr><td>Simple / Advanced</td><td>Advanced adds angles, secondary amps, multiples of pickup, all harmonics, every element, and a sample export</td></tr>
     </table>
     <h3>Notes and weather</h3>
-    <p><b>Event notes &amp; waveforms</b> (under the summary) lists every event: type a note and it's added to that event in the summary and exports.
-       <b>Station locations &amp; weather</b>: enter where each relay is (a town or latitude, longitude), or tick several relays (or <b>Select all</b>) and set one location for them all, then click <b>Look up weather</b>. The weather at the
+    <p>Type a note in an event's row on the <b>Events</b> page and it's added to that event in the summary and exports.
+       <b>Stations &amp; weather</b> (top right): enter where each relay is (a town or latitude, longitude), or tick several relays (or <b>Select all</b>) and set one location for them all, then click <b>Look up weather</b>. The weather at the
        hour of each event is added, and thunderstorms, high wind, ice/snow, heavy rain or extreme heat are listed as possible causes. Only the location and
        the event date go to Open-Meteo (a free weather service). <b>Add weather to event notes</b> copies it into the notes.</p>
     <h3>Event types</h3>
@@ -659,11 +729,35 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
     <p>Shown in the relay's line-length units. With settings loaded it's also shown as a percentage of the line.
        Negative means behind the relay; $$$$$ means the relay couldn't calculate it.</p>
     <h3>Shortcuts</h3>
-    <p><kbd>Ctrl</kbd>+<kbd>O</kbd> add files · <kbd>F5</kbd> generate · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> copy ·
+    <p><kbd>Alt</kbd>+<kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> pages · <kbd>Ctrl</kbd>+<kbd>O</kbd> add files · <kbd>F5</kbd> generate · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> copy ·
        <kbd>Ctrl</kbd>+<kbd>S</kbd> Word · <kbd>Ctrl</kbd>+<kbd>P</kbd> PDF · <kbd>Ctrl</kbd>+<kbd>G</kbd> waveform page · <kbd>Ctrl</kbd>+<kbd>F</kbd> search · <kbd>Ctrl</kbd>+<kbd>D</kbd> dark mode · <kbd>F1</kbd> help</p>
     <p class="hint">The analysis is automated. Always confirm against the oscillography and settings.
        <a href="https://github.com/{{REPO}}#readme" target="_blank" rel="noopener">Full guide on GitHub</a></p>
   </div>
+</dialog>
+
+<dialog id="stDlg" aria-labelledby="stTitle" class="wide">
+  <div class="dlg-head"><h2 id="stTitle">Stations &amp; weather <span class="hint" id="wxHint"></span></h2><button id="stClose">Close</button></div>
+  <div class="dlg-body wx-box">
+      <p class="hint" style="margin-top:0">Enter where each relay is (a town such as <i>Ocala, FL</i>, or <i>latitude, longitude</i>), then look up the weather.
+        Thunderstorms, high wind, ice and heavy rain are added to the probable cause. Only the location and the event date and hour are sent to
+        <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (a free weather service); your files stay on this computer.</p>
+      <div class="wx-bulk" role="group" aria-label="Set a location for several relays">
+        <label class="check"><input type="checkbox" id="wxAll"> Select all</label>
+        <input type="text" id="wxBulkText" placeholder="One location for the ticked relays, e.g. Ocala, FL" aria-label="Location for the ticked relays">
+        <button id="wxBulkApply">Apply to ticked</button>
+        <button id="wxBulkAll" title="Use this location for every relay">Apply to all</button>
+      </div>
+      <div id="wxRelays" class="wx-relays"></div>
+      <div class="row">
+        <button class="accent" id="wxGo">Look up weather</button>
+        <label class="field"><span class="hint">Units</span><select id="wxUnits"><option value="us">°F, mph, in</option><option value="metric">°C, km/h, mm</option></select></label>
+        <label class="check"><input type="checkbox" id="wxOn" checked> Show weather in the summary</label>
+        <button id="wxToNotes" title="Copy the weather into each event's notes, so it stays with the event even if you edit it">Add weather to event notes</button>
+        <button id="wxClear">Clear weather</button>
+      </div>
+      <p class="hint" id="wxStatus" aria-live="polite"></p>
+    </div>
 </dialog>
 
 <dialog id="expDlg" aria-labelledby="expTitle">
@@ -990,46 +1084,154 @@ function afterLoad() {
   $("waveBadge").textContent = n ? `${n} record${n === 1 ? "" : "s"}` : "9 examples";
   if (wave) wave.refresh();
 }
-function renderEvList() {
-  const ul = $("evList");
-  ul.textContent = "";
-  if (!state.cache) { $("notesHint").textContent = "generate a summary first"; return; }
-  const v = core.prepareView(state.cache.events, state.cache.rdb, currentOpts());
-  const notes = store.get("notes", {});
-  let withNotes = 0, withWave = 0;
-  v.shown.forEach((it, i) => {
-    const e = it.e, id = core.eventId(e);
-    const li = document.createElement("li");
-    const n = document.createElement("span"); n.className = "n"; n.textContent = i + 1;
-    const what = document.createElement("span"); what.className = "what";
-    what.textContent = `${e.date} ${e.time}  ${core.relayKey(e)}  ${e.event_type || ""}`;
-    const sm = document.createElement("small"); sm.textContent = core.shortCause(e, it.s, it.a); what.appendChild(sm);
-    what.title = what.textContent;
-    const inp = document.createElement("input"); inp.type = "text"; inp.value = notes[id] || ""; inp.placeholder = "Add a note…";
-    inp.setAttribute("aria-label", `Note for event ${i + 1}`);
-    inp.addEventListener("change", () => {
-      const all = store.get("notes", {}), val = inp.value.trim();
-      if (val) all[id] = val; else delete all[id];
-      store.set("notes", all);
-      notesChanged();
-    });
-    if (notes[id]) withNotes++;
-    const wx = store.get("wxResults", {})[id];
-    if (wx) {
-      const w = document.createElement("small"); w.className = "wx"; w.textContent = "Weather: " + wx.text; what.appendChild(w);
-      what.title += "\nWeather: " + wx.text + "\n" + (wx.hints || []).map((h) => h.text).join("\n");
+function renderEvList() { renderEvents(); }
+/** COMTRADE records in the loaded files: [{id, relay, dt}] (to link them to their events). */
+let ctIndex = { key: null, list: [] };
+function comtradeIndex() {
+  const files = state.cache ? state.cache.comtrade || [] : [];
+  const key = files.map((f) => f.name + f.bytes.length).join("|");
+  if (ctIndex.key !== key) {
+    let list = [];
+    try {
+      list = window.SELAnalysis.comtradeRecords(files).records.map((r) => ({ id: r.id, relay: String(r.relay || "").toUpperCase(),
+        dt: core.eventDatetime({ date: r.date || "", time: r.time || "" }) })).filter((r) => r.dt !== null);
+    } catch (e) { list = []; }
+    ctIndex = { key, list };
+  }
+  return ctIndex.list;
+}
+const evSort = { key: "time", dir: 1 };
+function renderEvents() {
+  const tbl = $("evTable");
+  tbl.textContent = "";
+  const glance = $("glance");
+  if (!state.cache) {
+    glance.innerHTML = '<div class="glance-empty hint">Load event files (or click <b>Try samples</b>) to see the events here.</div>';
+    $("evCount").textContent = ""; $("evBadge").textContent = "no files";
+    tbl.innerHTML = '<tbody><tr><td class="evt-empty">No events yet. Drop files or a folder above, or click <b>Try samples</b>.</td></tr></tbody>';
+    return;
+  }
+  const v = core.prepareView(state.cache.events, state.cache.rdb, { hide_duplicates: $("evDups").checked, notes: store.get("notes", {}),
+                                                                    weather: store.get("wxOn", true) ? store.get("wxResults", {}) : {} });
+  const notes = store.get("notes", {}), wxr = store.get("wxResults", {});
+  const all = v.items.filter((it) => !$("evDups").checked || it.e.dup_of === null);
+  const rep = new Set(v.repeats.flatMap((r) => r.items));
+  const cts = comtradeIndex();
+  const waveId = (it) => {
+    if (it.e.wave) return it.id;
+    const k = core.relayKey(it.e).toUpperCase();
+    const hit = it.dt === null ? null : cts.find((c) => c.relay === k && Math.abs(c.dt - it.dt) <= 2e6);
+    return hit ? hit.id : null;
+  };
+  const stormy = (it) => { const w = wxr[it.id]; return !!(w && (w.hints || []).some((h) => h.kind !== "calm")); };
+  const nChecks = (it) => it.a.checks.length + it.a.gaps.length;
+  // at a glance
+  const trips = all.filter((it) => it.a.tripped).length;
+  const cards = [
+    ["all", all.length, `event${all.length === 1 ? "" : "s"}`, `${trips} trip${trips === 1 ? "" : "s"}`],
+    ["review", all.filter((it) => nChecks(it)).length, "need review", "have CHECK items", "warn"],
+    ["related", v.pairs.length + v.incidents.length, "linked", `${v.pairs.length} two-ended, ${v.incidents.length} incident${v.incidents.length === 1 ? "" : "s"}`],
+    ["trips", v.repeats.length, "repeat trips", v.repeats.length ? v.repeats.map((r) => `${r.relay} ×${r.items.length}`).join(", ") : "none in 30 days", v.repeats.length ? "warn" : ""],
+    ["wave", waveCount(), "waveform records", "CEV and COMTRADE"],
+    ["weather", all.filter(stormy).length, "weather-related", Object.keys(wxr).length ? "storm, wind, ice, rain or heat" : "set station locations", ""],
+  ];
+  glance.innerHTML = cards.map(([k, n, label, sub, cls]) =>
+    `<button class="gcard ${cls || ""}" data-show="${k}" title="Show these events"><span class="gn">${n}</span><span class="gl">${esc(label)}</span><span class="gs">${esc(sub)}</span></button>`).join("");
+  // filter + sort
+  const q = $("evSearch").value.trim().toUpperCase(), show = $("evShow").value;
+  const match = (it) => {
+    if (show === "trips" && !it.a.tripped) return false;
+    if (show === "review" && !nChecks(it)) return false;
+    if (show === "wave" && !waveId(it)) return false;
+    if (show === "notes" && !notes[it.id]) return false;
+    if (show === "weather" && !stormy(it)) return false;
+    if (show === "related" && !it.pair && !it.incident) return false;
+    if (q) {
+      const hay = [it.e.date, it.e.time, core.relayKey(it.e), it.e.terminal_id, it.e.event_type, it.e.source, core.shortCause(it.e, it.s, it.a), notes[it.id], (wxr[it.id] || {}).text].join(" ").toUpperCase();
+      if (!hay.includes(q)) return false;
     }
-    li.append(n, what, inp);
-    if (e.wave) {
-      withWave++;
-      const b = document.createElement("button"); b.textContent = "Waveforms ›"; b.title = "Open this event on the Waveform analysis page";
-      b.addEventListener("click", () => showPage("wave", id));
-      li.appendChild(b);
-    } else li.appendChild(document.createElement("span"));
-    ul.appendChild(li);
+    return true;
+  };
+  const num = new Map(all.map((it, i) => [it, i + 1]));
+  const keyOf = { time: (it) => (it.dt === null ? Infinity : it.dt), relay: (it) => core.relayKey(it.e).toUpperCase(), type: (it) => it.e.event_type || "",
+                  checks: (it) => nChecks(it), weather: (it) => (stormy(it) ? 0 : wxr[it.id] ? 1 : 2) };
+  const rows = all.filter(match).sort((a, b) => {
+    const ka = keyOf[evSort.key](a), kb = keyOf[evSort.key](b);
+    return (ka < kb ? -1 : ka > kb ? 1 : 0) * evSort.dir || num.get(a) - num.get(b);
   });
-  $("notesHint").textContent = `${v.shown.length} event${v.shown.length === 1 ? "" : "s"}` + (withNotes ? `, ${withNotes} with notes` : "") +
-    (withWave ? `, ${withWave} with waveforms` : "");
+  $("evCount").textContent = `${rows.length} of ${all.length}`;
+  $("evBadge").textContent = `${all.length}`;
+  const th = (k, label) => `<th${k ? ` data-sort="${k}" class="sortable${evSort.key === k ? (evSort.dir > 0 ? " asc" : " desc") : ""}"` : ""}>${label}</th>`;
+  const head = `<thead><tr>${th("", "#")}${th("time", "When")}${th("relay", "Relay")}${th("type", "Type")}${th("", "What happened")}${th("checks", "Check")}${th("weather", "Weather")}${th("", "Note")}${th("", "")}</tr></thead>`;
+  const body = rows.map((it) => {
+    const e = it.e, id = it.id, cause = core.shortCause(e, it.s, it.a);
+    const runs = core.tripRuns(cause).map(([t, c]) => (c ? `<b class="${c}">${esc(t)}</b>` : esc(t))).join("");
+    const chips = [];
+    if (it.pair) chips.push(`<span class="chip2" title="${esc(it.pair.info.likely ? "Locations add up to the line length: likely the same fault" : "Same time and phases")}">↔ ${esc(core.relayKey(it.pair.other.e))}</span>`);
+    if (it.incident) chips.push(`<span class="chip2" title="${esc(it.incident.items.length + " events within " + Math.round(it.incident.spanUs / 1e6) + " s")}">Incident ${it.incident.n}</span>`);
+    if (rep.has(it)) chips.push(`<span class="chip2 warn" title="3 or more trips on this relay within 30 days">Repeat</span>`);
+    if (e.dup_of !== null) chips.push(`<span class="chip2">Same as a CEV</span>`);
+    const nc = nChecks(it);
+    const w = wxr[id];
+    const wparts = w ? w.text.replace(/ \(hour of .*\)$/, "").split(", ") : [];
+    const wtxt = wparts.length ? [wparts[0], (wparts.find((x) => /^gusts /.test(x)) || wparts.find((x) => /^wind /.test(x)) || ""), wparts.find((x) => /°/.test(x)) || ""].filter(Boolean).join(" · ") : "";
+    return `<tr data-id="${esc(id)}">
+      <td class="n">${num.get(it)}</td>
+      <td class="when">${esc(e.date)}<br><span class="hint">${esc(e.time)}</span></td>
+      <td class="relay"><b>${esc(core.relayKey(e))}</b>${e.terminal_id && e.terminal_id !== core.relayKey(e) ? `<br><span class="hint">${esc(e.terminal_id)}</span>` : ""}</td>
+      <td class="type">${esc(e.event_type || "?")}</td>
+      <td class="cause">${runs}${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}</td>
+      <td class="chk">${nc ? `<span class="badge-w" title="${esc(it.a.checks.concat(it.a.gaps).join("\n"))}">${nc}</span>` : `<span class="okmark" title="Nothing to check">✓</span>`}</td>
+      <td class="wx${stormy(it) ? " storm" : ""}" title="${esc(w ? w.text + "\n" + (w.hints || []).map((h) => h.text).join("\n") : "")}">${esc(wtxt) || '<span class="hint">-</span>'}</td>
+      <td class="note"><input type="text" value="${esc(notes[id] || "")}" placeholder="Add a note…" aria-label="Note for event ${num.get(it)}"></td>
+      <td class="act"><button data-act="details" title="Show this event in the summary">Details</button>${waveId(it) ? `<button data-act="wave" data-rec="${esc(waveId(it))}" title="Open its waveforms">Waveforms</button>` : ""}</td>
+    </tr>`;
+  }).join("");
+  tbl.innerHTML = head + `<tbody>${body || `<tr><td colspan="9" class="evt-empty">No events match.</td></tr>`}</tbody>`;
+}
+$("evTable").addEventListener("click", (e) => {
+  const h = e.target.closest("th[data-sort]");
+  if (h) { const k = h.dataset.sort; if (evSort.key === k) evSort.dir *= -1; else { evSort.key = k; evSort.dir = k === "checks" ? -1 : 1; } renderEvents(); return; }
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const id = b.closest("tr").dataset.id;
+  if (b.dataset.act === "wave") showPage("wave", b.dataset.rec || id); else jumpToEvent(id);
+});
+$("evTable").addEventListener("change", (e) => {
+  const inp = e.target.closest("td.note input"); if (!inp) return;
+  const id = inp.closest("tr").dataset.id, all = store.get("notes", {}), val = inp.value.trim();
+  if (val) all[id] = val; else delete all[id];
+  store.set("notes", all);
+  notesChanged();
+});
+$("evTable").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("td.note input")) e.target.blur(); });
+$("glance").addEventListener("click", (e) => { const c = e.target.closest("[data-show]"); if (!c) return; $("evShow").value = c.dataset.show; renderEvents(); });
+for (const id of ["evSearch", "evShow", "evDups"]) $(id).addEventListener(id === "evSearch" ? "input" : "change", renderEvents);
+$("toSummary").addEventListener("click", () => showPage("summary"));
+
+/** Show an event's details in the summary (if the summary's view includes it). */
+function jumpToEvent(id) {
+  showPage("summary");
+  if (!state.cache || state.empty) return;
+  const shown = core.prepareView(state.cache.events, state.cache.rdb, currentOpts()).shown;
+  const k = shown.findIndex((it) => core.eventId(it.e) === id);
+  if (k < 0) { setStatus("That event isn't in the summary's current view (check Show, Relay, Search and Hide duplicates)."); return; }
+  const needle = `Event ${k + 1} of ${shown.length}`;
+  const walker = document.createTreeWalker(out, NodeFilter.SHOW_TEXT);
+  let acc = "", node;
+  const text = out.textContent, at = text.indexOf(needle);
+  if (at < 0) { setStatus("Switch Detail to Standard or Full to see each event's details."); return; }
+  let pos = 0;
+  while ((node = walker.nextNode())) {
+    if (pos + node.length > at) {
+      const r = document.createRange(); r.setStart(node, at - pos); r.setEnd(node, Math.min(node.length, at - pos + needle.length));
+      const top = r.getBoundingClientRect().top + window.scrollY - 90;
+      window.scrollTo({ top, behavior: "smooth" });
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      setStatus(`Showing ${needle.toLowerCase()} in the summary`);
+      return;
+    }
+    pos += node.length;
+  }
 }
 /** A note changed: rebuild the summary so it shows (unless that would throw away edits). */
 function notesChanged() {
@@ -1173,16 +1375,24 @@ function ensureWave() {
   return wave;
 }
 function showPage(which, recId) {
-  const w = which === "wave";
-  $("pageSummary").hidden = w; $("pageWave").hidden = !w;
-  $("tabSummary").setAttribute("aria-selected", String(!w)); $("tabWave").setAttribute("aria-selected", String(w));
-  store.set("page", which);
-  if (w) {
-    ensureWave().show(recId);
+  if (!["events", "summary", "wave"].includes(which)) which = "events";
+  for (const [k, page, tab] of [["events", "pageEvents", "tabEvents"], ["summary", "pageSummary", "tabSummary"], ["wave", "pageWave", "tabWave"]]) {
+    $(page).hidden = k !== which; $(tab).setAttribute("aria-selected", String(k === which));
   }
+  store.set("page", which);
+  if (which === "wave") ensureWave().show(recId);
+  if (which === "events") renderEvents();
 }
+$("tabEvents").addEventListener("click", () => showPage("events"));
 $("tabSummary").addEventListener("click", () => showPage("summary"));
 $("tabWave").addEventListener("click", () => showPage("wave"));
+// stations & weather window
+const openStations = () => { renderRelays(); $("stDlg").showModal(); };
+$("stationsBtn").addEventListener("click", openStations);
+$("stationsBtn2").addEventListener("click", openStations);
+$("stClose").addEventListener("click", () => $("stDlg").close());
+$("stDlg").addEventListener("click", (e) => { if (e.target === $("stDlg")) $("stDlg").close(); });
+$("stDlg").addEventListener("close", () => renderEvents());
 $("wOpen").addEventListener("click", () => $("pickFiles").click());
 
 // typing into the summary: keep it plain text
@@ -1596,9 +1806,10 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "F5" || (ctrl && e.key === "Enter")) { e.preventDefault(); generate(); }
   else if (ctrl && e.shiftKey && k === "c") { e.preventDefault(); copyAll(); }
   else if (ctrl && !e.shiftKey && k === "o") { e.preventDefault(); $("pickFiles").click(); }
-  else if (ctrl && !e.shiftKey && k === "f") { e.preventDefault(); $("vSearch").focus(); $("vSearch").select(); }
+  else if (ctrl && !e.shiftKey && k === "f") { e.preventDefault(); const f = !$("pageEvents").hidden ? $("evSearch") : !$("pageWave").hidden ? $("wElSearch") : $("vSearch"); f.focus(); f.select(); }
   else if (ctrl && !e.shiftKey && k === "s") { e.preventDefault(); if ($("pageWave").hidden) askExport("docx"); else $("wExportMenu").querySelector('[data-wexp="docx"]').click(); }
-  else if (ctrl && !e.shiftKey && k === "g") { e.preventDefault(); showPage($("pageWave").hidden ? "wave" : "summary"); }
+  else if (ctrl && !e.shiftKey && k === "g") { e.preventDefault(); showPage($("pageWave").hidden ? "wave" : "events"); }
+  else if (e.altKey && ["1", "2", "3"].includes(e.key)) { e.preventDefault(); showPage(["events", "summary", "wave"][+e.key - 1]); }
   else if (ctrl && !e.shiftKey && k === "p") { e.preventDefault(); if ($("pageWave").hidden) askExport("pdf"); }
   else if (ctrl && !e.shiftKey && k === "d") { e.preventDefault(); applyTheme(!$("dark").checked); store.set("dark", $("dark").checked); }
 });
@@ -1606,9 +1817,9 @@ document.addEventListener("keydown", (e) => {
 if (DESK) $("footVer").textContent = `v${VERSION} · desktop app · files never leave your computer`;
 renderFiles();
 showEmpty();
-if (store.get("page", "summary") === "wave") showPage("wave");
+showPage(store.get("page", "events"));
 // test hook
-window.__selApp = { state, generate, summaryText, reportHtml, reportBlocks, exportAs, showPage, wave: () => wave };
+window.__selApp = { state, generate, summaryText, reportHtml, reportBlocks, exportAs, showPage, jumpToEvent, wave: () => wave };
 })();
 </script>
 </body>

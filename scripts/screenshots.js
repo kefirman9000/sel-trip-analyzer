@@ -3,13 +3,14 @@
  * Needs Playwright with Chromium (and the Inter font for the same look as the README).
  * Weather is faked so no network is needed.
  *
- *   main.png        the trip summary with samples loaded
- *   connections.png two-ended event, incident, weather and notes in the summary
+ *   main.png        the Events page: at-a-glance cards and the events table with weather and notes
+ *   summary.png     the written trip summary
+ *   connections.png two-ended event and incident in the summary
  *   wave.png        Waveform analysis: graphs with a pinned note and the hover readout, phasors
  *   checks.png      overcurrent elements vs. settings, sequence components, harmonics
  *   elements.png    every relay element in plain English (Advanced view)
  *   reference.png   the reference library (CT saturation)
- *   weather.png     station locations & weather, with the event notes list
+ *   weather.png     the Stations & weather window
  *   export.png      the export options dialog
  */
 const { chromium } = require("playwright");
@@ -48,36 +49,39 @@ const W = 1360;
     return { x: Math.max(0, b.x - pad), y: Math.max(0, b.y - pad), width: Math.min(W, b.width + 2 * pad), height: Math.min(maxH || 5000, b.height + 2 * pad) };
   };
 
-  // --- the main screen
+  // --- load the samples, set the stations, look up the weather, add notes
   await page.click("#samples");
   await page.waitForFunction(() => !window.__selApp.state.empty);
-  await page.fill("#comments", "Storm on 10/21: crews patrolling Feeder 3 and Feeder 8. Line 5 relays checked by protection.");
-  await page.click("#generate");
-  await page.waitForFunction(() => window.__selApp.summaryText().includes("Storm on 10/21"));
-  await page.setViewportSize({ width: W, height: 1240 });
-  await shot("main.png");
-
-  // --- weather + notes, then the summary sections they feed
-  await page.click("#wxPanel summary");
+  await page.click("#stationsBtn");
   await page.check("#wxAll");
   await page.fill("#wxBulkText", "Ocala, FL");
   await page.click("#wxBulkApply");
   await page.waitForFunction(() => /Set \d+ relays/.test(document.getElementById("wxStatus").textContent));
   await page.click("#wxGo");
   await page.waitForFunction(() => /Weather found/.test(document.getElementById("wxStatus").textContent));
-  await page.click("#notesPanel summary");
+  await page.setViewportSize({ width: W, height: 1000 });
+  await shot("weather.png", { clip: await clipOf("#stDlg", 16) });
+  await page.click("#stClose");
   const notes = { "FEEDER 3": "Crew found a flashed insulator at pole 214", "LINE 5 HILL": "Both ends agree: fault near Hill Sub" };
-  const rows = page.locator("#evList li");
-  for (let i = 0; i < await rows.count(); i++) {
-    const t = await rows.nth(i).locator(".what").innerText();
-    const k = Object.keys(notes).find((r) => t.includes(`  ${r}  `) || t.includes(` ${r} `));
-    if (k && notes[k]) { await rows.nth(i).locator("input").fill(notes[k]); await rows.nth(i).locator("input").press("Enter"); notes[k] = null; }
+  for (const [relay, text] of Object.entries(notes)) {
+    const row = page.locator("#evTable tbody tr", { has: page.locator("td.relay b", { hasText: new RegExp(`^${relay}$`) }) }).first();
+    await row.locator("td.note input").fill(text); await row.locator("td.note input").press("Enter");
   }
-  await page.waitForTimeout(400);
-  await page.evaluate(() => { document.getElementById("evList").scrollTop = 0; document.getElementById("wxPanel").scrollIntoView(); });
-  const wxBox = await clipOf("#wxPanel", 12);
-  const nlBox = await clipOf("#notesPanel", 12);
-  await shot("weather.png", { clip: { x: wxBox.x, y: wxBox.y, width: wxBox.width, height: Math.min(1100, nlBox.y + nlBox.height - wxBox.y) }, fullPage: true });
+  await page.waitForTimeout(300);
+
+  // --- the main screen: the Events page
+  await page.setViewportSize({ width: W, height: 1300 });
+  await page.evaluate(() => { document.activeElement.blur(); document.querySelector(".evt-wrap").scrollTop = 0; window.scrollTo(0, 0); });
+  await shot("main.png");
+
+  // --- the Summary page
+  await page.click("#tabSummary");
+  await page.fill("#comments", "Storm on 10/21: crews patrolling Feeder 3 and Feeder 8. Line 5 relays checked by protection.");
+  await page.click("#generate");
+  await page.waitForFunction(() => window.__selApp.summaryText().includes("Storm on 10/21"));
+  await page.setViewportSize({ width: W, height: 1100 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot("summary.png");
 
   // summary: two-ended + incident + an event with weather and a note
   const region = await page.evaluate(() => {
@@ -108,6 +112,8 @@ const W = 1360;
 
   // --- waveform analysis
   await page.click("#tabWave");
+  await page.setViewportSize({ width: W, height: 1180 });
+  await page.evaluate(() => window.scrollTo(0, 0));
   const ct = (await page.$$eval("#wRec option", (o) => o.map((x) => x.textContent))).find((x) => x.includes("COMTRADE"));
   await page.selectOption("#wRec", { label: ct });
   await page.click("#wNoteMode");
@@ -115,6 +121,21 @@ const W = 1360;
   await page.mouse.click(bb.x + bb.width * 0.73, bb.y + 60);
   await page.fill("#wNoteText", "51G times out on the U3 curve");
   await page.click("#wNoteSave");
+  {
+    const lay = await page.evaluate(() => window.__selApp.wave().state.lay.panels.map((q) => [q.kind, q.y, q.h]));
+    const V = lay.find((q) => q[0] === "V"), D = lay.find((q) => q[0] === "D");
+    await page.click("#wNoteMode");
+    await page.mouse.click(bb.x + bb.width * 0.2, bb.y + V[1] + 18);
+    await page.fill("#wNoteText", "VC sags to 37%");
+    await page.click('.swatches label[title="Red"]'); await page.selectOption("#wNoteLine", "panel");
+    await page.click("#wNoteSave");
+    await page.click("#wNoteMode");
+    await page.mouse.move(bb.x + bb.width * 0.13, bb.y + D[1] + 70); await page.mouse.down();
+    await page.mouse.move(bb.x + bb.width * 0.69, bb.y + D[1] + 70, { steps: 5 }); await page.mouse.up();
+    await page.fill("#wNoteText", "51G timing");
+    await page.click('.swatches label[title="Blue"]'); await page.selectOption("#wNoteLine", "panel");
+    await page.click("#wNoteSave");
+  }
   await page.setViewportSize({ width: W, height: 1180 });
   bb = await page.locator("#wOverlay").boundingBox();
   await page.mouse.move(bb.x + bb.width * 0.36, bb.y + 110);

@@ -18,15 +18,17 @@ settings.
 
 Nothing to install, no account, and **your files never leave your computer**.
 
-![Trip summary](docs/screenshots/main.png)
+![Events page](docs/screenshots/main.png)
 
 ## Contents
 
 - [What it does](#what-it-does)
 - [Get started](#get-started)
 - [Files it reads](#files-it-reads)
-- [The trip summary](#the-trip-summary)
-- [Waveform analysis](#waveform-analysis)
+- [Three pages](#three-pages)
+- [Events](#events)
+- [Summary](#summary)
+- [Waveforms](#waveforms)
 - [Notes and weather](#notes-and-weather)
 - [Exporting](#exporting)
 - [Web page or Windows program?](#web-page-or-windows-program)
@@ -54,19 +56,31 @@ Nothing to install, no account, and **your files never leave your computer**.
    **[download SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)**
    and double-click it to use it offline. It works in Chrome, Edge, Firefox and
    Safari, on Windows, Mac or Linux.
-2. **Drag your event files, a folder, or a .zip** onto the page. The summary
-   appears straight away.
-3. **Read the CHECK lines**, edit the text if you need to, and **Export**.
+2. **Drag your event files, a folder, or a .zip** onto the page. Every event
+   appears in the **Events** table straight away.
+3. Open the **Summary** for the written report: read the CHECK lines, edit the
+   text if you need to, and **Export**.
 
 New to it? Click **Try samples** to load a set of made-up events that show
-every feature, then open the **Waveform analysis** tab.
+every feature, then look through the three pages.
+
+## Three pages
+
+| Page | What it's for |
+|---|---|
+| **Events** | Load files, see every event in one table, add notes, jump to the details or the waveforms |
+| **Summary** | The written trip summary: organize it, edit it, copy or export it |
+| **Waveforms** | Dig into one record: graphs, phasors, harmonics, settings check, every relay element |
+
+Switch with the tabs or `Alt+1` `Alt+2` `Alt+3`. **Stations & weather** (top
+right) is where you set where each relay is and look up the weather.
 
 ## Files it reads
 
 | File | What it is | What you get |
 |---|---|---|
 | `.CEV` | SEL compressed event report | **Best.** Element timeline, currents, voltages, waveforms, usually the settings |
-| `.CFG` + `.DAT`, or `.CFF` | COMTRADE record (IEEE C37.111, 1991 to 2013, ASCII or binary) from **any** relay or recorder: SEL, GE, ABB, Siemens, DFRs… | Waveforms and elements on the Waveform analysis page |
+| `.CFG` + `.DAT`, or `.CFF` | COMTRADE record (IEEE C37.111, 1991 to 2013, ASCII or binary) from **any** relay or recorder: SEL, GE, ABB, Siemens, DFRs… | Waveforms and elements on the Waveforms page |
 | `.RDB` | AcSELerator QuickSet settings database | Trip equation (TR), line length (LL), CT ratio, 50/51 pickups, curves and time dials |
 | `.SET`, `.TXT` | Settings saved as text (`SHO` command output, or a QuickSet text export) | Same as an RDB |
 | `.EVE` `.TXT` | Text event report or saved terminal capture | Event type, targets, location, currents |
@@ -85,12 +99,29 @@ To get a CEV, download the event from the relay with AcSELerator QuickSet and
 choose the compressed (CEV) format, or save the output of the `CEV` command from
 a terminal session.
 
-## The trip summary
+## Events
 
-The summary has an **Overview**, a **Quick summary** (one line per event), any
+The first page. Drop files anywhere on the window (or use **Add files**, **Add
+folder**, or **Try samples**).
+
+- **At a glance**: how many events and trips, how many need review, linked
+  events (two-ended and incidents), repeat trips, waveform records and
+  weather-related trips. Click a card to show just those events.
+- **The events table**: one row per event, with what happened (TRIP in red),
+  tags for **two-ended** (↔ the other end), **Incident n** and **Repeat**, the
+  number of items to check, the weather, and a **note** you can type straight
+  in. Click a column heading to sort, or filter by text or by type of event.
+- **Details** jumps to that event in the Summary; **Waveforms** opens its graphs
+  (including a COMTRADE record that matches the event's relay and time).
+
+## Summary
+
+The written report. It has an **Overview**, a **Quick summary** (one line per event), any
 **two-ended events**, **incidents** and **repeat trips**, then the **Event
 details**: event type, targets, location, currents, voltages, notes, weather,
 the **probable cause** and the **`CHECK:` lines**.
+
+![Summary page](docs/screenshots/summary.png)
 
 ![Two-ended events and incidents](docs/screenshots/connections.png)
 
@@ -102,14 +133,15 @@ or several items to check).
 |---|---|
 | *No settings for this relay* | Add the relay's `.RDB` (or settings text) |
 | *History row only / no relay element data* | Load the `.CEV` for that event |
-| *Targets show phase B but the event type says A* | The record disagrees with itself: open it on the Waveform analysis page |
+| *Targets show phase B but the event type says A* | The record disagrees with itself: open it on the Waveforms page |
 | *Highest fault current is on phase …* | The fault type may be misclassified: check the waveforms |
 | *Location beyond the end of the line* / *negative location* | Fault likely past the remote bus or behind the relay: check directionality and adjacent sections |
 | *Breaker took … cycles to open* | Check the breaker and trip circuit |
 | *Tripped without identifying a fault type* | Confirm transfer trip, manual/SCADA open, or an external trip input |
 | *Settings assumed / none match relay* | Make sure the right settings file is loaded |
 
-**Organize it** with the row of controls above the summary:
+**Comments & suggestions** at the top are added to the start of the summary.
+**Organize it** with the row of controls above it:
 
 | Control | Choices |
 |---|---|
@@ -123,10 +155,10 @@ or several items to check).
 The summary box is **fully editable**; what you see is what gets copied or
 exported. If you change the view after editing, it asks first.
 
-## Waveform analysis
+## Waveforms
 
-Click the **Waveform analysis** tab (`Ctrl+G`), or **Waveforms ›** next to an
-event. Choose a record from your files or the reference library and step through
+Click the **Waveforms** tab (`Alt+3` or `Ctrl+G`), or **Waveforms** on an
+event's row. Choose a record from your files or the reference library and step through
 them with ◀ ▶ (`Page Up` / `Page Down`).
 
 ![Waveform analysis](docs/screenshots/wave.png)
@@ -160,23 +192,28 @@ them with ◀ ▶ (`Page Up` / `Page Down`).
 
 ## Notes and weather
 
-**Event notes.** Open **Event notes & waveforms** under the summary and type a
-note on any event (*"Crew found a burned crossarm at pole 112"*). It appears in
-that event's details and exports, and you can search for it.
+**Event notes.** Type a note in an event's row on the **Events** page (*"Crew
+found a burned crossarm at pole 112"*), or in **Event notes** on the Waveforms
+page. It appears in that event's details and exports, and you can search for it.
 
-**Notes on the graph.** On the Waveform analysis page, click **✎ Add note**
-then click the graph. The note is pinned to that moment, drawn on the graph,
-and included in the picture and Word exports.
+**Notes on the graph.** On the Waveforms page, click **✎ Add note**,
+then click on any graph (currents, voltages or relay elements) to pin a note to
+that moment, or drag across the graph to mark a stretch of time. Each note has a
+colour, sits on the graph you choose, and can draw its line across all graphs,
+on its own graph only, or not at all. **Drag a note** to move it in time or onto
+another graph; click it to edit or delete it. Notes are included in the picture
+and Word exports.
 
-**Weather.** Open **Station locations & weather** and enter where each relay is
+**Weather.** Click **Stations & weather** (top right, or on the Events page) and enter where each relay is
 (a town like *Ocala, FL*, or *latitude, longitude*). To set many at once, tick
 them (or **Select all**), type one location and click **Apply to ticked** or
 **Apply to all**. Then click **Look up weather**.
 
-![Station locations and weather](docs/screenshots/weather.png)
+<img src="docs/screenshots/weather.png" width="760" alt="Stations and weather">
 
 Each event gets a *Weather* line for that hour, and when the weather could
-explain the trip it's added to the probable cause:
+explain the trip it's added to the probable cause and shown in amber in the
+Events table:
 
 | Weather | Added to the cause |
 |---|---|
@@ -196,7 +233,7 @@ lightning strikes.
 | From | Formats |
 |---|---|
 | Trip summary | **Word (.docx)** with a waveform picture for each event that has one · **PDF** (print window → *Save as PDF*) · **Spreadsheet (.csv)**, one row per event · **Text** |
-| Waveform analysis | **Word report** · **Picture of the graph (.png)** · **Samples (.csv)** |
+| Waveforms | **Word report** · **Picture of the graph (.png)** · **Samples (.csv)** |
 
 Every export first asks **what to include**:
 
@@ -261,12 +298,13 @@ shown as % of the line. Negative means behind the relay; `$$$$$` means the
 relay couldn't calculate it.
 
 Relay elements (`Z1G`, `51GT`, `PTRX`, `79LO`…) are explained in plain English
-on the Waveform analysis page.
+on the Waveforms page.
 
 ## Shortcuts
 
-`Ctrl+O` add files · `F5` rebuild · `Ctrl+F` search · `Ctrl+Shift+C` copy ·
-`Ctrl+S` Word · `Ctrl+P` PDF · `Ctrl+G` waveform page · `Ctrl+D` dark mode · `F1` help
+`Alt+1` Events · `Alt+2` Summary · `Alt+3` Waveforms · `Ctrl+O` add files ·
+`F5` rebuild the summary · `Ctrl+F` search on this page · `Ctrl+Shift+C` copy ·
+`Ctrl+S` Word · `Ctrl+P` PDF · `Ctrl+G` Waveforms · `Ctrl+D` dark mode · `F1` help
 
 On the graph: `←` `→` move the cursor (`Shift` = one cycle) · `+` `−` zoom ·
 `F` the fault · `0` whole record · `N` add a note · `Page Up`/`Page Down` previous/next record

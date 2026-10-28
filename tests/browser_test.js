@@ -46,7 +46,9 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await shot(page, "web_samples_light.png");
 
   // 3) real file upload with comments
+  ok("starts on the Events page with the events table filled", !(await page.isHidden("#pageEvents")) && (await page.locator("#evTable tbody tr").count()) >= 10);
   await page.click("#clear");
+  await page.click("#tabSummary");
   await page.fill("#comments", "Crew patrol found a cracked insulator.\nSecond line.");
   const pick = ["Feeder12_AG_Zone1.cev", "Feeder12_settings.rdb", "Feeder12_history.his"].map((n) => path.join(REPO, "sample_files", n));
   await page.setInputFiles("#pickFiles", pick);
@@ -55,7 +57,9 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   ok("uploaded files + comments match command-line report", up === pyOut([...pick, "--comments", "Crew patrol found a cracked insulator.\nSecond line."]));
 
   // 4) folder upload (webkitdirectory)
+  await page.click("#tabEvents");
   await page.click("#clear");
+  await page.click("#tabSummary");
   await page.fill("#comments", "");
   try {
     await page.setInputFiles("#pickFolder", path.join(REPO, "sample_files"));
@@ -143,8 +147,8 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await page.evaluate(() => { window.confirm = () => true; });
   await page.click("#generate");
   await page.waitForFunction(() => !window.__selApp.state.edited);
-  await page.click("#notesPanel summary");
-  const noteInput = page.locator("#evList input").first();
+  await page.click("#tabEvents");
+  const noteInput = page.locator("#evTable td.note input").first();
   await noteInput.fill("Crew found a burned crossarm"); await noteInput.press("Enter"); await noteInput.blur();
   await page.waitForFunction(() => window.__selApp.summaryText().includes("Notes       : Crew found a burned crossarm"), null, { timeout: 5000 }).catch(() => {});
   ok("event note appears in the summary", (await page.evaluate(() => window.__selApp.summaryText())).includes("Notes       : Crew found a burned crossarm"));
@@ -158,7 +162,7 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
       wind_speed_10m: time.map(() => 9), wind_gusts_10m: time.map(() => 14) } }) }); };
   await page.route("https://api.open-meteo.com/**", wxRoute);
   await page.route("https://archive-api.open-meteo.com/**", wxRoute);
-  await page.click("#wxPanel summary");
+  await page.click("#stationsBtn");
   await page.check("#wxAll");
   await page.fill("#wxBulkText", "Ocala, FL");
   await page.click("#wxBulkApply");
@@ -169,6 +173,16 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   ok("weather lookup adds Weather lines and a thunderstorm hint", /Weather {5}: thunderstorm/.test(wxText) && wxText.includes("Weather: Thunderstorm in the area"),
      await page.textContent("#wxStatus"));
   await shot(page, "web_weather_light.png", { fullPage: true });
+  await page.click("#stClose");
+  ok("events table shows the weather", (await page.locator("#evTable td.wx.storm").count()) >= 1);
+  await page.click("#tabEvents");
+  await page.selectOption("#evShow", "related");
+  ok("events filter: two-ended or incident", (await page.locator("#evTable tbody tr").count()) === 5, String(await page.locator("#evTable tbody tr").count()));
+  await page.selectOption("#evShow", "all");
+  const f3 = page.locator("#evTable tbody tr", { hasText: "FEEDER 3" });
+  ok("an .EVE event links to its COMTRADE record", (await f3.locator('button[data-act="wave"]').count()) === 1);
+  await page.locator("#evTable tbody tr", { hasText: "LINE 5 HILL" }).last().locator('button[data-act="details"]').click();
+  ok("Details jumps to the event in the summary", !(await page.isHidden("#pageSummary")) && /Showing event \d+ of \d+ in the summary/.test(await page.textContent("#status")));
 
   // 6d) waveform analysis page
   await page.click("#tabWave");
@@ -187,6 +201,22 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await page.mouse.click(bb.x + bb.width * 0.5, bb.y + 80);
   await page.fill("#wNoteText", "Arc restrikes here"); await page.click("#wNoteSave");
   ok("note pinned on the graph", (await page.locator("#wPins li input").count()) === 1);
+  {
+    const lay = await page.evaluate(() => { const st = window.__selApp.wave().state; return { box: st.lay.pinBoxes[0], panels: st.lay.panels.map((q) => [q.kind, q.y, q.h]) }; });
+    const V = lay.panels.find((q) => q[0] === "V");
+    await page.mouse.move(bb.x + lay.box.x + 8, bb.y + lay.box.y + 9); await page.mouse.down();
+    await page.mouse.move(bb.x + lay.box.x + 60, bb.y + V[1] + 40, { steps: 6 }); await page.mouse.up();
+    const saved = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem("sel-trip:pins")))[0]);
+    ok("a note can be dragged onto another graph", saved.length === 1 && saved[0].panel === "V", JSON.stringify(saved[0]));
+    await page.click("#wNoteMode");
+    await page.mouse.move(bb.x + bb.width * 0.2, bb.y + V[1] + 30); await page.mouse.down();
+    await page.mouse.move(bb.x + bb.width * 0.4, bb.y + V[1] + 30, { steps: 4 }); await page.mouse.up();
+    await page.fill("#wNoteText", "Voltage dip"); await page.click('.swatches label[title="Blue"]'); await page.selectOption("#wNoteLine", "panel");
+    await page.click("#wNoteSave");
+    const two = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem("sel-trip:pins")))[0]);
+    const span = two.find((x) => x.text === "Voltage dip");
+    ok("drag in note mode marks a span, with colour and line options", span && span.t2 > span.t && span.color === "blue" && span.line === "panel" && span.panel === "V", JSON.stringify(span));
+  }
   const spanMs = async () => parseInt(/\((\d+) ms of/.exec(await page.textContent("#wSpan"))[1], 10);
   const before = await spanMs();
   await page.mouse.move(bb.x + bb.width * 0.3, bb.y + 120); await page.mouse.down(); await page.mouse.move(bb.x + bb.width * 0.6, bb.y + 120, { steps: 4 }); await page.mouse.up();
@@ -215,6 +245,7 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
      q.get("title") === "Feedback: Event 3 was really a DTT." && q.get("body").includes("<details>") && fb.length < 8200, fb.length + " chars");
 
   // 8) dark mode via switch, remembered after reload
+  await page.click("#tabEvents");
   await page.click("#clear");
   await page.click("#samples");
   await page.waitForFunction(() => !window.__selApp.state.empty);
