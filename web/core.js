@@ -994,6 +994,35 @@ function analyzeEvent(rec, settings, how, label) {
     if (rec.prefault_short) checks.push("The record triggered very early, so 'prefault' values may include fault data.");
   }
 
+  // what each conclusion rests on, with the sample to look at in the record (for "Show on graph")
+  const sam = rec.wave ? rec.wave.sam : null;
+  const at = (c) => (sam && c !== null && c !== undefined ? Math.round(c * sam) : null);
+  const firstAt = (el) => { const hit = asserted.find((x) => x[1] === el); return hit ? hit[0] : null; };
+  const evidence = [];
+  if (rec.event_type) evidence.push({ text: `The relay recorded event type ${strip(rec.event_type)}` + (desc ? ` (${desc})` : ""), idx: null, elements: [] });
+  if (tdesc.length) evidence.push({ text: `Front-panel targets ${strip(rec.targets)}: ${tdesc.join(", ")}`, idx: null, elements: [] });
+  for (const [key, hits] of eqHits) {
+    const c = Math.min(...hits.map(firstAt).filter((x) => x !== null));
+    evidence.push({ text: `${key} = ${strip(settings[key])}: ${hits.join(", ")} asserted before the trip`, idx: Number.isFinite(c) ? at(c) : null, elements: hits.slice() });
+  }
+  const inEq = new Set([...eqHits.values()].flat());
+  for (const el of primary) {
+    const c = firstAt(el);
+    if (inEq.has(el)) continue;
+    if (c !== null) evidence.push({ text: `${el} (${elementClass(el) || "relay element"}) asserted at ${fx(c, 2)} cyc`, idx: at(c), elements: [el] });
+  }
+  if (tc !== null) {
+    const trips = asserted.filter((x) => TRIP_NAMES.has(x[1].toUpperCase()) && Math.abs(x[0] - tc) < 1e-9).map((x) => x[1]);
+    evidence.push({ text: `TRIP asserted at ${fx(tc, 2)} cyc`, idx: at(tc), elements: trips });
+  }
+  if (rec.open_cycle !== null) {
+    const bk = BREAKER_NAMES.filter((b) => rec.wave && rec.wave.digitals.some((d) => d.name === b));
+    evidence.push({ text: `Breaker status (${bk[0] || "52A"}) dropped at ${fx(rec.open_cycle, 2)} cyc` +
+                    (tc !== null && rec.open_cycle > tc ? `: cleared ${fx(rec.open_cycle - tc, 2)} cyc after the trip` : ""), idx: at(rec.open_cycle), elements: bk.slice(0, 1) });
+  }
+  if (loc && v !== null) evidence.push({ text: `Fault location ${loc}` + (ll ? ` on a ${settings.LL} line (${fx(100 * v / ll, 0)}%)` : ""), idx: null, elements: [] });
+  if (settings.TR && !eqHits.size && tripped && rec.sequence.length) evidence.push({ text: `TR = ${strip(settings.TR)}: none of these asserted before the trip`, idx: null, elements: [] });
+
   let level;
   if (rec.kind === "history") level = 1;
   else if (rec.sequence.length && settings.TR) level = 3;
@@ -1003,7 +1032,7 @@ function analyzeEvent(rec, settings, how, label) {
   level = Math.max(1, level);
   let basis = rec.kind === "history" ? "history row" : rec.sequence.length ? "element data" : rec.targets ? "targets only" : "event type only";
   if (settings.TR) basis += ", settings" + (label ? ` from ${label}` : " in event file");
-  return { tripped, desc, cause, checks, gaps, confidence: { 3: "High", 2: "Medium", 1: "Low" }[level], basis, primary };
+  return { tripped, desc, cause, checks, gaps, confidence: { 3: "High", 2: "Medium", 1: "Low" }[level], basis, primary, evidence };
 }
 
 function shortCause(rec, settings, a) {

@@ -184,6 +184,22 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await page.locator("#evTable tbody tr", { hasText: "LINE 5 HILL" }).last().locator('button[data-act="details"]').click();
   ok("Details jumps to the event in the summary", !(await page.isHidden("#pageSummary")) && /Showing event \d+ of \d+ in the summary/.test(await page.textContent("#status")));
 
+  // 6c2) evidence: Why? lists what the conclusion rests on; Show on graph puts the cursor there
+  await page.click("#tabEvents");
+  const pott = page.locator("#evTable tbody tr[data-id]", { hasText: "PTRX" }).first();
+  await pott.locator('button[data-act="why"]').click();
+  const why = page.locator("#evTable tr.why").first();
+  const whyText = await why.textContent();
+  ok("Why? lists the trip equation, the tripping elements and breaker clearing", /TRCOMM = M2P OR Z2G/.test(whyText) && /PTRX .* asserted at 4\.50 cyc/.test(whyText) && /cleared 2\.75 cyc after the trip/.test(whyText), whyText.replace(/\s+/g, " ").slice(0, 160));
+  await why.locator('button[data-act="goto"]', { hasText: "Show on graph" }).nth(1).click();
+  await page.waitForSelector("#pageWave:not([hidden])");
+  const focus = await page.evaluate(() => { const w = window.__selApp.wave().state; return { idx: w.cursor, rec: w.recKey, sel: [...w.digSel] }; });
+  ok("Show on graph opens the record with the cursor on that moment", focus.idx === 72 && /^LINE 5\|/.test(focus.rec) && focus.sel.includes("PTRX") &&
+     /Cursor on: PTRX/.test(await page.textContent("#status")), JSON.stringify(focus).slice(0, 120));
+  await page.click("#tabEvents");
+  await pott.locator('button[data-act="why"]').click();
+  ok("Why? closes again", (await page.locator("#evTable tr.why").count()) === 0);
+
   // 6d) waveform analysis page
   await page.click("#tabWave");
   await page.waitForSelector("#pageWave:not([hidden])");

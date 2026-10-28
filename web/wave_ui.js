@@ -1270,7 +1270,20 @@ function create(ctx) {
 
   setAdv(st.adv);
   return {
-    show(id) { refresh(id || (st.idx < 0 ? ctx.store.get("w.last", null) : null)); if (st.rec) { redraw(); renderCursorPanels(); } },
+    show(id, focus) {
+      refresh(id || (st.idx < 0 ? ctx.store.get("w.last", null) : null));
+      if (!st.rec) return;
+      if (focus && focus.idx !== null && focus.idx !== undefined) {
+        for (const el of focus.elements || []) if (st.an.elements.some((x) => x.name === el)) st.digSel.add(el);
+        const idx = clamp(focus.idx, 0, st.rec.n - 1), t = st.rec.t[idx], f = st.rec.freq;
+        if (t < st.view.t0 || t > st.view.t1) st.view = { t0: Math.max(st.rec.t[0], t - 3 / f), t1: Math.min(st.rec.t[st.rec.n - 1], t + 3 / f) };
+        renderElements();
+        setCursor(idx, true);
+        if (focus.label) ctx.setStatus("Cursor on: " + focus.label);
+        return;
+      }
+      redraw(); renderCursorPanels();
+    },
     refresh() {
       if (st.idx < 0) return;
       const before = new Set(st.list.filter((x) => x.group === "file").map((x) => x.id));
