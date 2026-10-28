@@ -1,8 +1,8 @@
 name: Website
 
-# Publishes the browser version to GitHub Pages (https://<owner>.github.io/<repo>/).
-# One-time setup: repo Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
-# Until that's done this workflow just skips the deploy.
+# Keeps the gh-pages branch (the published browser version) in step with main.
+# GitHub Pages serves that branch: Settings -> Pages -> Source: "Deploy from a branch",
+# Branch: gh-pages, folder: / (root).
 on:
   push:
     branches: [main]
@@ -16,50 +16,32 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  check:
+  publish:
     runs-on: ubuntu-latest
-    outputs:
-      enabled: ${{ steps.pages.outputs.enabled }}
-    steps:
-      - id: pages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh api "repos/${{ github.repository }}/pages" --jq .build_type >/dev/null 2>&1; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::GitHub Pages isn't turned on yet (Settings -> Pages -> Source: GitHub Actions). Skipping deploy."
-          fi
-
-  deploy:
-    needs: check
-    if: needs.check.outputs.enabled == 'true'
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build site
+      - name: Build page
+        run: python scripts/build_html.py "$RUNNER_TEMP/index.html"
+      - name: Update gh-pages branch
         run: |
-          python scripts/build_html.py site/index.html
-          cp site/index.html site/SEL_Trip_Analyzer.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deploy
-        uses: actions/deploy-pages@v4
+          git fetch origin gh-pages
+          git worktree add "$RUNNER_TEMP/site" origin/gh-pages
+          cd "$RUNNER_TEMP/site"
+          cp "$RUNNER_TEMP/index.html" index.html
+          cp index.html SEL_Trip_Analyzer.html
+          touch .nojekyll
+          git add -A
+          if git diff --cached --quiet; then echo "Website already up to date"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Publish browser version from ${GITHUB_SHA::7}"
+          git push origin HEAD:gh-pages

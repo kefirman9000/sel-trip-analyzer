@@ -45,8 +45,7 @@ Can't run `.exe` files, or not on Windows? Use **`SEL_Trip_Analyzer.html`**, a
 single file that does the same analysis inside your web browser.
 
 1. Download [SEL_Trip_Analyzer.html](../../releases/latest/download/SEL_Trip_Analyzer.html)
-   (or open the online copy, if it has been enabled for this project:
-   `https://kefirman9000.github.io/sel-trip-analyzer/`).
+   or use the online copy at <https://kefirman9000.github.io/sel-trip-analyzer/>.
 2. Double-click it. It opens in Chrome, Edge, Firefox or Safari, on Windows, Mac
    or Linux. It also works offline.
 3. Drag your event files or a folder onto the page, exactly like the Windows program.
