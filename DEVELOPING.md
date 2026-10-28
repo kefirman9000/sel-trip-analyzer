@@ -14,7 +14,8 @@ launcher that shows that page in its own window.
 | `web/app.html` | The page: layout, summary, notes, weather, updates, desktop bridge |
 | `web/cli.js` | The same analysis from the command line |
 | `web/history.js` | Trip History: event records across files, issue types, recurrence, hot spots, trends, ranking, report blocks and CSV |
-| `web/history.html` | The Trip History page (IndexedDB storage, overview, locations, issues, events, evidence drawer, exports) |
+| `web/history_ui.js`, `web/history_ui.css` | The History screen as a module (`SELHistoryUI.mount`), scoped to `.hx` with `hx-` ids: used by the Analyzer's History tab and by `history.html`. One IndexedDB database per history (`sel-trip-history`, `sel-trip-history:<id>`), list in `localStorage` |
+| `web/history.html` | The standalone Trip History page: header, theme and the mounted module |
 | `web/history_cli.js` | Trip History from the command line |
 | `sel_trip_analyzer.py` | Windows launcher (standard library only): local server, Edge app window, Save dialogs, file hand-off, updater |
 | `scripts/build_history.py` | Builds `dist/SEL_Trip_History.html` (with `sample_history/`, made by `scripts/make_history_samples.py`) |
