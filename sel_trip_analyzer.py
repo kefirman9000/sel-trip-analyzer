@@ -35,7 +35,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_NAME = "SEL Trip Event Analyzer"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 # GitHub "owner/repo" that publishes releases. Each release attaches
 # SEL_Trip_Analyzer.exe and SEL_Trip_Analyzer.html (the release workflow does that).
 GITHUB_REPO = "kefirman9000/sel-trip-analyzer"

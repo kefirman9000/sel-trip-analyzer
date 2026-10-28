@@ -236,6 +236,11 @@ const DEFAULTS = {
   slowCycles: 5,       // breaker clearing slower than this is "slow"
   slowingPerYear: 0.5, // clearing time rising this many cycles a year (or more) is "slowing"
   weather: {},         // record id -> {text, kinds: ["lightning", "wind", ...] or ["calm"], location}
+  reviews: {},         // record id -> PRC-004 review from the Trip Analyzer {outcome: correct|misop|na, category, cause, reviewer, date, ...}
+  reviewDays: 120,     // PRC-004-6 R1: decide within 120 days
+  today: "",           // YYYY-MM-DD for "overdue"; empty = today
+  customers: {},       // relay -> customers served
+  sustained: "lockout", // "lockout": a lockout is a sustained interruption, other trips momentary; "all": every trip is sustained
   overrides: {},       // relay -> station
   worklog: {},         // relay -> [{date, text}]
 };
@@ -342,9 +347,14 @@ function buildModel(allRecords, cfgIn) {
     r.stationName = st.name; r.stationFrom2 = st.from;
   }
 
+  const todayMs = Date.parse((cfg.today || new Date().toISOString().slice(0, 10)) + "T00:00:00Z");
   for (const r of records) {
     const w = cfg.weather[r.id] || null;
     r.wx = w; r.storm = w ? !w.kinds.includes("calm") : null;
+    const rv = cfg.reviews[r.id] || null;
+    r.review = rv && rv.outcome ? rv : null;
+    r.reviewDue = r.tripped && r.ms !== null ? isoDate(r.ms + cfg.reviewDays * DAY) : "";
+    r.reviewStatus = !r.tripped ? "" : r.review ? r.review.outcome : r.ms !== null && r.ms + cfg.reviewDays * DAY < todayMs ? "overdue" : "open";
   }
   const dated = records.filter((r) => r.ms !== null);
   const latest = dated.length ? dated[dated.length - 1].ms : Date.now();
@@ -452,6 +462,18 @@ function buildModel(allRecords, cfgIn) {
       }
     }
 
+    // ---- PRC-004 reviews (made in the Trip Analyzer)
+    const tr = recs.filter((r) => r.tripped);
+    L.rev = { trips: tr.length, reviewed: tr.filter((r) => r.review).length, misop: tr.filter((r) => r.reviewStatus === "misop").length,
+              correct: tr.filter((r) => r.reviewStatus === "correct").length, overdue: tr.filter((r) => r.reviewStatus === "overdue").length,
+              open: tr.filter((r) => r.reviewStatus === "open").length };
+
+    // ---- customers: interruptions in the last year (estimate: every trip occasion interrupts the whole circuit)
+    const cust = num(cfg.customers[L.relay] ?? cfg.customers[L.key]);
+    const yearOccs = occs.filter((o) => o.tripped && o.ms !== null && o.ms > anchor - 365 * DAY && o.ms <= anchor);
+    const sus = yearOccs.filter((o) => cfg.sustained === "all" || o.issues.has("lockout")).length;
+    L.cust = cust ? { customers: cust, occ: yearOccs.length, sustained: sus, momentary: yearOccs.length - sus, ci: cust * sus, cmi: cust * (yearOccs.length - sus) } : null;
+
     // ---- breaker health: how fast it clears, and how much current it has interrupted
     L.breaker = breakerHealth(L, occs, cfg, anchor);
 
@@ -525,11 +547,21 @@ function buildModel(allRecords, cfgIn) {
   hot.sort((a, b) => b.n - a.n);
   const breakers = ranked.filter((L) => L.breaker).map((L) => L.breaker)
     .sort((a, b) => (b.slowing - a.slowing) || (b.latest - a.latest));
+  const revAll = { trips: 0, reviewed: 0, misop: 0, correct: 0, overdue: 0, open: 0 };
+  for (const L of ranked) for (const k of Object.keys(revAll)) revAll[k] += L.rev[k];
+  revAll.overdueList = records.filter((r) => r.reviewStatus === "overdue").sort((a, b) => a.ms - b.ms);
+  revAll.misopList = records.filter((r) => r.reviewStatus === "misop");
+  const withCust = ranked.filter((L) => L.cust);
+  const custAll = withCust.length ? (() => {
+    const served = withCust.reduce((a, L) => a + L.cust.customers, 0), ci = withCust.reduce((a, L) => a + L.cust.ci, 0), cmi = withCust.reduce((a, L) => a + L.cust.cmi, 0);
+    return { served, ci, cmi, saifi: ci / served, maifi: cmi / served, locations: withCust.length, missing: ranked.length - withCust.length,
+             ranked: withCust.slice().sort((a, b) => b.cust.ci + b.cust.cmi * 0.1 - (a.cust.ci + a.cust.cmi * 0.1)) };
+  })() : null;
   const wxAll = { known: 0, storm: 0, calm: 0, kinds: {} };
   for (const L of ranked) { wxAll.known += L.wx.known; wxAll.storm += L.wx.storm; wxAll.calm += L.wx.calm; for (const [k, n] of Object.entries(L.wx.kinds)) wxAll.kinds[k] = (wxAll.kinds[k] || 0) + n; }
   return {
     cfg, anchor, first, latest, months, byMonth, records, relays: ranked, stations: stationList, issues: issueStats,
-    recurring, hotspots: hot, breakers, wx: wxAll, byId: new Map(records.map((r) => [r.id, r])),
+    recurring, hotspots: hot, breakers, wx: wxAll, reviews: revAll, customers: custAll, byId: new Map(records.map((r) => [r.id, r])),
     totals: { events: records.length, trips: tripsAll.length, faults: records.filter((r) => r.fault).length,
               review: records.filter((r) => r.checks.length).length, relays: ranked.length, stations: stationList.length,
               undated: records.filter((r) => r.ms === null).length,
@@ -640,7 +672,7 @@ function scoped(model, opts) {
 /** opts: {station, relay, sections: {overview, ranking, recurring, hotspots, trends, matrix, details, events, worklog}, top, notes} */
 function reportBlocks(model, opts) {
   opts = opts || {};
-  const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, breakers: true, weather: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
+  const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, breakers: true, weather: true, customers: true, reviews: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
   const S = scoped(model, opts);
   const recs = S.records;
   const dated = recs.filter((r) => r.ms !== null);
@@ -662,6 +694,8 @@ function reportBlocks(model, opts) {
       ["Fault hot spots", S.hotspots.length ? `${S.hotspots.length}` : "none"],
       ["Needs review", `${recs.filter((r) => r.checks.length).length} events have items to check`],
     ].concat(S.relays.some((L) => L.breaker && L.breaker.slowing) ? [["Breakers", `getting slower at ${S.relays.filter((L) => L.breaker && L.breaker.slowing).map(whereText).join(", ")}`]] : [])
+     .concat(model.customers ? [["Customer impact", `SAIFI ~${model.customers.saifi.toFixed(2)}, MAIFI ~${model.customers.maifi.toFixed(2)} over the last 12 months (estimate)`]] : [])
+     .concat(model.reviews.reviewed || model.reviews.overdue ? [["PRC-004 reviews", `${model.reviews.reviewed} of ${model.reviews.trips} trips reviewed, ${plural(model.reviews.misop, "misoperation")}, ${model.reviews.overdue} overdue`]] : [])
      .concat(model.wx.known ? [["Weather", `${S.relays.reduce((a, L) => a + L.wx.storm, 0)} of ${S.relays.reduce((a, L) => a + L.wx.known, 0)} trips with weather were in storms`]] : [])]);
     const up = S.relays.filter((L) => L.trend.dir === "up"), down = S.relays.filter((L) => L.trend.dir === "down");
     if (up.length) blocks.push(["para", `Trips are increasing at ${up.map(whereText).join(", ")}.`]);
@@ -714,6 +748,26 @@ function reportBlocks(model, opts) {
         bks.sort((a, b) => b.slowing - a.slowing || b.latest - a.latest).map((b) => [whereText(b), String(b.n), `${b.first} cyc`, `${b.latest} cyc`, b.n >= 3 ? `${b.slope >= 0 ? "+" : ""}${b.slope.toFixed(2)} cyc` : "-",
           String(b.ops), String(b.kA), b.verdict]), [16, 8, 8, 8, 10, 10, 10, 30]]);
     }
+  }
+  if (sec.customers !== false && model.customers) {
+    const rows = S.relays.filter((L) => L.cust).sort((a, b) => b.cust.ci - a.cust.ci || b.cust.cmi - a.cust.cmi)
+      .map((L) => [whereText(L), L.cust.customers.toLocaleString("en-US"), String(L.cust.occ), String(L.cust.sustained), L.cust.ci.toLocaleString("en-US"), L.cust.cmi.toLocaleString("en-US")]);
+    if (rows.length) {
+      const c = model.customers;
+      blocks.push(["h1", "Customer impact (last 12 months)"]);
+      blocks.push(["note", `Estimate: each trip interrupts every customer on the circuit; ${model.cfg.sustained === "all" ? "every trip counts as sustained" : "a recloser lockout is a sustained interruption and other trips are momentary"}. Trips in the 12 months to ${fmtDate(model.anchor)}.`]);
+      blocks.push(["kv", [["Customers served", `${c.served.toLocaleString("en-US")} on ${plural(c.locations, "circuit")}${c.missing ? ` (${c.missing} without a customer count)` : ""}`],
+        ["SAIFI (estimate)", `${c.saifi.toFixed(2)} sustained interruptions per customer`], ["MAIFI (estimate)", `${c.maifi.toFixed(2)} momentary interruptions per customer`]]]);
+      blocks.push(["table", ["Location", "Customers", "Trips", "Sustained", "Sustained customer interruptions", "Momentary customer interruptions"], rows, [28, 12, 9, 11, 22, 18]]);
+    }
+  }
+  if (sec.reviews !== false && model.reviews.reviewed) {
+    const rows = S.relays.filter((L) => L.rev.trips).map((L) => [whereText(L), String(L.rev.trips), String(L.rev.reviewed), String(L.rev.misop), String(L.rev.overdue)]);
+    blocks.push(["h1", "PRC-004 reviews"]);
+    blocks.push(["note", `From the reviews recorded in the Trip Analyzer. Overdue = not decided within ${model.cfg.reviewDays} days of the trip.`]);
+    blocks.push(["table", ["Location", "Trips", "Reviewed", "Misoperations", "Overdue"], rows, [40, 15, 15, 15, 15]]);
+    const mis = model.reviews.misopList.filter((r) => S.keys.has(upper(r.relay)));
+    if (mis.length) blocks.push(["bullets", mis.map((r) => `${fmtWhen(r)} ${r.relay}: misoperation${r.review.category ? ` (${r.review.category})` : ""}${r.review.cause ? `, cause: ${r.review.cause}` : ""}`)]);
   }
   if (sec.weather !== false && model.wx.known) {
     const rows = S.relays.filter((L) => L.wx.known).map((L) => [whereText(L), String(L.wx.known), String(L.wx.storm), String(L.wx.calm),
@@ -791,22 +845,23 @@ function blocksToText(blocks) {
 const csvField = (v) => { v = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const csv = (rows) => rows.map((r) => r.map(csvField).join(",")).join("\r\n") + "\r\n";
 const EVENT_COLUMNS = ["Date", "Time", "Station", "Relay", "Event type", "Tripped", "Fault", "Phases", "Location", "% of line",
-  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Source files"];
+  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Review", "Decide by", "Source files"];
 function eventsCsv(model, opts) {
   const S = scoped(model, opts || {});
   const recurIds = new Set(S.recurring.flatMap((x) => x.allIds)), hotIds = new Set(S.hotspots.flatMap((h) => h.ids));
   return csv([EVENT_COLUMNS].concat(S.records.map((r) => [r.date || r.rawDate, r.time || r.rawTime, r.stationName, r.relay, r.et, r.tripped ? "Yes" : "No",
     r.fault ? "Yes" : "No", r.phases, r.loc, r.locPct ?? "", r.clearCyc ?? "", issueList(r), r.short, r.checks.join(" | "), r.confidence,
-    recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.wx ? r.wx.text : "", r.sources.map((s) => s.path).join(" | ")])));
+    recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.wx ? r.wx.text : "", r.review ? ({ correct: "Correct operation", misop: "Misoperation", na: "Not applicable" }[r.review.outcome] || r.review.outcome) + (r.review.category ? ` - ${r.review.category}` : "") : r.reviewStatus === "overdue" ? "Overdue" : r.tripped ? "Not reviewed" : "", r.reviewDue, r.sources.map((s) => s.path).join(" | ")])));
 }
 const LOCATION_COLUMNS = ["Rank", "Station", "Relay", "Score", "Events", "Trips", "Faults", "First event", "Last trip", "Trend",
-  "Trips recent", "Trips before", "Recurring issues", "Hot spots", "Needs review", "Main issues", "Trips in storms", "Breaker latest (cycles)", "Breaker change a year", "kA interrupted"];
+  "Trips recent", "Trips before", "Recurring issues", "Hot spots", "Needs review", "Main issues", "Trips in storms", "Breaker latest (cycles)", "Breaker change a year", "kA interrupted", "Customers", "Trips last 12 months", "Sustained", "Customer interruptions", "Misoperations", "Reviews overdue"];
 function locationsCsv(model, opts) {
   const S = scoped(model, opts || {});
   return csv([LOCATION_COLUMNS].concat(S.relays.map((L) => [L.rank, L.station, L.relay, L.score, L.events, L.trips, L.faults, fmtDate(L.first), fmtDate(L.lastTrip),
     L.trend.label, L.trend.recent, L.trend.prev, L.recurring.map((x) => `${x.label} (${x.inWindow} in ${x.windowDays} d)`).join("; "),
     L.hotspots.map((h) => `${h.n} at ${fx(h.from, 2)}-${fx(h.to, 2)}`).join("; "), L.review, L.top.map((t) => `${t.label} ${t.n}`).join("; "),
-    L.wx.known ? `${L.wx.storm} of ${L.wx.known}` : "", L.breaker && L.breaker.latest !== null ? L.breaker.latest : "", L.breaker && L.breaker.n >= 3 ? L.breaker.slope.toFixed(2) : "", L.breaker ? L.breaker.kA : ""])));
+    L.wx.known ? `${L.wx.storm} of ${L.wx.known}` : "", L.breaker && L.breaker.latest !== null ? L.breaker.latest : "", L.breaker && L.breaker.n >= 3 ? L.breaker.slope.toFixed(2) : "", L.breaker ? L.breaker.kA : "",
+    L.cust ? L.cust.customers : "", L.cust ? L.cust.occ : "", L.cust ? L.cust.sustained : "", L.cust ? L.cust.ci : "", L.rev.misop, L.rev.overdue])));
 }
 
 const api = {
