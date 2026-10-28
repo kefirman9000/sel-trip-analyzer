@@ -296,6 +296,60 @@ def open_in_explorer(path):
 
 
 # --------------------------------------------------------------------------
+# Watching folders (--watch): new event files go to the page like dropped files
+# --------------------------------------------------------------------------
+class FolderWatch:
+    """Polls folders for new or changed event files. A file is passed on once its size and time
+    haven't changed between two checks, so files still being copied wait."""
+
+    def __init__(self, app, folders, interval=5.0):
+        self.app, self.interval = app, interval
+        self.folders = [os.path.abspath(f.strip('"')) for f in folders]
+        self.seen, self.waiting = {}, {}
+
+    def scan(self):
+        out = {}
+        for p in expand_paths([f for f in self.folders if os.path.isdir(f)]):
+            try:
+                st = os.stat(p)
+                out[p] = (st.st_size, st.st_mtime_ns)
+            except OSError:
+                continue
+        return out
+
+    def step(self, first=False):
+        """One check. Returns the files queued for the page."""
+        ready = []
+        for p, sig in self.scan().items():
+            if self.seen.get(p) == sig:
+                continue
+            if not first and self.waiting.get(p) != sig:
+                self.waiting[p] = sig
+                continue
+            self.waiting.pop(p, None)
+            changed = p in self.seen
+            self.seen[p] = sig
+            ready.append((p, changed))
+        if ready:
+            items = file_payload([p for p, _ in ready])
+            changed = {p for p, c in ready if c}
+            for it in items:
+                it["changed"] = it["path"] in changed
+            with self.app.lock:
+                self.app.pending.extend(items)
+        return [p for p, _ in ready]
+
+    def run(self):
+        self.step(first=True)
+        while True:
+            time.sleep(self.interval)
+            try:
+                self.step()
+            except Exception:  # noqa: BLE001  (a share going offline must not stop the program)
+                pass
+
+
+# --------------------------------------------------------------------------
 # Local server
 # --------------------------------------------------------------------------
 class App:
@@ -312,6 +366,7 @@ class App:
         self.finish_update = None
         self.prefs = load_prefs()
         self.server = None
+        self.watching = []
 
     def queue(self, paths):
         items = file_payload(paths)
@@ -361,6 +416,8 @@ def make_handler(app):
                 return self._send(403, {"error": "forbidden"})
             if path == "/api/info":
                 return self._send(200, {"version": VERSION, "frozen": bool(getattr(sys, "frozen", False)), "platform": sys.platform})
+            if path == "/api/watch":
+                return self._send(200, {"folders": app.watching})
             if path == "/api/pending":
                 app.last_ping = time.time()
                 with app.lock:
@@ -528,8 +585,18 @@ def main(argv):
         selftest()
         return 0
     use_default = "--browser" in argv
-    paths = [a for a in argv if not a.startswith("--")]
-    if hand_off(paths):
+    watch, rest = [], []
+    it = iter(argv)
+    for a in it:
+        if a == "--watch":
+            watch.append(next(it, ""))
+        elif a.startswith("--watch="):
+            watch.append(a.split("=", 1)[1])
+        else:
+            rest.append(a)
+    watch = [w for w in watch if w]
+    paths = [a for a in rest if not a.startswith("--")]
+    if not watch and hand_off(paths):
         return 0
     app = App(find_page())
     srv = start_server(app, int(os.environ.get("SEL_TRIP_PORT", PORT)))
@@ -538,6 +605,10 @@ def main(argv):
         json.dump({"port": port, "token": app.token, "pid": os.getpid()}, f)
     if paths:
         app.queue(paths)
+    if watch:
+        fw = FolderWatch(app, watch)
+        app.watching = fw.folders
+        threading.Thread(target=fw.run, daemon=True).start()
     proc = open_window(f"http://127.0.0.1:{port}/", use_default)
 
     def watchdog():
