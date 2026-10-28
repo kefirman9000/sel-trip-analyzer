@@ -12,6 +12,8 @@ on:
       - sample_files/**
       - assets/**
       - scripts/build_html.py
+      - scripts/build_history.py
+      - sample_history/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -31,7 +33,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Build page
-        run: python scripts/build_html.py "$RUNNER_TEMP/index.html"
+        run: |
+          python scripts/build_html.py "$RUNNER_TEMP/index.html"
+          python scripts/build_history.py "$RUNNER_TEMP/history.html"
       - name: Update gh-pages branch
         run: |
           git fetch origin gh-pages
@@ -39,6 +43,8 @@ jobs:
           cd "$RUNNER_TEMP/site"
           cp "$RUNNER_TEMP/index.html" index.html
           cp index.html SEL_Trip_Analyzer.html
+          cp "$RUNNER_TEMP/history.html" history.html
+          cp history.html SEL_Trip_History.html
           touch .nojekyll
           git add -A
           if git diff --cached --quiet; then echo "Website already up to date"; exit 0; fi

@@ -13,7 +13,11 @@ launcher that shows that page in its own window.
 | `web/wave_ui.js` | The Waveform analysis page (charts, phasor diagram, notes, exports) |
 | `web/app.html` | The page: layout, summary, notes, weather, updates, desktop bridge |
 | `web/cli.js` | The same analysis from the command line |
+| `web/history.js` | Trip History: event records across files, issue types, recurrence, hot spots, trends, ranking, report blocks and CSV |
+| `web/history.html` | The Trip History page (IndexedDB storage, overview, locations, issues, events, evidence drawer, exports) |
+| `web/history_cli.js` | Trip History from the command line |
 | `sel_trip_analyzer.py` | Windows launcher (standard library only): local server, Edge app window, Save dialogs, file hand-off, updater |
+| `scripts/build_history.py` | Builds `dist/SEL_Trip_History.html` (with `sample_history/`, made by `scripts/make_history_samples.py`) |
 | `scripts/build_html.py` | Inlines everything (plus the samples and the icon) into `dist/SEL_Trip_Analyzer.html` |
 
 All scripts work in browsers and in Node (`require("./web/core.js")`).

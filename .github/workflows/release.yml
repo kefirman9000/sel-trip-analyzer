@@ -45,6 +45,8 @@ jobs:
           python -m pip install -r requirements.txt
           python scripts/make_samples.py
           python scripts/build_html.py
+          python scripts/make_history_samples.py
+          python scripts/build_history.py
           python -m PyInstaller --noconfirm --onefile --windowed --name SEL_Trip_Analyzer --icon assets/icon.ico --add-data "dist/SEL_Trip_Analyzer.html:app" --add-data "sample_files:sample_files" sel_trip_analyzer.py
 
       - name: Self-test the built exe (serves the page, all scripts present, API locked to the page)
@@ -61,7 +63,9 @@ jobs:
           files: |
             dist/SEL_Trip_Analyzer.exe
             dist/SEL_Trip_Analyzer.html
+            dist/SEL_Trip_History.html
             SEL_sample_files.zip
+            SEL_history_samples.zip
 
       - name: Keep build as artifact
         uses: actions/upload-artifact@v4
@@ -70,4 +74,6 @@ jobs:
           path: |
             dist/SEL_Trip_Analyzer.exe
             dist/SEL_Trip_Analyzer.html
+            dist/SEL_Trip_History.html
             SEL_sample_files.zip
+            SEL_history_samples.zip
