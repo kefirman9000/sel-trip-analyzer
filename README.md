@@ -92,6 +92,8 @@ The summary has an **Overview**, a **Quick summary** (one line per event), any
 details**: event type, targets, location, currents, voltages, notes, weather,
 the **probable cause** and the **`CHECK:` lines**.
 
+![Two-ended events and incidents](docs/screenshots/connections.png)
+
 **Confidence**: **High** (element data and settings, nothing looked wrong),
 **Medium** (some data missing, or one item to check), **Low** (history row only,
 or several items to check).
@@ -144,8 +146,12 @@ them with ◀ ▶ (`Page Up` / `Page Down`).
 - **Overcurrent elements vs. the relay's settings**: each 50 element's pickup
   against the measured current, and each 51 element's curve time (from its curve
   and time dial) against when it actually timed out.
+
+  ![Overcurrent check, sequence components](docs/screenshots/checks.png)
 - **Relay elements**: every element in the record in plain English with its
   on/off times. Search, filter by group, tick to put it on the graph.
+
+  ![Relay elements in plain English](docs/screenshots/elements.png)
 - **Simple / Advanced**: Advanced adds angles, secondary amps, multiples of
   pickup, all harmonics up to the 15th, a 1/2/4-cycle window, every element and
   a samples export.
@@ -193,6 +199,8 @@ lightning strikes.
 | Waveform analysis | **Word report** · **Picture of the graph (.png)** · **Samples (.csv)** |
 
 Every export first asks **what to include**:
+
+<img src="docs/screenshots/export.png" width="560" alt="Export options">
 
 - **Summary**: comments, overview, quick summary, two-ended/incidents/repeat
   trips, event details, SER, settings; in each event the CHECK lines, notes,
