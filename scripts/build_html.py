@@ -37,11 +37,24 @@ def main():
         with open(os.path.join(folder, name), "rb") as f:
             samples.append({"name": name, "b64": base64.b64encode(f.read()).decode()})
 
+    hfolder = os.path.join(ROOT, "sample_history")
+    hsamples = []
+    if os.path.isdir(hfolder):
+        for dirpath, dirs, names in os.walk(hfolder):
+            dirs.sort()
+            for name in sorted(names):
+                if name.upper().startswith("README"):
+                    continue
+                full = os.path.join(dirpath, name)
+                with open(full, "rb") as f:
+                    hsamples.append({"name": name, "path": os.path.relpath(full, ROOT).replace(os.sep, "/"), "b64": base64.b64encode(f.read()).decode()})
+    page = page.replace("{{HISTORY_SAMPLES_JSON}}", json.dumps(hsamples).replace("</", "<\\/"))
     page = (page.replace("{{VERSION}}", version).replace("{{REPO}}", repo).replace("{{ICON}}", icon)
                 .replace("{{SAMPLES_JSON}}", json.dumps(samples).replace("</", "<\\/")))
     scripts = {"CORE_JS": core}
     for key, name in [("ANALYSIS_JS", "analysis.js"), ("REFERENCE_JS", "reference.js"), ("DOCX_JS", "docx.js"),
-                      ("WAVE_JS", "wave_ui.js"), ("WEATHER_JS", "weather.js")]:
+                      ("WAVE_JS", "wave_ui.js"), ("WEATHER_JS", "weather.js"),
+                      ("HISTORY_JS", "history.js"), ("HISTORY_UI_JS", "history_ui.js"), ("HISTORY_CSS", "history_ui.css")]:
         path = os.path.join(ROOT, "web", name)
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:

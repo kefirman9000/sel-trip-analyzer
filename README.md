@@ -257,6 +257,29 @@ name before saving.
 
 ## Trip History (many stations, many dates)
 
+**It's built into the Analyzer as a fourth tab, *History*** (`Alt+4`), and
+also runs on its own as **`SEL_Trip_History.html`** (the same screen) for
+people who only want the history.
+
+- **Add to history**: on the Events page, *Add to history* puts the files
+  you've loaded into the open history; tick *Add new files automatically* and
+  everything you load from then on goes in too. Each event counts once, so
+  adding a file twice is harmless. (The single-event samples aren't added.)
+- **Open in the Analyzer**: any event on the History tab opens on the
+  Waveforms page (or in the summary), with its settings.
+- **Separate histories**: keep as many as you like (a region, a team,
+  transmission vs distribution, one storm season…). Switch with the *History*
+  list at the top of the tab, or *＋ New history…*. Each has its own files,
+  notes, work log, weather and settings. Rename or delete them on *Files &
+  settings → Histories*.
+- **Combine**: tick histories there and *Combine the ticked into* a new or an
+  existing history; events that appear in more than one are still counted once.
+- **One file for everything**: *Export all histories as one file* saves every
+  history (or just the ticked ones) in one `.json`. *Import histories from a
+  file* (or *Open a backup…* on an empty page) brings each one back as its own
+  history, on this computer or another. *Back up this history* still saves
+  just the open one.
+
 **`SEL_Trip_History.html`** is a companion page for looking across *everything*
 you've downloaded, not one event at a time. It reads the same files with the
 same analysis, keeps them in your browser, and answers: *what keeps happening,

@@ -406,6 +406,8 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
   #print-root { display: block; }
   @page { margin: 0.7in 0.8in; }
 }
+/*{{HISTORY_CSS}}*/
+.hist-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; font-size: 12.5px; }
 </style>
 </head>
 <body>
@@ -417,7 +419,6 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
       <div class="sub">Trip-cause summaries from SEL relay event reports and QuickSet settings</div>
     </div>
     <div class="head-actions">
-      <button id="historyBtn" title="SEL Trip History: every event you've collected, by location, with recurring issues and trends">Trip History ↗</button>
       <button id="stationsBtn" title="Where each relay is, and the weather at each event">Stations &amp; weather</button>
       <button id="helpBtn" title="Help (F1)">Help</button>
       <label class="switch" title="Dark mode (Ctrl+D)"><input type="checkbox" id="dark"> Dark mode</label>
@@ -435,6 +436,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
     <button role="tab" id="tabEvents" aria-selected="true" aria-controls="pageEvents" title="Load files and see every event (Alt+1)">Events<span class="badge" id="evBadge">no files</span></button>
     <button role="tab" id="tabSummary" aria-selected="false" aria-controls="pageSummary" title="The written trip summary to copy or export (Alt+2)">Summary</button>
     <button role="tab" id="tabWave" aria-selected="false" aria-controls="pageWave" title="Graphs, phasors, harmonics and relay elements (Alt+3 or Ctrl+G)">Waveforms<span class="badge" id="waveBadge">9 examples</span></button>
+    <button role="tab" id="tabHistory" aria-selected="false" aria-controls="pageHistory" title="Every event you've collected, by location: recurring issues, trends, problem locations (Alt+4)">History<span class="badge" id="histBadge"></span></button>
   </nav>
 
   <div id="pageEvents" role="tabpanel" aria-labelledby="tabEvents">
@@ -458,6 +460,11 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
         <button id="watchBtn" hidden title="Keep checking a folder and add new event files as they arrive (Chrome and Edge)">Watch folder…</button>
         <button id="clear">Clear</button>
         <button id="samples">Try samples</button>
+      </div>
+      <div class="hist-row">
+        <button id="addHist" title="Add the loaded files to the history on the History tab (each event counts once, so adding twice is harmless)" disabled>Add to history</button>
+        <label class="check" title="Every file you load here also goes into the history"><input type="checkbox" id="autoHist"> Add new files automatically</label>
+        <span class="hint" id="histTarget"></span>
       </div>
       <div class="watchbar" id="watchBar" hidden><span class="dot" aria-hidden="true"></span><span id="watchText"></span><button id="watchStop">Stop</button></div>
     </section>
@@ -664,6 +671,8 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
     </div>
   </div><!-- /pageWave -->
 
+  <div id="pageHistory" role="tabpanel" aria-labelledby="tabHistory" hidden></div>
+
   <footer>
     <span class="hint" id="status" aria-live="polite">Ready</span>
     <span class="hint" id="footVer">v{{VERSION}} · runs in your browser, files never leave your computer</span>
@@ -821,6 +830,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
 <div id="print-root"></div>
 
 <script id="sample-data" type="application/json">{{SAMPLES_JSON}}</script>
+<script id="history-samples" type="application/json">{{HISTORY_SAMPLES_JSON}}</script>
 <script>
 /*{{CORE_JS}}*/
 </script>
@@ -838,6 +848,12 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
 </script>
 <script>
 /*{{WEATHER_JS}}*/
+</script>
+<script>
+/*{{HISTORY_JS}}*/
+</script>
+<script>
+/*{{HISTORY_UI_JS}}*/
 </script>
 <script>
 (function () {
@@ -1102,10 +1118,12 @@ const drop = $("drop");
 drop.addEventListener("click", () => $("pickFiles").click());
 drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("pickFiles").click(); } });
 let dragDepth = 0;
-document.addEventListener("dragenter", (e) => { e.preventDefault(); dragDepth++; drop.classList.add("over"); });
-document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove("over"); } });
-document.addEventListener("dragover", (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; });
+const histShown = () => !$("pageHistory").hidden;
+document.addEventListener("dragenter", (e) => { if (histShown()) return; e.preventDefault(); dragDepth++; drop.classList.add("over"); });
+document.addEventListener("dragleave", () => { if (histShown()) return; if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove("over"); } });
+document.addEventListener("dragover", (e) => { if (histShown()) return; e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; });
 document.addEventListener("drop", async (e) => {
+  if (histShown()) return;
   e.preventDefault(); dragDepth = 0; drop.classList.remove("over");
   const dt = e.dataTransfer; if (!dt) return;
   const items = dt.items ? [...dt.items].filter((i) => i.kind === "file") : [];
@@ -1221,6 +1239,8 @@ async function generate(reload) {
     renderEvList();
     renderRelays();
     afterLoad();
+    $("addHist").disabled = !state.files.some(historyable);
+    if ($("autoHist").checked && state.files.some((f) => historyable(f) && !sentToHistory.has(f.key))) addToHistory(true);
   } catch (e) {
     setStatus("Something went wrong: " + (e && e.message ? e.message : e));
   } finally { busy = false; }
@@ -1617,20 +1637,54 @@ function ensureWave() {
   return wave;
 }
 function showPage(which, recId, focus) {
-  if (!["events", "summary", "wave"].includes(which)) which = "events";
-  for (const [k, page, tab] of [["events", "pageEvents", "tabEvents"], ["summary", "pageSummary", "tabSummary"], ["wave", "pageWave", "tabWave"]]) {
+  if (!["events", "summary", "wave", "history"].includes(which)) which = "events";
+  for (const [k, page, tab] of [["events", "pageEvents", "tabEvents"], ["summary", "pageSummary", "tabSummary"], ["wave", "pageWave", "tabWave"], ["history", "pageHistory", "tabHistory"]]) {
     $(page).hidden = k !== which; $(tab).setAttribute("aria-selected", String(k === which));
   }
   store.set("page", which);
+  if (which === "history") ensureHistory().ready.then(() => hist.render());
   if (which === "wave") ensureWave().show(recId, focus);
   if (which === "events") renderEvents();
 }
 // ---------------------------------------------------------------- Trip History link and hand-off
-$("historyBtn").addEventListener("click", () => {
-  const local = /^https?:$/.test(location.protocol) && !/^(127\.0\.0\.1|localhost)$/.test(location.hostname);
-  const [owner, repo] = REPO.split("/");
-  window.open(local ? new URL("SEL_Trip_History.html", location.href).href : `https://${owner}.github.io/${repo}/SEL_Trip_History.html`, "sel-history");
-});
+// The History tab (the same screen as the standalone Trip History page), loaded the first time it's needed
+let hist = null;
+const histSamples = () => { try { return JSON.parse($("history-samples").textContent || "[]"); } catch (e) { return []; } };
+function ensureHistory() {
+  if (!hist) {
+    hist = window.SELHistoryUI.mount($("pageHistory"), {
+      version: VERSION, repo: REPO, embedded: true, isActive: histShown, download, printRoot: $("print-root"), samples: histSamples,
+      openEvent: (ev) => openFromHistory(ev),
+      onChange: (h) => { $("histBadge").textContent = h.events ? String(h.events) : ""; $("histTarget").textContent = `into “${h.name}”`; },
+    });
+  }
+  return hist;
+}
+/** An event picked on the History tab: load its files here and show its waveforms (or its summary). */
+async function openFromHistory(ev) {
+  let added = 0;
+  for (const f of ev.files) {
+    const key = "history|" + f.path + "|" + f.bytes.length;
+    if (state.files.some((x) => x.key === key)) continue;
+    state.files.push({ key, name: f.name, path: f.path, bytes: f.bytes }); added++;
+  }
+  renderFiles();
+  if (added || !state.cache) await generate();
+  setStatus(`From the history: ${ev.label}`);
+  if (ev.rec) showPage("wave", ev.rec); else jumpToEvent(ev.id);
+}
+const sentToHistory = new Set();
+const historyable = (f) => !f.key.startsWith("sample|") && !f.key.startsWith("history|");
+async function addToHistory(auto) {
+  const list = state.files.filter((f) => historyable(f) && !(auto && sentToHistory.has(f.key)));
+  if (!list.length) { if (!auto) setStatus("Nothing to add: load your own event files first (samples and files that came from the history aren't added)."); return; }
+  for (const f of list) sentToHistory.add(f.key);
+  const n = await ensureHistory().addFiles(list.map((f) => ({ name: f.name, path: f.path || f.name, bytes: f.bytes })), auto ? "Loaded in the Analyzer" : "Added from the Analyzer");
+  setStatus(n ? `Added ${n} file${n === 1 ? "" : "s"} to the history “${hist.currentName()}”: see the History tab` : `Those files are already in the history “${hist.currentName()}”`);
+}
+$("addHist").addEventListener("click", () => addToHistory(false));
+$("autoHist").checked = store.get("autoHist", false);
+$("autoHist").addEventListener("change", () => { store.set("autoHist", $("autoHist").checked); if ($("autoHist").checked) addToHistory(true); });
 /** The Trip History page sends an event's files here (only the window that opened this one is listened to). */
 window.addEventListener("message", async (e) => {
   const d = e.data;
@@ -1654,6 +1708,7 @@ window.addEventListener("message", async (e) => {
 $("tabEvents").addEventListener("click", () => showPage("events"));
 $("tabSummary").addEventListener("click", () => showPage("summary"));
 $("tabWave").addEventListener("click", () => showPage("wave"));
+$("tabHistory").addEventListener("click", () => showPage("history"));
 // stations & weather window
 const openStations = () => { renderRelays(); $("stDlg").showModal(); };
 $("stationsBtn").addEventListener("click", openStations);
@@ -2084,6 +2139,8 @@ $("helpClose").addEventListener("click", () => $("help").close());
 $("help").addEventListener("click", (e) => { if (e.target === $("help")) $("help").close(); });
 document.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (histShown() && ((ctrl && !e.shiftKey && ["o", "s", "f", "p", "g"].includes(k)) || e.key === "F5" || (ctrl && e.key === "Enter"))) return;   // the History tab's own
+  if (e.altKey && e.key === "4") { e.preventDefault(); showPage("history"); return; }
   if (e.key === "Escape") closeMenu();
   else if (e.key === "F1") { e.preventDefault(); $("help").showModal(); }
   else if (e.key === "F5" || (ctrl && e.key === "Enter")) { e.preventDefault(); generate(); }
@@ -2102,7 +2159,7 @@ renderFiles();
 showEmpty();
 showPage(store.get("page", "events"));
 // test hook
-window.__selApp = { state, generate, summaryText, reportHtml, reportBlocks, exportAs, showPage, jumpToEvent, wave: () => wave };
+window.__selApp = { state, generate, summaryText, reportHtml, reportBlocks, exportAs, showPage, jumpToEvent, wave: () => wave, history: () => ensureHistory(), addToHistory };
 })();
 </script>
 </body>
