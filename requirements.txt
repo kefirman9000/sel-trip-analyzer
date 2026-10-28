@@ -1,3 +1,4 @@
 tkinterdnd2>=0.4
 olefile>=0.47
+sv-ttk>=2.6
 pyinstaller>=6.0

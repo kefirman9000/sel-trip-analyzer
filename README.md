@@ -4,6 +4,12 @@ A Windows drag-and-drop tool that reads SEL relay event files and AcSELerator
 QuickSet `.rdb` settings databases, then writes an editable, copy-and-paste
 summary of what caused each trip.
 
+![Trip summary in light mode](docs/screenshots/light.png)
+
+| Dark mode, with an update waiting | First launch |
+|---|---|
+| ![Dark mode](docs/screenshots/dark.png) | ![Empty start screen](docs/screenshots/empty.png) |
+
 ## Download
 
 Grab `SEL_Trip_Analyzer.exe` from the [latest release](../../releases/latest).
@@ -12,17 +18,22 @@ built-in updater can replace it.
 
 ## Using it
 
-- Drag files or whole folders onto the blue box, or click it to browse. You can
-  also drop files onto the `.exe` icon.
+- Drag files or whole folders onto the drop zone, or click it to browse. You
+  can also drop files onto the `.exe` icon.
 - Event data: `.CEV .EVE .TXT .SUM .HIS .SER .HDR`. Settings: `.RDB`.
-- Anything typed in **Custom comments / suggestions** is added to the top of
-  the summary. Press F5 or **Generate** to refresh.
-- The summary is editable. **Copy all** puts it on the clipboard; **Save as
-  .txt** writes a file.
-- **Check for updates** looks at this repo's latest release. If there's a newer
-  version it shows the release notes and asks before downloading. On yes, it
-  downloads the new `.exe`, verifies its SHA-256, swaps it in and restarts. The
-  app also checks quietly at startup and only speaks up if an update exists.
+- Anything typed in **Comments & suggestions** is added to the top of the
+  summary. Press F5 or **Generate summary** to refresh.
+- The summary is editable and colour-coded (trips in red, no-trip events in
+  green). **Copy all** puts plain text on the clipboard; **Save .txt** writes a file.
+- **Dark mode** switch in the top corner. It follows your Windows setting on
+  first launch and remembers your choice after that.
+- **Check for updates** looks at this repo's latest release. When a newer
+  version exists the button turns blue and reads *Update to vX.Y.Z*. Clicking it
+  shows the release notes and asks before downloading. On yes, it downloads the
+  new `.exe`, verifies its SHA-256, swaps it in and restarts.
+
+Shortcuts: `Ctrl+O` add files, `F5` / `Ctrl+Enter` generate, `Ctrl+Shift+C`
+copy summary, `Ctrl+D` dark mode, `Delete` removes selected files.
 
 The summary covers, per event: relay ID, date/time, decoded event type
 (`AG T` = A-to-ground fault, tripped), fault location (as % of line when `LL`
@@ -48,7 +59,7 @@ The interpretation is automated, so confirm it against the oscillography.
 Install Python 3.9+ (tick "Add python.exe to PATH"), then double-click
 `build_exe.bat`. The program lands in `dist\SEL_Trip_Analyzer.exe`.
 
-To run from source: `pip install tkinterdnd2 olefile` then
+To run from source: `pip install tkinterdnd2 olefile sv-ttk` then
 `python sel_trip_analyzer.py`. When run from source, the updater replaces the
 `.py` file with the release's version instead.
 
