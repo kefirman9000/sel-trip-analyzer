@@ -12,6 +12,7 @@ Supported inputs
   .HIS            Event history (HIS command output)
   .SER            Sequential Events Recorder output
   .HDR            COMTRADE header (SEL writes the event summary here)
+  .TXT            Saved terminal captures of EVE / SUM output
   .RDB            QuickSet relay database (settings context: TR, LL, CTR, ...)
   Folders         Dropped folders are scanned for the types above
 """
@@ -31,7 +32,7 @@ except ImportError:  # pragma: no cover
     olefile = None
 
 APP_NAME = "SEL Trip Event Analyzer"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 # GitHub "owner/repo" that publishes releases. Each release must attach
 # SEL_Trip_Analyzer.exe (the GitHub Actions workflow in this repo does that).
 GITHUB_REPO = "kefirman9000/sel-trip-analyzer"
@@ -170,6 +171,10 @@ class EventRecord:
     settings: dict = field(default_factory=dict)
     ser_lines: list = field(default_factory=list)
     extra: list = field(default_factory=list)
+    dup_of: int = None                                  # history row that repeats event #n
+    trigger_cycle: float = None
+    prefault_short: bool = False                        # trigger too early for a clean prefault
+    notes: list = field(default_factory=list)           # extra cause lines (e.g. duplicates)
 
 
 # --------------------------------------------------------------------------
@@ -267,13 +272,15 @@ TARGET_WORDS = [
     (r"\b27\w*\b", "undervoltage (27)"),
     (r"\b59\w*\b", "overvoltage (59)"),
     (r"\bBF\w*\b|\b50BF\b", "breaker failure"),
-    (r"\b79\w*\b|\bRCLS\b|\bRS\b", "reclosing activity"),
-    (r"\bLO\b", "reclose lockout"),
+    (r"\bCY\b", "recloser cycling (reclose in progress)"),
+    (r"\bRS\b", "recloser reset (ready)"),
+    (r"\b79\w*\b|\bRCLS\b", "reclosing"),
+    (r"\bLO\b", "recloser locked out"),
 ]
 
 ELEMENT_RULES = [
-    (r"^(Z|M)\d+(P|G|MG|XG|AB|BC|CA|AG|BG|CG)?T?$|^MAB\d|^MBC\d|^MCA\d|^MAG\d|^MBG\d|^MCG\d|^XAG\d|^XBG\d|^XCG\d", "distance"),
-    (r"^(Z|M)\d+(P|G)?T$|^Z\d+(P|G)?D$", "distance (time-delayed)"),
+    (r"^(Z|M)\d+(P|G|MG|XG)?T$|^Z\d+(P|G)?D$", "distance (time-delayed)"),
+    (r"^(Z|M)\d+(P|G|MG|XG|AB|BC|CA|AG|BG|CG)?$|^MAB\d|^MBC\d|^MCA\d|^MAG\d|^MBG\d|^MCG\d|^XAG\d|^XBG\d|^XCG\d", "distance"),
     (r"^87", "differential"),
     (r"^51\w*T$", "time-overcurrent trip"),
     (r"^51", "time-overcurrent pickup"),
@@ -346,6 +353,8 @@ def fmt_loc(loc, settings):
         return f"{loc} (not calculated - relay could not determine distance)"
     v = fnum(loc)
     ll = fnum(settings.get("LL", "")) if settings else None
+    if v is not None and v < 0:
+        return f"{loc} (negative: fault was likely behind the relay)"
     if v is not None and ll:
         return f"{loc} line-length units (~{100 * v / ll:.0f}% of LL={settings['LL']})"
     return f"{loc} (in the relay's line-length units)"
@@ -424,6 +433,9 @@ def analyze_table(rec, hdr, table, sam):
     lag = max(1, round(sam / 4))
     trig = next((k for k, row in enumerate(table) if ">" in row), None)
     start_fault = trig if trig is not None else 0
+    rec.trigger_cycle = start_fault / sam if trig is not None else None
+    rec.prefault_short = trig is not None and trig < sam + lag
+    analog = []
 
     # Analog channels
     for c, name in enumerate(hdr):
@@ -436,14 +448,14 @@ def analyze_table(rec, hdr, table, sam):
         mags = [math.hypot(vals[k], vals[k - lag]) / math.sqrt(2) for k in range(lag, len(vals))]
         if not mags:
             continue
-        pre = sum(mags[: max(1, sam)]) / max(1, min(sam, len(mags)))
-        post = mags[max(0, start_fault - lag):] or mags
-        if re.match(r"^(I[ABCNGRSPQ]|IA|IB|IC|IN|IG|3I0|3I2|I1|I2|IP)\w*$", n):
-            rec.currents[name] = (pre, max(post))
-        elif re.match(r"^V(A|B|C|AB|BC|CA|S|P|1|2)\w*$", n):
-            rec.voltages[name] = (pre, min(post))
+        # prefault = the cycle just before the trigger (falls back to the first cycle)
+        pre_end = max(sam, start_fault - lag) if trig is not None else sam
+        pre_win = mags[max(0, pre_end - sam):pre_end] or mags[:sam]
+        pre = sum(pre_win) / len(pre_win)
+        analog.append((name, n, pre, mags))
 
-    # Digital channels (hex-packed relay word bits)
+    # Digital channels (hex-packed relay word bits) - read before the analog
+    # summary so the fault window can stop when the breaker opens
     first_on, pre_on = {}, set()
     for c, name in enumerate(hdr):
         if " " not in name.strip():
@@ -471,6 +483,15 @@ def analyze_table(rec, hdr, table, sam):
             for bn in BREAKER_NAMES[:5]:
                 if bn in pre_on and state.get(bn) == "0" and rec.open_cycle is None:
                     rec.open_cycle = k / sam
+
+    # fault window: trigger -> breaker open (if seen) else end of record
+    end = int(rec.open_cycle * sam) if rec.open_cycle is not None else len(table)
+    for name, n, pre, mags in analog:
+        win = mags[max(0, start_fault - lag):max(start_fault - lag + 1, end - lag)] or mags
+        if re.match(r"^(I[ABCNGRSPQ]|IA|IB|IC|IN|IG|3I0|3I2|I1|I2|IP)\w*$", n):
+            rec.currents[name] = (pre, max(win))
+        elif re.match(r"^V(A|B|C|AB|BC|CA|S|P|1|2)\w*$", n):
+            rec.voltages[name] = (pre, min(win))
 
     for el, k in sorted(first_on.items(), key=lambda x: x[1]):
         rec.sequence.append((k / sam, el, "asserted"))
@@ -515,29 +536,33 @@ def parse_text(text, source):
 
     # Event reports / summaries
     matches = list(EVENT_LINE_RE.finditer(text))
+    header_re = re.compile(r"^[ \t]*(\S.*?)\s{2,}Date\s*:\s*(\S+)\s+Time\s*:\s*(\S+)[^\n]*\n((?:[ \t]*\n)*)([^\n]*)", re.M)
     for idx, m in enumerate(matches):
-        start = text.rfind("\n", 0, max(0, m.start() - 600)) + 1
         prev_end = matches[idx - 1].end() if idx else 0
-        start = max(start, prev_end)
         end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
-        chunk = text[start:end]
+        back = text[prev_end:m.start()]      # report header (relay, date/time, FID)
+        chunk = text[m.start():end]          # this event's own lines
         r = EventRecord(source=source)
+        heads = list(header_re.finditer(back)) or list(header_re.finditer(chunk))
+        if heads:
+            h = heads[-1]
+            r.date, r.time = h.group(2), h.group(3)
+            if not settings.get("RID"):
+                r.relay_id = h.group(1).strip()
+                second = h.group(5).strip()
+                if second and not re.match(r"^(Event|FID|#|=>|\[)", second, re.I):
+                    r.terminal_id = re.split(r"\s{2,}", second)[0].strip()
         r.event_type = re.split(r"\s{2,}|Location|Shot|Freq", m.group(1), flags=re.I)[0].strip()
         r.location = grab(r"(?:Fault\s+)?Location\s*:\s*([-$\d.]+)", chunk)
         r.shot = grab(r"Shot\s*:\s*(\S+)", chunk)
         r.freq = grab(r"Freq(?:uency)?\s*:\s*([\d.]+)", chunk)
         r.targets = grab(r"Targets?\s*:\s*(.+)$", chunk)
-        r.date = grab(r"Date\s*:\s*(\S+)", chunk)
-        r.time = grab(r"Time\s*:\s*(\S+)", chunk)
-        r.relay_id = settings.get("RID", "")
-        r.terminal_id = settings.get("TID", "")
-        r.fid = grab(r"FID\s*=\s*(\S+)", chunk)
-        if not r.relay_id:
-            first = [ln.strip() for ln in chunk.splitlines() if ln.strip()][:2]
-            if first and "Date" in first[0]:
-                r.relay_id = re.split(r"\s{2,}Date", first[0])[0].strip()
-                if len(first) > 1 and not first[1].lower().startswith("event"):
-                    r.terminal_id = re.split(r"\s{2,}Time", first[1])[0].strip()
+        if not r.date:
+            r.date = grab(r"Date\s*:\s*(\S+)", chunk)
+            r.time = grab(r"\bTime\s*:\s*(\d\S*)", chunk)
+        if settings.get("RID"):
+            r.relay_id, r.terminal_id = settings.get("RID", ""), settings.get("TID", "")
+        r.fid = grab(r"FID\s*=\s*(\S+)", back) or grab(r"FID\s*=\s*(\S+)", chunk)
         for lbl in ("Trip Time", "Event Time", r"Breaker\s*\d*\s*\w*", "Fault Type", "Group", "Recloser"):
             v = grab(rf"^\s*({lbl}\s*:.+)$", chunk)
             if v:
@@ -548,7 +573,7 @@ def parse_text(text, source):
             for ch, v in zip(labels, nums):
                 fv = fnum(v)
                 if fv is not None:
-                    rec_name = "I" + ch
+                    rec_name = "3I2" if ch.upper() == "Q" else "I" + ch.upper()
                     r.currents[rec_name] = (None, fv)
         r.settings = settings
         recs.append(r)
@@ -557,6 +582,8 @@ def parse_text(text, source):
 
 def parse_his(text, source, settings):
     recs = []
+    head = re.match(r"\s*(.+?)\s{2,}Date\s*:", text)
+    rid = settings.get("RID") or (head.group(1).strip() if head else "")
     for line in text.splitlines():
         m = re.match(r"^\s*(\d+)\s+(\d{1,2}/\d{1,2}/\d{2,4})\s+(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+(.*)$", line)
         if not m:
@@ -580,7 +607,7 @@ def parse_his(text, source, settings):
             r.shot = nums[4]
         r.targets = " ".join(toks)
         r.settings = settings
-        r.relay_id = settings.get("RID", "")
+        r.relay_id = rid
         recs.append(r)
     return recs
 
@@ -612,8 +639,11 @@ def parse_rdb(path):
                     texts.append((n, decode_blob(z.read(n))))
                 except Exception:
                     continue
+    method = "ole" if texts else None
     if not texts:
         texts.append(("raw", decode_blob(raw)))
+        method = "scan"
+    method = method or "zip"
 
     combined = {}
     per_relay = {}
@@ -626,9 +656,13 @@ def parse_rdb(path):
         for k, v in s.items():
             combined.setdefault(k, v)
     if len(per_relay) <= 1:
-        return {combined.get("RID") or os.path.basename(path): combined} if combined else {}
+        if not combined:
+            return {}
+        combined["__method__"] = method
+        return {combined.get("RID") or os.path.basename(path): combined}
     out = {}
     for top, s in per_relay.items():
+        s["__method__"] = method
         out[s.get("RID") or top] = s
     return out
 
@@ -652,6 +686,8 @@ def expand_paths(paths):
         if os.path.isdir(p):
             for root, _, files in os.walk(p):
                 for fn in sorted(files):
+                    if fn.upper().startswith("README"):
+                        continue
                     if os.path.splitext(fn)[1].lower() in ALL_EXTS:
                         out.append(os.path.join(root, fn))
         elif os.path.isfile(p):
@@ -683,107 +719,348 @@ def load_files(paths):
 
 
 def match_settings(rec, rdb):
+    """Pick the RDB settings for an event.
+
+    Returns (settings, label, how) where how is:
+      rid      - matched on relay ID
+      assumed  - event has no relay ID and exactly one RDB is loaded
+      mismatch - RDBs loaded but none match this relay (nothing applied)
+      none     - no RDBs loaded
+    """
     if not rdb:
-        return {}, ""
+        return {}, "", "none"
     rid = (rec.relay_id or "").strip().upper()
     for label, s in rdb.items():
-        if rid and (rid == str(label).upper() or rid == s.get("RID", "").upper()):
-            return s, label
-    if len(rdb) == 1:
+        if rid and rid in (str(label).strip().upper(), str(s.get("RID", "")).strip().upper()):
+            return s, label, "rid"
+    if not rid and len(rdb) == 1:
         label = next(iter(rdb))
-        return rdb[label], label
-    return {}, ""
+        return rdb[label], label, "assumed"
+    return {}, "", "mismatch"
 
 
-def determine_cause(rec, settings):
-    desc, tripped = interpret_event_type(rec.event_type)
+def event_core(et):
+    return re.sub(r"\s+T$", "", (et or "").strip().upper()).strip(" *").replace(" ", "")
+
+
+def event_phases(et):
+    core = event_core(et)
+    return set(core) if core in FAULT_TYPES else None
+
+
+def target_phases(targets):
+    toks = set((targets or "").upper().split())
+    ph = {p for p in "ABC" if p in toks}
+    if toks & {"G", "N"}:
+        ph.add("G")
+    return ph
+
+
+def phase_currents(rec):
+    """Split recorded currents into per-phase and ground (pre, fault) pairs."""
+    ph, grounds = {}, {}
+    for name, (pre, post) in rec.currents.items():
+        n = name.upper().split("(")[0].strip()
+        m = re.match(r"^I([ABC])(?:W\d+|_PRI|_SEC)?$", n)
+        if m:
+            ph[m.group(1)] = (pre, post)
+        else:
+            g = re.match(r"^(IG|3I0|IN)", n)
+            if g:
+                grounds.setdefault(g.group(1), (pre, post))
+    # residual ground (IG / 3I0) reflects the fault; IN is a separate neutral CT that may read ~0
+    gnd = grounds.get("IG") or grounds.get("3I0") or grounds.get("IN")
+    return ph, gnd
+
+
+def equation_hits(equation, elements):
+    """Elements (in order) that appear un-negated in a SELogic equation."""
+    eq = re.sub(r"(\bNOT\s+|!)\(?\s*[A-Z0-9_]+", " ", equation.upper())
+    tokens = set(re.findall(r"[A-Z0-9_]+", eq))
+    return list(dict.fromkeys(el for el in elements if el.upper() in tokens))
+
+
+NON_PROTECTION = ("", "TRIP", "output contact", "breaker status", "SELogic variable", "reclosing")
+TRIP_EQUATIONS = (("TR", "trip equation"), ("TRCOMM", "communications-assisted trip equation"),
+                  ("TRSOTF", "switch-onto-fault trip equation"), ("DTT", "direct transfer trip equation"))
+
+
+def analyze_event(rec, settings, how="none", label=""):
+    """Work out the probable cause and everything a person should double-check.
+
+    Returns dict with: tripped, desc, cause (lines), checks (problems that lower
+    confidence), gaps (missing data), confidence, basis, primary (elements).
+    """
+    desc, tripped_by_type = interpret_event_type(rec.event_type)
+    core = event_core(rec.event_type)
+    is_fault = core in FAULT_TYPES
+    tc = rec.trip_cycle
+    tripped = tripped_by_type or tc is not None
     tdesc = interpret_targets(rec.targets)
-    lines = []
+    cause, checks, gaps = [], [], []
 
-    if rec.trip_cycle is not None:
-        tripped = True
+    asserted = [(c, el) for c, el, st in rec.sequence if st == "asserted"]
+    before = [(c, el) for c, el in asserted if tc is None or c <= tc + 0.01]
+    prot = [(c, el, element_class(el)) for c, el in before if element_class(el) not in NON_PROTECTION]
+    initiators = [x for x in prot if tc is not None and tc - x[0] <= 0.5]
+    pickups = [x for x in prot if x not in initiators]
 
-    initiators, pickups = [], []
-    if rec.sequence:
-        tc = rec.trip_cycle
-        for cyc, el, st in rec.sequence:
-            cls = element_class(el)
-            if st != "asserted" or not cls or cls in ("TRIP", "output contact", "breaker status",
-                                                       "SELogic variable", "reclosing"):
-                continue
-            if tc is None or cyc <= tc + 0.01:
-                if tc is not None and tc - cyc <= 0.5:
-                    initiators.append((el, cls, cyc))
-                else:
-                    pickups.append((el, cls, cyc))
+    eq_hits = {}
+    for key, _ in TRIP_EQUATIONS:
+        if settings.get(key):
+            hits = equation_hits(settings[key], [el for _, el in before])
+            if hits:
+                eq_hits[key] = hits
 
-    tr_eq = settings.get("TR", "")
-    tr_hits = []
-    if tr_eq:
-        tokens = set(re.findall(r"[A-Z0-9_]+", tr_eq.upper()))
-        tr_hits = [el for _, el, st in rec.sequence if st == "asserted" and el.upper() in tokens]
-
+    # ---- headline and evidence
     if tripped:
-        what = desc if desc else "Event"
-        lines.append(f"Relay TRIPPED. {what}.")
+        cause.append(f"Relay TRIPPED. {desc or 'Event'}.")
     else:
-        lines.append(f"No trip recorded. {desc}." if desc else "No trip recorded for this event.")
-
+        cause.append(f"No trip recorded. {desc}." if desc else "No trip recorded for this event.")
     if tdesc:
-        lines.append("Front-panel targets indicate: " + ", ".join(tdesc) + f"  [{rec.targets.strip()}]")
+        cause.append("Front-panel targets indicate: " + ", ".join(tdesc) + f"  [{rec.targets.strip()}]")
 
-    if tr_hits:
-        lines.append("Trip equation terms that asserted (TR): " + ", ".join(dict.fromkeys(tr_hits)) +
-                     " -> these elements caused the trip.")
-    elif initiators:
-        lines.append("Element(s) that asserted with the trip: " +
-                     ", ".join(f"{el} ({cls}, {cyc:.2f} cyc)" for el, cls, cyc in initiators) +
-                     " -> most likely tripping element(s).")
+    primary = []
+    if "TR" in eq_hits:
+        primary = eq_hits["TR"]
+        cause.append("Trip equation (TR) elements that asserted before the trip: " + ", ".join(primary)
+                     + " -> these caused the trip.")
+    comm_bits = [el for _, el in before if element_class(el) == "communications / transfer trip"]
+    for key, what in TRIP_EQUATIONS[1:]:
+        if key in eq_hits:
+            primary = primary or eq_hits[key]
+            line = f"Elements in the {what} ({key}) asserted before the trip: " + ", ".join(eq_hits[key])
+            if key == "TRCOMM" and comm_bits:
+                line += (f", with {', '.join(comm_bits)} from the communications scheme -> "
+                         "communications-assisted trip (e.g. POTT/DCUB)")
+                primary = primary + [b for b in comm_bits if b not in primary and b != "KEY"]
+            cause.append(line + ".")
+    if not primary and initiators:
+        primary = [el for _, el, _ in initiators]
+        cause.append("Element(s) that asserted with the trip: "
+                     + ", ".join(f"{el} ({cls}, {c:.2f} cyc)" for c, el, cls in initiators)
+                     + " -> most likely tripping element(s).")
     if pickups:
-        lines.append("Earlier pickups before the trip: " +
-                     ", ".join(f"{el} ({cls}, {cyc:.2f} cyc)" for el, cls, cyc in pickups[:10]))
+        cause.append("Earlier pickups before the trip: "
+                     + ", ".join(f"{el} ({cls}, {c:.2f} cyc)" for c, el, cls in pickups[:10]))
 
-    classes = {c for _, c, _ in initiators}
-    if tripped and not FAULT_TYPES.get(re.sub(r"\s+T$", "", rec.event_type.upper()).replace(" ", "")):
+    classes = {cls for _, _, cls in initiators} | {element_class(el) for el in primary}
+    if tripped and not is_fault:
         if classes & {"communications / transfer trip", "contact input"}:
-            lines.append("No fault type was identified and a communications/input bit asserted with the trip: "
-                         "likely a direct/remote transfer trip or external trip input, not a local fault.")
+            cause.append("No fault type was identified and a communications/input bit asserted with the trip: "
+                         "most likely a direct/remote transfer trip or an external trip input, not a local fault.")
         elif "frequency" in classes:
-            lines.append("Frequency element tripped: likely underfrequency load shed / system disturbance.")
-        elif "undervoltage" in classes or "overvoltage" in classes:
-            lines.append("Voltage element tripped: check system voltage conditions / loss of source.")
+            cause.append("Frequency element tripped: likely underfrequency load shedding or a system disturbance.")
+        elif classes & {"undervoltage", "overvoltage"}:
+            cause.append("Voltage element tripped: check system voltage conditions or loss of source.")
         elif "breaker failure" in classes:
-            lines.append("Breaker-failure logic operated: a breaker failed to clear a fault.")
+            cause.append("Breaker-failure logic operated: a breaker failed to clear a fault.")
+        elif "out-of-step" in classes:
+            cause.append("Out-of-step logic operated: power swing / loss of synchronism.")
+        elif "COMM" in (rec.targets or "").upper().split():
+            cause.append("COMM target with no fault type: most likely a transfer trip received from the remote end.")
+        elif re.search(r"\b81\b", rec.targets or ""):
+            cause.append("Frequency (81) target: likely underfrequency load shedding or a system disturbance.")
 
-    if rec.trip_cycle is not None and rec.open_cycle is not None and rec.open_cycle > rec.trip_cycle:
-        lines.append(f"Breaker opened ~{rec.open_cycle - rec.trip_cycle:.2f} cycles after trip "
-                     f"(trip at {rec.trip_cycle:.2f} cyc, 52A dropped at {rec.open_cycle:.2f} cyc).")
-    elif tripped and rec.trip_cycle is not None and rec.open_cycle is None and rec.sequence:
-        lines.append("No breaker-open indication seen in the record window - verify breaker operation.")
-
+    if tc is not None and rec.open_cycle is not None and rec.open_cycle > tc:
+        cause.append(f"Breaker opened ~{rec.open_cycle - tc:.2f} cycles after trip "
+                     f"(trip at {tc:.2f} cyc, 52A dropped at {rec.open_cycle:.2f} cyc).")
     if rec.shot and rec.shot not in ("0", ""):
-        lines.append(f"Reclose shot counter = {rec.shot} (event occurred during a reclose sequence).")
-    return lines, tripped
+        cause.append(f"Reclose shot counter = {rec.shot} (event occurred during a reclose sequence).")
+    cause.extend(rec.notes)
+
+    # ---- what we can't know from this data (gaps)
+    if rec.kind == "history" and tripped and not rec.dup_of:
+        gaps.append("History row only, so the cause is read from the targets. "
+                    "Load this event's .CEV report to confirm which element tripped.")
+    elif rec.kind != "history" and not rec.sequence and tripped:
+        gaps.append("No relay element data in this file, so the tripping element is inferred from the "
+                    "front-panel targets. Load the .CEV report for this event to confirm.")
+    if tripped and not settings.get("TR"):
+        if how == "mismatch":
+            gaps.append(f"Settings files are loaded, but none match relay '{rec.relay_id}', so no settings "
+                        "were applied. Add this relay's .RDB.")
+        else:
+            gaps.append("No settings for this relay, so the trip equation (TR) and line length couldn't be "
+                        "checked. Add the relay's .RDB (or use a CEV that includes settings).")
+    if settings.get("__method__") == "scan":
+        gaps.append("Settings were read with a best-effort scan of the .RDB file; some values may be missing.")
+
+    # ---- things that look wrong or ambiguous (checks)
+    if how == "assumed":
+        checks.append(f"This event has no relay ID, so settings from the only loaded RDB ({label}) were "
+                      "assumed to apply. Confirm it's the same relay.")
+    if rec.event_type and core not in FAULT_TYPES and core not in NON_FAULT_TYPES:
+        checks.append(f"Event type '{rec.event_type}' isn't a code this tool recognizes; interpret it manually.")
+    if core == "TRIP":
+        checks.append("The relay tripped without identifying a fault type. Confirm whether this was a transfer "
+                      "trip, a manual/SCADA open, or an external trip input.")
+
+    ep, tp = event_phases(rec.event_type), target_phases(rec.targets)
+    if ep and tp:
+        e_abc, t_abc = ep - {"G"}, tp - {"G"}
+        if t_abc and e_abc != t_abc:
+            checks.append(f"Targets show phase(s) {''.join(sorted(t_abc))} but the event type says "
+                          f"{''.join(sorted(e_abc))}.")
+        if t_abc and ("G" in ep) != ("G" in tp):
+            checks.append("Targets and event type disagree on whether ground was involved.")
+
+    ph, gnd = phase_currents(rec)
+    if ep and len(ph) >= 2:
+        top = max(ph, key=lambda k: ph[k][1])
+        top_pre, top_fault = ph[top]
+        e_abc = ep - {"G"}
+        if top not in e_abc:
+            checks.append(f"Highest fault current is on phase {top} ({top_fault:,.0f} A), but the event type "
+                          f"says {rec.event_type.split()[0]}.")
+        if top_pre and top_fault < 1.5 * top_pre:
+            checks.append(f"Fault current barely rose above load ({top_fault:,.0f} A vs {top_pre:,.0f} A "
+                          "prefault). Could be a high-impedance fault, a weak source, or a misclassified event.")
+        if gnd is not None and top_fault > 0:
+            g = gnd[1]
+            if "G" in ep and g < 0.1 * top_fault:
+                checks.append(f"Ground fault reported, but ground current ({g:,.0f} A) is small next to phase "
+                              f"current ({top_fault:,.0f} A).")
+            if "G" not in ep and g > 0.3 * top_fault:
+                checks.append(f"Significant ground current ({g:,.0f} A) for a fault classified without ground "
+                              f"({rec.event_type.split()[0]}).")
+
+    loc = (rec.location or "").strip()
+    v = fnum(loc)
+    ll = fnum(settings.get("LL", ""))
+    if is_fault:
+        if not loc:
+            gaps.append("No fault location in this file.")
+        elif "$" in loc:
+            checks.append("The relay couldn't calculate a fault location ($$$$$). This usually means too "
+                          "little fault data or a very fast clearing.")
+    if v is not None and is_fault:
+        if v < 0:
+            checks.append(f"Negative fault location ({loc}) usually means the fault was behind the relay "
+                          "(reverse direction). Check the directional elements and CT polarity.")
+        elif ll:
+            pct = 100 * v / ll
+            if v > ll * 1.02:
+                checks.append(f"Fault location {loc} is beyond the end of the line (LL = {settings['LL']}). "
+                              "Possible fault on the adjacent section, or a location error.")
+            zone1 = "Zone 1 distance" in tdesc or any(re.match(r"^(Z|M)1", el) for el in primary)
+            if zone1 and pct > 90:
+                checks.append(f"Zone 1 operated for a fault at ~{pct:.0f}% of the line, beyond typical Zone 1 "
+                              "reach (80-90%). Check for overreach or a location error.")
+        elif settings.get("TR") or not tripped:  # (missing settings already flagged above)
+            gaps.append("Line length (LL) isn't known, so the fault location can't be checked against the "
+                        "line. Load the relay's .RDB.")
+
+    f = fnum(rec.freq)
+    if f:
+        nominal = 50.0 if abs(f - 50) < abs(f - 60) else 60.0
+        if abs(f - nominal) > 0.5:
+            checks.append(f"Frequency was {f:.2f} Hz, well off nominal {nominal:.0f} Hz.")
+
+    if rec.sequence:
+        if tripped_by_type and tc is None:
+            checks.append("The event type shows a trip (T), but no TRIP bit asserted in this record.")
+        if tc is not None and rec.event_type and not tripped_by_type:
+            checks.append("TRIP asserted in the record, but the event type doesn't show a trip.")
+        if tripped and settings.get("TR") and not eq_hits:
+            checks.append("No element from the trip equations asserted before the trip. It may have come "
+                          "from a manual/SCADA command, another logic path, or an element not in this record.")
+        if tripped and not prot and not eq_hits:
+            checks.append("No protection element asserted before the trip in this record.")
+        if tc is not None:
+            if rec.open_cycle is None:
+                checks.append("No breaker-open indication in the record. Confirm the breaker opened (the record "
+                              "may end too soon, or 52A isn't in this report).")
+            elif rec.open_cycle < tc:
+                checks.append("Breaker status dropped before the trip asserted. The breaker may have been "
+                              "opened by another relay or manually.")
+            elif rec.open_cycle - tc > 5:
+                checks.append(f"Breaker took {rec.open_cycle - tc:.1f} cycles to open after the trip "
+                              "(typical is 2-5). Check the breaker and trip circuit.")
+        if rec.prefault_short:
+            checks.append("The record triggered very early, so 'prefault' values may include fault data.")
+
+    # ---- confidence
+    if rec.kind == "history":
+        level = 1
+    elif rec.sequence and settings.get("TR"):
+        level = 3
+    elif rec.sequence or rec.targets:
+        level = 2
+    else:
+        level = 1
+    if checks:
+        level -= 2 if len(checks) >= 3 else 1
+    level = max(1, level)
+    basis = ("history row" if rec.kind == "history" else
+             "element data" if rec.sequence else
+             "targets only" if rec.targets else "event type only")
+    if settings.get("TR"):
+        basis += ", settings" + (f" from {label}" if label else " in event file")
+    return {"tripped": tripped, "desc": desc, "cause": cause, "checks": checks, "gaps": gaps,
+            "confidence": {3: "High", 2: "Medium", 1: "Low"}[level], "basis": basis, "primary": primary}
 
 
-def short_cause(rec, settings):
-    desc, tripped = interpret_event_type(rec.event_type)
-    tripped = tripped or rec.trip_cycle is not None
+def determine_cause(rec, settings, how="none", label=""):
+    a = analyze_event(rec, settings, how, label)
+    return a["cause"], a["tripped"]
+
+
+def short_cause(rec, settings, analysis=None):
+    a = analysis or analyze_event(rec, settings)
     parts = []
-    if desc:
-        parts.append(desc.split(" (")[0])
-    td = interpret_targets(rec.targets)
-    if td:
-        parts.append("via " + "/".join(td[:3]))
-    elif rec.sequence:
-        cand = [el for c, el, st in rec.sequence if st == "asserted" and element_class(el)
-                and element_class(el) not in ("TRIP", "output contact", "breaker status", "SELogic variable")]
-        if cand:
-            parts.append("via " + ", ".join(cand[:3]))
+    if a["desc"]:
+        d = re.sub(r"\s*\((?:non-fault|phase-to-phase|event report)[^)]*\)", "", a["desc"]).split(" (")[0]
+        parts.append(re.sub(r" - no trip$", "", d))
+    if a["primary"]:
+        parts.append("via " + ", ".join(a["primary"][:3]))
+    else:
+        td = interpret_targets(rec.targets)
+        if td:
+            parts.append("via " + "/".join(td[:3]))
     loc = rec.location if rec.location and "$" not in rec.location else ""
     if loc:
         parts.append(f"@ {loc}")
-    return ("TRIP - " if tripped else "No trip - ") + " ".join(parts)
+    n = len(a["checks"]) + len(a["gaps"])
+    tail = f"  [{n} to check]" if n else ""
+    return ("TRIP - " if a["tripped"] else "No trip - ") + " ".join(parts) + tail
+
+
+def event_datetime(rec):
+    """Best-effort datetime for sorting and duplicate matching."""
+    d = (rec.date or "").strip()
+    t = (rec.time or "").strip()
+    for fmt in ("%m/%d/%Y", "%m/%d/%y", "%Y/%m/%d", "%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            day = datetime.datetime.strptime(d, fmt)
+            break
+        except ValueError:
+            continue
+    else:
+        return None
+    m = re.match(r"(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?", t)
+    if m:
+        frac = float("0." + m.group(4)) if m.group(4) else 0.0
+        day = day.replace(hour=int(m.group(1)), minute=int(m.group(2)), second=int(m.group(3)),
+                          microsecond=int(frac * 1e6))
+    return day
+
+
+def link_duplicates(events):
+    """Note when a history row is the same event as a detailed report."""
+    detailed = [(i, e, event_datetime(e)) for i, e in enumerate(events, 1) if e.kind == "event"]
+    for e in events:
+        if e.kind != "history":
+            continue
+        dt = event_datetime(e)
+        if not dt:
+            continue
+        for i, d, ddt in detailed:
+            if ddt and abs((ddt - dt).total_seconds()) <= 1.0 and \
+                    (not e.relay_id or not d.relay_id or e.relay_id.upper() == d.relay_id.upper()):
+                e.notes.append(f"Same event as #{i} ({d.source}), which has more detail.")
+                e.dup_of = i
+                break
 
 
 def build_report(events, rdb, errors, files, comments="", opts=None):
@@ -793,7 +1070,20 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
     show_ser = opts.get("ser", True)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     ev = [e for e in events if e.kind in ("event", "history")]
+    ev.sort(key=lambda e: (event_datetime(e) is None, event_datetime(e) or datetime.datetime.min))
+    for e in ev:
+        e.notes = [n for n in e.notes if not n.startswith("Same event as")]
+        e.dup_of = None
+    link_duplicates(ev)
     ser = [e for e in events if e.kind == "ser"]
+
+    analyses = []
+    for e in ev:
+        s_rdb, label, how = match_settings(e, rdb)
+        s = {**e.settings, **s_rdb}
+        analyses.append((e, s, label, how, analyze_event(e, s, how, label)))
+    n_items = sum(len(a["checks"]) + len(a["gaps"]) for *_, a in analyses)
+    n_ev = sum(1 for *_, a in analyses if a["checks"] or a["gaps"])
 
     out = []
     out.append("SEL TRIP EVENT SUMMARY")
@@ -801,6 +1091,9 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
     out.append(f"Generated: {now}")
     out.append(f"Files analyzed: {len(files)}   Events found: {len(ev)}   "
                f"Settings databases: {len(rdb)}")
+    if ev:
+        out.append(f"Needs review: {n_items} item(s) to check across {n_ev} of {len(ev)} event(s)"
+                   + (" - see the CHECK lines" if n_items else ""))
     out.append("")
 
     if comments.strip():
@@ -814,19 +1107,16 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
     else:
         out.append("QUICK SUMMARY")
         out.append("-" * 60)
-        for n, e in enumerate(ev, 1):
-            s, _ = match_settings(e, rdb)
-            s = {**e.settings, **s}
+        for n, (e, s, label, how, a) in enumerate(analyses, 1):
             when = f"{e.date} {e.time}".strip() or "date n/a"
             who = e.relay_id or e.terminal_id or e.source
-            out.append(f"{n:>2}. {when} | {who} | {e.event_type or '?'} | {short_cause(e, s)}")
+            out.append(f"{n:>2}. {when} | {who} | {e.event_type or '?'} | {short_cause(e, s, a)}")
         out.append("")
 
         out.append("EVENT DETAILS")
         out.append("-" * 60)
-        for n, e in enumerate(ev, 1):
-            s_rdb, label = match_settings(e, rdb)
-            s = {**e.settings, **s_rdb}
+        shown_settings = {}
+        for n, (e, s, label, how, a) in enumerate(analyses, 1):
             out.append(f"Event {n} of {len(ev)}  ({'history row' if e.kind == 'history' else 'event report'})")
             out.append(f"  Source file : {e.source}")
             relay = " / ".join(x for x in (e.relay_id, e.terminal_id) if x)
@@ -837,8 +1127,7 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
             if e.date or e.time:
                 out.append(f"  Date / Time : {e.date} {e.time}")
             if e.event_type:
-                d, _ = interpret_event_type(e.event_type)
-                out.append(f"  Event type  : {e.event_type}  ({d})")
+                out.append(f"  Event type  : {e.event_type}  ({a['desc']})")
             if e.location:
                 out.append(f"  Fault loc.  : {fmt_loc(e.location, s)}")
             if e.targets:
@@ -853,15 +1142,22 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
                 parts = []
                 for k, (pre, post) in e.currents.items():
                     parts.append(f"{k} {post:,.0f}" + (f" (pre {pre:,.0f})" if pre is not None else ""))
-                out.append("  Currents    : " + "; ".join(parts) + "  [A, max during event]")
+                est = ", estimated from samples" if e.sequence or any(p is not None for p, _ in e.currents.values()) else ""
+                out.append("  Currents    : " + "; ".join(parts) + f"  [A, max during fault{est}]")
             if e.voltages:
                 parts = [f"{k} {pre:,.2f} -> {post:,.2f}" for k, (pre, post) in e.voltages.items()]
-                out.append("  Voltages    : " + "; ".join(parts) + "  [prefault -> min during event]")
+                out.append("  Voltages    : " + "; ".join(parts) + "  [prefault -> min during fault]")
+            n_chk = len(a["checks"]) + len(a["gaps"])
+            out.append(f"  Confidence  : {a['confidence']} ({a['basis']})"
+                       + (f" - {n_chk} item(s) to check" if n_chk else ""))
 
-            cause, _ = determine_cause(e, s)
-            out.append("  Probable cause of trip:")
-            for c in cause:
+            out.append("  Probable cause:")
+            for c in a["cause"]:
                 out.append(f"    - {c}")
+            if n_chk:
+                out.append("  Check before relying on this:")
+                for c in a["checks"] + a["gaps"]:
+                    out.append(f"    - CHECK: {c}")
 
             if show_seq and e.sequence:
                 out.append("  Element sequence (cycles from start of record):")
@@ -880,9 +1176,14 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
                                     "Z1MG", "50P1P", "50G1P", "51PP", "51GP", "ER") if k in s]
                 if keys:
                     src = f"RDB: {label}" if label else "event file"
-                    out.append(f"  Settings context ({src}):")
-                    for k in keys:
-                        out.append(f"    {k} := {s[k]}")
+                    sig = (src, tuple((k, s[k]) for k in keys))
+                    if sig in shown_settings:
+                        out.append(f"  Settings    : same as Event {shown_settings[sig]} ({src})")
+                    else:
+                        shown_settings[sig] = n
+                        out.append(f"  Settings context ({src}):")
+                        for k in keys:
+                            out.append(f"    {k} := {s[k]}")
             out.append("")
 
     if show_ser and ser:
@@ -916,7 +1217,8 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
 # Report export (Word / PDF) - built from the summary text *as edited*
 # --------------------------------------------------------------------------
 REPORT_COLORS = {"ink": "1B1B1B", "muted": "666666", "accent": "0B5CAD", "rule": "D6DCE4",
-                 "head_bg": "EAF1FA", "trip": "C42B1C", "ok": "0F7B0F", "band": "F7F9FC"}
+                 "head_bg": "EAF1FA", "trip": "C42B1C", "ok": "0F7B0F", "band": "F7F9FC",
+                 "warn": "A15C00"}
 
 KV_RE = re.compile(r"^ {2}([A-Za-z][A-Za-z ./]{1,14}?)\s*:\s?(.*)$")
 SUB_RE = re.compile(r"^ {2}(\S.*?):\s*$")
@@ -955,7 +1257,7 @@ def parse_report_text(text):
         if not blocks and not para and s.upper().startswith("SEL TRIP"):
             blocks.append(("title", s.title().replace("Sel ", "SEL ")))
             continue
-        if not section and re.match(r"^(Generated|Files analyzed)\b", s):
+        if not section and re.match(r"^(Generated|Files analyzed|Needs review)\b", s):
             add("meta", [s])
             continue
         if ln == s and re.fullmatch(r"[A-Z][A-Z /&\-]{3,}(\s*\(.*\))?", s):
@@ -1012,11 +1314,18 @@ def parse_report_text(text):
 
 def _trip_runs(text):
     """Split a cause string so the TRIP / No trip prefix can be coloured."""
-    for word, color in (("TRIP", "trip"), ("Relay TRIPPED", "trip"), ("No trip", "ok"),
-                        ("No trip recorded", "ok")):
+    runs = [(text, None)]
+    for word, color in (("Relay TRIPPED", "trip"), ("TRIP", "trip"), ("No trip recorded", "ok"),
+                        ("No trip", "ok"), ("CHECK:", "warn")):
         if text.startswith(word):
-            return [(word, color), (text[len(word):], None)]
-    return [(text, None)]
+            runs = [(word, color), (text[len(word):], None)]
+            break
+    m = re.search(r"\s*\[\d+ to check\]$", runs[-1][0])
+    if m:  # quick-summary suffix
+        last = runs[-1][0]
+        runs[-1] = (last[:m.start()], runs[-1][1])
+        runs.append((last[m.start():], "warn"))
+    return runs
 
 
 def export_docx(text, path):
@@ -1328,15 +1637,70 @@ def export_report(text, path):
 PALETTES = {
     "light": dict(bg="#fafafa", surface="#ffffff", text="#1b1b1b", muted="#616161",
                   border="#d9d9d9", accent="#005fb8", drop="#f4f8fd", drop_hover="#e3eefb",
-                  drop_line="#9fb9d9", sel="#cce4f7", trip="#c42b1c", ok="#0f7b0f"),
+                  drop_line="#9fb9d9", sel="#cce4f7", trip="#c42b1c", ok="#0f7b0f", warn="#9a5800"),
     "dark": dict(bg="#1c1c1c", surface="#252525", text="#e9e9e9", muted="#9e9e9e",
                  border="#3a3a3a", accent="#4cc2ff", drop="#20262d", drop_hover="#22344a",
-                 drop_line="#4d6a8b", sel="#264f78", trip="#ff8f85", ok="#6ccb5f"),
+                 drop_line="#4d6a8b", sel="#264f78", trip="#ff8f85", ok="#6ccb5f", warn="#ffb74d"),
 }
 
 PLACEHOLDER = ("Notes to include at the top of the summary, e.g.\n"
                "Crew found a cracked insulator at pole 47. Recommend checking Z1 reach.")
-EMPTY_HINT = ("Drop SEL event files or a folder above and the trip summary will appear here.\n\n"
+HELP_TEXT = """QUICK START
+1. Drag your relay's event files (or a whole folder) onto the drop zone.
+   Best: the .CEV event report plus the relay's .RDB settings file.
+2. Read the summary. Lines marked CHECK are things the program is unsure about.
+3. Edit the text if needed, then Copy all or Export to Word / PDF.
+New here? Click "Try samples" to load example files.
+
+WHICH FILES TO USE
+  .CEV        Compressed event report - the most complete (elements, currents, settings)
+  .RDB        QuickSet settings database - adds the trip equation (TR) and line length (LL)
+  .EVE .TXT   Text event report (terminal EVE command or a saved capture)
+  .SUM .HDR   Event summary / COMTRADE header written by the relay
+  .HIS        Event history list - one line per event, least detail
+  .SER        Sequential events recorder - element on/off times
+Getting a CEV: download the event from the relay with AcSELerator QuickSet and
+choose the compressed (CEV) format, or save the output of the CEV command from a
+terminal session.
+
+EVENT TYPES (what the relay decided the fault was)
+  AG BG CG       single phase-to-ground fault (A, B or C)
+  AB BC CA       phase-to-phase fault
+  ABG BCG CAG    two phases to ground
+  ABC            three-phase fault
+  TRIP           tripped but no fault type found (transfer trip, manual/SCADA, external input)
+  ER             event recorded by the ER trigger - no trip
+  TRIG           manually triggered event
+  A trailing  T  (for example "AG T") means the relay tripped.
+
+COMMON TARGETS (front-panel lights)
+  INST instantaneous    TIME time-delayed    COMM communications-assisted
+  ZONE1/2/3 distance zones   50 instantaneous overcurrent   51 time-overcurrent
+  81 frequency    SOTF switch-onto-fault    A B C G N faulted phases / ground
+  RS recloser reset (ready)    CY recloser cycling    LO recloser locked out
+
+CONFIDENCE AND CHECKS
+  High    element data + settings, and nothing looked wrong
+  Medium  element data or targets, settings missing or one item to check
+  Low     history row, very little data, or several items to check
+  CHECK lines say exactly what to confirm: missing data (e.g. no settings),
+  disagreements (targets vs. event type vs. currents), or unusual results
+  (reverse or beyond-line location, slow breaker, off-nominal frequency).
+
+FAULT LOCATION
+  Shown in the relay's line-length units. With settings loaded it is also
+  shown as % of the line. Negative = behind the relay. $$$$$ = not calculated.
+
+SHORTCUTS
+  Ctrl+O add files    F5 generate    Ctrl+Shift+C copy    Ctrl+S Word    Ctrl+P PDF
+  Ctrl+D dark mode    F1 this help    Delete removes the selected files
+
+The program only reads your files. Nothing is uploaded, except feedback you choose
+to send and the update check (which only asks GitHub for the latest version).
+"""
+
+EMPTY_HINT = ("Drop SEL event files or a folder above and the trip summary will appear here.\n"
+              "New here? Click \"Try samples\" (under the file list) to load example files.\n\n"
               "Everything in this box is editable before you copy or save it.")
 
 
@@ -1487,9 +1851,11 @@ def run_gui():
     v_dark = tk.BooleanVar(value=st["dark"])
     dark_sw = ttk.Checkbutton(hdr, text="Dark mode", variable=v_dark,
                               style="Switch.TCheckbutton" if sv_ttk else "TCheckbutton")
-    dark_sw.grid(row=0, column=1, rowspan=2, padx=(0, 18))
+    help_btn = ttk.Button(hdr, text="Help")
+    help_btn.grid(row=0, column=1, rowspan=2, padx=(0, 14))
+    dark_sw.grid(row=0, column=2, rowspan=2, padx=(0, 18))
     upd_btn = ttk.Button(hdr, text="Check for updates")
-    upd_btn.grid(row=0, column=2, rowspan=2)
+    upd_btn.grid(row=0, column=3, rowspan=2)
 
     # ---- drop zone
     drop = tk.Canvas(root, height=122, highlightthickness=0, bd=0, cursor="hand2")
@@ -1664,6 +2030,8 @@ def run_gui():
         out.tag_configure("label", foreground=pal["muted"])
         out.tag_configure("trip", font=F["mono_b"], foreground=pal["trip"])
         out.tag_configure("notrip", font=F["mono_b"], foreground=pal["ok"])
+        out.tag_configure("warn", foreground=pal["warn"])
+        out.tag_configure("warn_b", font=F["mono_b"], foreground=pal["warn"])
         out.tag_configure("bold", font=F["mono_b"])
         out.tag_configure("hint", font=F["body"], foreground=pal["muted"])
 
@@ -1735,7 +2103,7 @@ def run_gui():
         st["empty"] = True
 
     def highlight():
-        for tag in ("h1", "h2", "rule", "label", "trip", "notrip", "bold"):
+        for tag in ("h1", "h2", "rule", "label", "trip", "notrip", "bold", "warn", "warn_b"):
             out.tag_remove(tag, "1.0", "end")
         for i, ln in enumerate(out.get("1.0", "end-1c").split("\n"), 1):
             s = ln.strip()
@@ -1755,6 +2123,15 @@ def run_gui():
                 m = re.match(r"^(\s{2}[A-Za-z][A-Za-z ./]{2,12}:)", ln)
                 if m:
                     out.tag_add("label", f"{i}.0", f"{i}.{len(m.group(1))}")
+            k = ln.find("CHECK:")
+            if k >= 0:
+                out.tag_add("warn", f"{i}.{k}", f"{i}.end")
+                out.tag_add("warn_b", f"{i}.{k}", f"{i}.{k + 6}")
+            m = re.search(r"\[\d+ to check\]", ln)
+            if m:
+                out.tag_add("warn_b", f"{i}.{m.start()}", f"{i}.{m.end()}")
+            if s.startswith(("Needs review:", "Confidence")) and "to check" in s:
+                out.tag_add("warn", f"{i}.0", f"{i}.end")
             for word, tag in (("TRIP - ", "trip"), ("Relay TRIPPED", "trip"),
                               ("No trip - ", "notrip"), ("No trip recorded", "notrip")):
                 k = ln.find(word)
@@ -1938,14 +2315,6 @@ def run_gui():
             return
         summary = "" if st["empty"] else out.get("1.0", "end-1c")
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        # always keep a local copy
-        log = os.path.join(os.path.dirname(settings_path()), "feedback.log")
-        try:
-            os.makedirs(os.path.dirname(log), exist_ok=True)
-            with open(log, "a", encoding="utf-8") as f:
-                f.write(f"===== {stamp}  v{VERSION}\n{text}\n\n")
-        except Exception:
-            pass
         exts = sorted({os.path.splitext(p)[1].lower() for p in files})
         body = (f"{text}\n\n---\nApp version: v{VERSION}  \n"
                 f"Files loaded: {len(files)} ({', '.join(exts) or 'none'})\n")
@@ -1957,13 +2326,21 @@ def run_gui():
             body += ("\n<details><summary>Summary output</summary>\n\n```\n" + clip
                      + ("\n... (truncated)" if len(clip) < len(summary) else "") + "\n```\n</details>\n")
         title = "Feedback: " + re.sub(r"\s+", " ", text)[:70]
-        if "OWNER/" in GITHUB_REPO:
-            messagebox.showinfo("Feedback", f"Saved to {log}")
-            return
-        if v_attach.get() and summary and not messagebox.askyesno(
+        if v_attach.get() and summary and "OWNER/" not in GITHUB_REPO and not messagebox.askyesno(
                 "Attach summary?",
                 "Feedback is posted as a public GitHub issue, so anyone can read the attached "
                 "summary (relay names, dates, locations).\n\nAttach it anyway?"):
+            return
+        # keep a local copy of everything that's sent
+        log = os.path.join(os.path.dirname(settings_path()), "feedback.log")
+        try:
+            os.makedirs(os.path.dirname(log), exist_ok=True)
+            with open(log, "a", encoding="utf-8") as f:
+                f.write(f"===== {stamp}  v{VERSION}\n{text}\n\n")
+        except Exception:
+            pass
+        if "OWNER/" in GITHUB_REPO:
+            messagebox.showinfo("Feedback", f"Saved to {log}")
             return
         url = (f"https://github.com/{GITHUB_REPO}/issues/new?"
                + urllib.parse.urlencode({"title": title, "body": body}))
@@ -1974,6 +2351,48 @@ def run_gui():
         flash(send_btn, "Opened ✓", "Send feedback")
         set_status("Feedback opened on GitHub - click 'Create' there to submit (a copy was saved locally)")
 
+    def load_samples():
+        folder = resource_path("sample_files")
+        if not os.path.isdir(folder):
+            messagebox.showinfo("Samples", "Sample files aren't included in this build.")
+            return
+        add_paths([folder])
+        set_status("Loaded the sample files - these are made-up events for trying the program")
+
+    def show_help(_=None):
+        if st.get("help_win") and st["help_win"].winfo_exists():
+            st["help_win"].lift()
+            return
+        pal = st["pal"]
+        win = tk.Toplevel(root)
+        st["help_win"] = win
+        win.title(f"{APP_NAME} - Help")
+        win.geometry("760x700")
+        win.configure(bg=pal["bg"])
+        set_window_icon(win)
+        frm = ttk.Frame(win, padding=16)
+        frm.pack(fill="both", expand=True)
+        frm.rowconfigure(0, weight=1)
+        frm.columnconfigure(0, weight=1)
+        t = tk.Text(frm, wrap="word", relief="flat", bd=0, highlightthickness=1, padx=16, pady=12,
+                    font=F["mono"])
+        t.grid(row=0, column=0, sticky="nsew")
+        sb2 = ttk.Scrollbar(frm, orient="vertical", command=t.yview)
+        sb2.grid(row=0, column=1, sticky="ns", padx=(4, 0))
+        t.configure(yscrollcommand=sb2.set)
+        style_text(t, pal)
+        t.tag_configure("h", font=F["mono_b"], foreground=pal["accent"])
+        for line in HELP_TEXT.splitlines():
+            tag = "h" if line and line == line.upper() and line[0].isalpha() else ""
+            t.insert("end", line + "\n", tag)
+        t.configure(state="disabled")
+        bar2 = ttk.Frame(frm)
+        bar2.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        ttk.Button(bar2, text="Online guide", command=lambda: __import__("webbrowser").open(
+            f"https://github.com/{GITHUB_REPO}#readme")).pack(side="left")
+        ttk.Button(bar2, text="Close", command=win.destroy).pack(side="right")
+        win.bind("<Escape>", lambda e: win.destroy())
+
     def on_close(save_only=False):
         save_settings({"dark": st["dark"], "geometry": root.geometry(), "export_dir": cfg.get("export_dir"),
                        "seq": v_seq.get(), "set": v_set.get(), "ser": v_ser.get()})
@@ -1982,6 +2401,7 @@ def run_gui():
 
     # ---- wiring
     upd_btn.config(command=on_update_click)
+    help_btn.config(command=show_help)
     dark_sw.config(command=toggle_dark)
     gen_btn.config(command=generate)
     copy_btn.config(command=copy_all)
@@ -1993,7 +2413,7 @@ def run_gui():
     feedback.bind("<FocusOut>", lambda e: fb_placeholder(True))
     feedback.bind("<Control-a>", lambda e: (e.widget.tag_add("sel", "1.0", "end"), "break")[1])
     for txt, cmd in (("Add files", browse), ("Add folder", browse_folder),
-                     ("Remove", remove_sel), ("Clear", clear_all)):
+                     ("Remove", remove_sel), ("Clear", clear_all), ("Try samples", load_samples)):
         ttk.Button(fb, text=txt, command=cmd).pack(side="left", padx=(0, 6))
 
     drop.bind("<Configure>", draw_drop)
@@ -2037,6 +2457,7 @@ def run_gui():
     root.bind("<Control-Return>", generate)
     root.bind("<F5>", generate)
     root.bind("<Control-d>", toggle_dark)
+    root.bind("<F1>", show_help)
     root.bind("<Control-s>", lambda e: export_as(".docx"))
     root.bind("<Control-p>", lambda e: export_as(".pdf"))
     root.bind("<Control-Shift-C>", copy_all)

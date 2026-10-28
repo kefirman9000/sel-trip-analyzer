@@ -2,93 +2,175 @@
 
 # SEL Trip Event Analyzer
 
-A Windows drag-and-drop tool that reads SEL relay event files and AcSELerator
-QuickSet `.rdb` settings databases, then writes an editable, copy-and-paste
-summary of what caused each trip.
+Drop in SEL relay event files and get a plain-English summary of **what tripped
+and why**, ready to paste into an outage report or export to Word or PDF.
+
+**[⬇ Download for Windows](../../releases/latest/download/SEL_Trip_Analyzer.exe)** ·
+**[Sample files](../../releases/latest/download/SEL_sample_files.zip)** ·
+[Report a problem](../../issues/new)
 
 ![Trip summary](docs/screenshots/main.png)
 
-| Update waiting | First launch |
+## What it does
+
+- Reads SEL event reports (`.CEV`, `.EVE`, `.TXT`, `.SUM`, `.HIS`, `.SER`, COMTRADE `.HDR`)
+  and QuickSet settings files (`.RDB`), as many as you like at once.
+- Works out the fault type, faulted phases, fault location, the element that
+  tripped, how fast the breaker opened, and the likely cause.
+- **Flags anything it isn't sure about** with a `CHECK:` line and rates each
+  event's confidence High, Medium or Low, so you know what to verify.
+- Gives you an editable summary you can copy, or export as a formatted Word or
+  PDF report.
+- Runs entirely on your PC. No install, no account.
+
+## Get started
+
+1. **Download** `SEL_Trip_Analyzer.exe` and put it in a folder you own, such as
+   Desktop or Documents. Avoid Program Files, because the program updates
+   itself in place.
+2. **Open it.** The first time, Windows may say *"Windows protected your PC"*.
+   Click **More info → Run anyway**. This appears because the program isn't
+   code-signed.
+3. **Drag your event files** (or a whole folder) onto the drop zone. The summary
+   appears straight away.
+
+Want to see it work first? Click **Try samples** in the program, or download the
+[sample files](../../releases/latest/download/SEL_sample_files.zip).
+
+## Which files to use
+
+| File | What it is | How much it helps |
+|---|---|---|
+| `.CEV` | Compressed event report | **Best.** Element timeline, currents, voltages, and usually the settings |
+| `.RDB` | QuickSet settings database | Adds the trip equation (TR) and line length (LL) |
+| `.EVE` `.TXT` | Text event report or saved terminal capture | Good: event type, targets, location |
+| `.SUM` `.HDR` | Event summary / COMTRADE header | Good: same as above |
+| `.HIS` | Event history list | Basic: one line per event |
+| `.SER` | Sequential events recorder | Shows element on/off times |
+
+**For the most reliable result, load the event's `.CEV` together with the
+relay's `.RDB`.** Settings are matched to events by relay ID (RID), so you can
+load files from several relays at once.
+
+To get a CEV file, download the event from the relay with AcSELerator QuickSet
+and choose the compressed (CEV) format, or save the output of the `CEV` command
+from a terminal session.
+
+## Reading the summary
+
+The summary starts with a **Quick summary** (one line per event, oldest first),
+then the **Event details**:
+
+- **Event type, targets, location, currents, voltages**, as recorded by the relay.
+- **Probable cause**: which element tripped and why. With a CEV and settings,
+  this comes from the trip equation and the element timeline. Otherwise it's
+  read from the front-panel targets.
+- **Confidence**:
+  - **High**: element data and settings, and nothing looked wrong.
+  - **Medium**: some data is missing, or one item needs checking.
+  - **Low**: only a history row, or several items need checking.
+- **`CHECK:` lines** say exactly what to confirm. They're shown in amber, and
+  the quick summary shows `[n to check]` for each event.
+
+| You'll see a CHECK like... | What to do |
 |---|---|
-| ![Update available](docs/screenshots/update.png) | ![Empty start screen](docs/screenshots/empty.png) |
+| *No settings for this relay* | Add the relay's `.RDB` so the trip equation and line length can be checked |
+| *No relay element data / History row only* | Load the `.CEV` for that event |
+| *Targets show phase B but the event type says A* | The record disagrees with itself. Look at the oscillography |
+| *Highest fault current is on phase …* | Fault type may be misclassified. Check the waveforms |
+| *Location beyond the end of the line* / *Negative location* | Fault was likely past the remote bus or behind the relay. Check directionality and adjacent sections |
+| *Zone 1 operated … beyond typical reach* | Possible overreach or a location error |
+| *Breaker took … cycles to open* | Check the breaker and trip circuit |
+| *Tripped without identifying a fault type* | Confirm transfer trip, manual/SCADA open, or external trip input |
+| *Settings assumed / none match relay* | Make sure the right `.RDB` is loaded |
 
-## Download
+### Event types
 
-Grab `SEL_Trip_Analyzer.exe` from the [latest release](../../releases/latest).
-No install is needed. Put it in a folder you own (Desktop, Documents) so the
-built-in updater can replace it.
+| Code | Meaning |
+|---|---|
+| `AG` `BG` `CG` | Single phase-to-ground fault |
+| `AB` `BC` `CA` | Phase-to-phase fault |
+| `ABG` `BCG` `CAG` | Two phases to ground |
+| `ABC` | Three-phase fault |
+| `TRIP` | Tripped, but no fault type found (transfer trip, manual/SCADA, external input) |
+| `ER` | Event recorded by the ER trigger; no trip |
+| `TRIG` | Manually triggered event |
+| `… T` | A trailing **T** (for example `AG T`) means the relay tripped |
 
-## Using it
+### Common targets
 
-- Drag files or whole folders onto the drop zone, or click it to browse. You
-  can also drop files onto the `.exe` icon.
-- Event data: `.CEV .EVE .TXT .SUM .HIS .SER .HDR`. Settings: `.RDB`.
-- Anything typed in **Comments & suggestions** is added to the top of the
-  summary. Press F5 or **Generate summary** to refresh.
-- The summary is editable and colour-coded (trips in red, no-trip events in
-  green). **Copy all** puts plain text on the clipboard.
-- **Export** saves the summary as a formatted **Word** document or **PDF**
-  report (title, quick-summary table, per-event details, cause bullets, element
-  timeline), or as plain text. Whatever you edited in the box is what gets
-  exported. Word and PDF files open automatically once saved.
-- **Feedback on this output**: type what was wrong, missing, or should be
-  added, then **Send feedback**. It opens a pre-filled issue on this repo in
-  your browser (click *Create* to submit; needs a free GitHub account), and a
-  copy is always saved to `%APPDATA%\SEL Trip Analyzer\feedback.log`. Tick
-  *Attach summary* to include the output; issues are public, so you're asked
-  to confirm first.
-- **Dark mode** switch in the top corner. It follows your Windows setting on
-  first launch and remembers your choice after that.
-- **Check for updates** looks at this repo's latest release. When a newer
-  version exists the button turns blue and reads *Update to vX.Y.Z*. Clicking it
-  shows the release notes and asks before downloading. On yes, it downloads the
-  new `.exe`, verifies its SHA-256, swaps it in and restarts.
+`INST` instantaneous · `TIME` time-delayed · `COMM` communications-assisted ·
+`ZONE1/2/3` distance zones · `50` instantaneous overcurrent · `51` time-overcurrent ·
+`81` frequency · `SOTF` switch-onto-fault · `A B C G N` faulted phases / ground ·
+`RS` recloser reset (ready) · `CY` recloser cycling · `LO` recloser locked out
 
-Shortcuts: `Ctrl+O` add files, `F5` / `Ctrl+Enter` generate, `Ctrl+Shift+C`
-copy summary, `Ctrl+S` export Word, `Ctrl+P` export PDF, `Ctrl+D` dark mode,
-`Delete` removes selected files.
+**Fault location** is in the relay's line-length units (miles or km, as set by
+LL). With settings loaded it's also shown as a percentage of the line. `$$$$$`
+means the relay couldn't calculate it.
 
-The summary covers, per event: relay ID, date/time, decoded event type
-(`AG T` = A-to-ground fault, tripped), fault location (as % of line when `LL`
-is known), decoded targets, fault currents and voltage sag, probable cause,
-element timeline from CEV digital data, breaker clearing time, and which terms
-of the `TR` trip equation asserted.
+## Comments, export and feedback
 
-CEV files give the best results. Load the `.rdb` alongside so `TR` and `LL`
-are known (matched by RID; a single loaded RDB applies to all events).
+- **Comments & suggestions** box: anything you type is added to the top of the
+  summary.
+- The summary box is **fully editable**. Whatever you change is what gets
+  copied or exported.
+- **Export** → Word (`.docx`), PDF, or plain text. Word and PDF open
+  automatically once saved. Shortcuts: `Ctrl+S` Word, `Ctrl+P` PDF.
+- **Feedback on this output**: tell us what was wrong or missing. **Send
+  feedback** opens a pre-filled issue on this page (you'll need a free GitHub
+  account to submit it), and a copy is always saved on your PC.
+  *Issues are public*, so only tick **Attach summary** if the content can be
+  shared.
 
-The interpretation is automated, so confirm it against the oscillography.
+## Updates
 
-## Releasing a new version
+The program checks for a new version when it starts. When one is available, the
+**Check for updates** button turns blue and reads **Update to vX.Y.Z**. Click
+it, read what's new, and choose **Yes**. It downloads the new version, checks
+it hasn't been tampered with, and restarts.
 
-1. Bump `VERSION` in `sel_trip_analyzer.py` (e.g. `1.0.1`) and commit.
-2. On GitHub, go to **Releases > Draft a new release**, create tag `v1.0.1`,
-   write what changed (users see these notes in the update prompt), and publish.
-3. GitHub Actions builds the `.exe` on Windows (about 3 minutes) and attaches it
-   to that release. Installed copies will then offer the update.
+## Help and shortcuts
 
-## Building locally
+Press **F1** (or click **Help**) for the built-in guide.
 
-Install Python 3.9+ (tick "Add python.exe to PATH"), then double-click
-`build_exe.bat`. The program lands in `dist\SEL_Trip_Analyzer.exe`.
+`Ctrl+O` add files · `F5` generate · `Ctrl+Shift+C` copy · `Ctrl+S` Word ·
+`Ctrl+P` PDF · `Ctrl+D` dark mode · `Delete` remove the selected files
 
-To run from source: `pip install -r requirements.txt` then
-`python sel_trip_analyzer.py`. When run from source, the updater replaces the
-`.py` file with the release's version instead.
+## Troubleshooting
 
-Command line:
+**Dragging files onto the window does nothing.**
+Windows blocks drag-and-drop into programs running *as administrator*. Open the
+program normally (not "Run as administrator"), or use **Add files**.
 
-```
-python sel_trip_analyzer.py --cli <files or folders> [--comments "text"] [--out report.docx] [--out report.pdf]
-```
+**"No event data recognized."**
+The file isn't in a format the program knows, or it's empty. Try the `.CEV`
+version of the event. If a real SEL file isn't recognized, please send feedback
+so support can be added.
 
-prints the report and writes any `--out` files (`.docx`, `.pdf` or `.txt`).
+**The update fails with a permission error.**
+The program is in a protected folder such as Program Files. Move
+`SEL_Trip_Analyzer.exe` to your Desktop or Documents and try again.
 
-## Tests
+**Export fails.**
+The file is probably open in Word or a PDF viewer. Close it and export again.
 
-`python -m unittest discover -s tests -v` covers parsing, cause analysis,
-Word/PDF export and the updater. They run on every push, and each release also
-test-drives the built `.exe`. To lock in behaviour on real relay files, add a
-scrubbed case under `tests/fixtures/` (see the README there).
+**My antivirus removed or quarantined the program.**
+Single-file Python programs are sometimes flagged by mistake. Restore it, or
+ask IT to allow it. You can check the file came from this page's Releases.
 
-The icon is drawn by `scripts/make_icon.py`.
+## Privacy
+
+Your files are only read on your own PC; nothing is uploaded. The program
+contacts the internet only to check GitHub for updates, and when you choose to
+send feedback.
+
+## Limitations
+
+The analysis is automated and is meant to speed up your review, not replace it.
+Always confirm against the oscillography and settings. SEL file formats vary
+between relay models and firmware, and the `.RDB` reader is best-effort. If
+something looks wrong for your relays, use **Send feedback**.
+
+---
+
+Developers: see [DEVELOPING.md](DEVELOPING.md) for building, testing and releasing.
