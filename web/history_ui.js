@@ -14,10 +14,11 @@ function mount(root, opts) {
 opts = opts || {};
 root.classList.add("hx");
 root.innerHTML = `<div class="toolbar">
-  <span class="field"><label for="hx-histSel" class="hint">History</label><select id="hx-histSel" title="Switch between histories, or make a new one"></select></span>
-  <button id="hx-addFiles" title="Add event files to this history (Ctrl+O)">Add files</button>
-  <button id="hx-addFolder" title="Add a folder (and its subfolders)">Add folder</button>
-  <button id="hx-watchBtn" title="Keep a folder watched: new relay files are added as they arrive (Chrome / Edge)" hidden>Watch a folder</button>
+  <span class="hint" id="hx-snapLabel" hidden></span>
+  <span class="field nosnap"><label for="hx-histSel" class="hint">History</label><select id="hx-histSel" title="Switch between histories, or make a new one"></select></span>
+  <button id="hx-addFiles" class="nosnap" title="Add event files to this history (Ctrl+O)">Add files</button>
+  <button id="hx-addFolder" class="nosnap" title="Add a folder (and its subfolders)">Add folder</button>
+  <button class="nosnap" id="hx-watchBtn" title="Keep a folder watched: new relay files are added as they arrive (Chrome / Edge)" hidden>Watch a folder</button>
   <span class="grow"></span>
   <button id="hx-analyzerBtn" title="Open the SEL Trip Analyzer (one event at a time, with waveforms)">Trip Analyzer ↗</button>
   <button id="hx-exportBtn" class="accent" title="Export a historical report (Ctrl+S)" disabled>Export report</button>
@@ -92,6 +93,7 @@ root.innerHTML = `<div class="toolbar">
       <label><input type="radio" name="fmt" value="txt"> Text</label>
       <label><input type="radio" name="fmt" value="csv-ev"> Events (.csv)</label>
       <label><input type="radio" name="fmt" value="csv-loc"> Locations (.csv)</label>
+      <label title="One web page with this history built in, read-only, for someone without the program's data"><input type="radio" name="fmt" value="snap"> Snapshot to share (.html)</label>
     </div>
     <div class="cap" style="margin-bottom:6px">Which locations</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -108,6 +110,8 @@ root.innerHTML = `<div class="toolbar">
         <label class="check"><input type="checkbox" data-s="trends" checked> Trends</label>
         <label class="check"><input type="checkbox" data-s="breakers" checked> Breaker health</label>
         <label class="check"><input type="checkbox" data-s="weather" checked> Weather</label>
+        <label class="check"><input type="checkbox" data-s="customers" checked> Customer impact</label>
+        <label class="check"><input type="checkbox" data-s="reviews" checked> PRC-004 reviews</label>
         <label class="check"><input type="checkbox" data-s="matrix" checked> Issue counts by location</label>
         <label class="check"><input type="checkbox" data-s="details" checked> Details for each location</label>
         <label class="check"><input type="checkbox" data-s="events" checked> Event list in each location</label>
@@ -162,6 +166,15 @@ const prefs = {
   get(k, d) { try { const v = localStorage.getItem("sel-history:" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("sel-history:" + k, JSON.stringify(v)); } catch (e) { /* unavailable */ } },
 };
+/** What the Trip Analyzer keeps (same browser storage): notes and PRC-004 reviews, keyed by the same event ids. */
+const shared = {
+  get(k, d) { try { const v = localStorage.getItem("sel-trip:" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("sel-trip:" + k, JSON.stringify(v)); } catch (e) { /* unavailable */ } },
+};
+const SNAP = opts.snapshot || null;          // a read-only snapshot: the data comes with the page
+const reviewsMap = () => (SNAP ? SNAP.reviews || {} : shared.get("reviews", {}));
+const noteOf = (id) => (state.sharedNotes && state.sharedNotes[id]) || state.notes[id] || "";
+if (SNAP) root.classList.add("hx-snap");
 const MAIN = { id: "main", name: "Main history" };
 function histList() { const l = prefs.get("list", null); return Array.isArray(l) && l.length ? l : [MAIN]; }
 function saveList(l) { prefs.set("list", l); }
@@ -198,7 +211,7 @@ async function txOn(dbPromise, store, mode, fn) {
 }
 const tx = (store, mode, fn) => txOn(db(), store, mode, fn);
 const kvGet = (k) => tx("kv", "readonly", (s) => s.get(k)).catch(() => undefined);
-const kvSet = (k, v) => tx("kv", "readwrite", (s) => s.put(v, k)).catch((e) => toast("Couldn't save: " + (e.message || e)));
+const kvSet = (k, v) => (SNAP ? Promise.resolve() : tx("kv", "readwrite", (s) => s.put(v, k)).catch((e) => toast("Couldn't save: " + (e.message || e))));
 const allOf = (store) => tx(store, "readonly", (s) => s.getAll()).catch(() => []);
 
 // ---------------------------------------------------------------- hashing
@@ -242,6 +255,8 @@ function issueChips(r, max) {
   const chips = list.slice(0, max || 9).map((x) => `<span class="chip${rec.has(x.key) ? " rec" : ""}" ${rec.has(x.key) ? 'data-tip="Recurring at this location"' : ""}>${esc(H.ISSUE[x.key].short)}${x.detail && !/^[ABC]+G?$/.test(x.detail) ? " " + esc(x.detail) : ""}</span>`);
   if (hot) chips.push('<span class="chip hot" data-tip="Part of a fault hot spot (same distance as other faults)">hot spot</span>');
   if (r.pair) chips.push(`<span class="chip pair" data-tip="Same fault seen from the other end">↔ ${esc(r.pair)}</span>`);
+  if (r.reviewStatus === "misop") chips.push(`<span class="chip rec" data-tip="${esc("PRC-004 review: misoperation" + (r.review.category ? "\n" + r.review.category : "") + (r.review.cause ? "\nCause: " + r.review.cause : ""))}">misoperation</span>`);
+  else if (r.reviewStatus === "overdue") chips.push(`<span class="chip hot" data-tip="${esc(`Not reviewed: the decision was due ${r.reviewDue}`)}">review overdue</span>`);
   if (r.occSize > 1) chips.push(`<span class="chip" data-tip="Part of a sequence of ${r.occSize} reports (recloses) on this relay">seq ×${r.occSize}</span>`);
   return chips.join("");
 }
@@ -376,6 +391,7 @@ function breakerChart(b) {
 
 // ---------------------------------------------------------------- analysis
 async function rebuild(reanalyze) {
+  if (SNAP) reanalyze = false;
   if (reanalyze) {
     const sig = state.files.map((f) => f.hash).sort().join(",");
     const cache = await kvGet("cache");
@@ -391,10 +407,11 @@ async function rebuild(reanalyze) {
       console.info(`analyzed ${state.files.length} files in ${Math.round(performance.now() - t0)} ms`);
     }
   }
-  const cfg = Object.assign({}, state.cfg, { overrides: state.overrides, worklog: state.worklog, weather: state.weather });
+  state.sharedNotes = SNAP ? SNAP.notes || {} : shared.get("notes", {});
+  const cfg = Object.assign({}, state.cfg, { overrides: state.overrides, worklog: state.worklog, weather: state.weather, reviews: reviewsMap(), customers: state.customers || {} });
   state.model = H.buildModel(state.records, cfg);
   // what changed since the user last marked the changes as seen (or since the first files were added)
-  if (!state.baseline && state.records.length) { state.baseline = { ids: state.records.map((r) => r.id), at: new Date().toISOString() }; kvSet("baseline", state.baseline); }
+  if (!SNAP && !state.baseline && state.records.length) { state.baseline = { ids: state.records.map((r) => r.id), at: new Date().toISOString() }; kvSet("baseline", state.baseline); }
   state.changes = [];
   if (state.baseline) {
     const seen = new Set(state.baseline.ids), newIds = state.records.filter((r) => !seen.has(r.id)).map((r) => r.id);
@@ -507,7 +524,8 @@ function render() {
   const dated = m.records.filter((r) => r.ms !== null);
   $("stripText").innerHTML = `<b>${t.events}</b> events · <b>${t.trips}</b> trips · <b>${t.relays}</b> relays at <b>${t.stations}</b> stations · ` +
     (dated.length ? `${fmtDate(dated[0].ms)} to ${fmtDate(dated[dated.length - 1].ms)}` : "no dated events") +
-    ` <span class="hint">· kept in this browser</span>`;
+    (SNAP ? ` <span class="hint">· read-only snapshot</span>` : ` <span class="hint">· kept in this browser</span>`);
+  if (SNAP) { $("snapLabel").hidden = false; $("snapLabel").innerHTML = `Snapshot of <b>${esc(SNAP.name || "a history")}</b>${SNAP.scope ? ` (${esc(SNAP.scope)})` : ""}, made ${esc((SNAP.made || "").slice(0, 10))} · read-only`; }
   $("bLoc").textContent = t.relays; $("bIss").textContent = m.recurring.length ? `${m.recurring.length} recurring` : ""; $("bEv").textContent = t.events; $("bFiles").textContent = state.files.length;
   $("fFrom").value = state.cfg.from || ""; $("fTo").value = state.cfg.to || ""; $("fAsOf").value = state.cfg.asOf || "";
   $("fReset").hidden = !(state.cfg.from || state.cfg.to || state.cfg.asOf);
@@ -556,7 +574,7 @@ function renderOverview() {
       <ul class="rl">${m.relays.slice(0, 8).map((L) => `
         <li data-relay="${esc(L.key)}" tabindex="0">
           <span class="rank${L.rank === 1 ? " r1" : ""}">${L.rank}</span>
-          <span style="min-width:0"><span class="name">${where(L)}</span>
+          <span style="min-width:0;display:block;overflow:hidden"><span class="name">${where(L)}</span>
             <span class="meta">${L.recurring.length ? `<span class="trip">${L.recurring.map((x) => esc(H.ISSUE[x.key].short.toLowerCase())).join(", ")} recurring</span> · ` : ""}${plural(L.tripOccasions, "trip")} · last ${fmtDate(L.lastTrip)}</span>
             <span class="scorebar" data-tip="Score ${L.score}"><i style="width:${(100 * L.score / maxScore).toFixed(0)}%"></i></span></span>
           <span class="sp" data-tip="Trips per month, last 12 months">${sparkSvg(L.spark)}</span>
@@ -579,7 +597,21 @@ function renderOverview() {
       ${m.wx.known ? `<p style="margin:0 0 8px"><b>${m.wx.storm}</b> of ${m.wx.known} trips (${Math.round(100 * m.wx.storm / m.wx.known)}%) happened in storms${Object.keys(m.wx.kinds).length ? `: ${Object.entries(m.wx.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(H.WX_LABEL[k] || k)} ${n}`).join(", ")}` : ""}.</p>
         <table class="t"><tbody>${m.relays.filter((L) => L.wx.known).sort((a, b) => b.wx.known - a.wx.known).slice(0, 8).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="num">${L.wx.calm} calm · ${L.wx.storm} storm</td><td style="width:40%"><span class="scorebar" style="margin:0"><i style="width:${Math.round(100 * L.wx.storm / L.wx.known)}%;background:var(--c-nofault)"></i></span></td></tr>`).join("")}</tbody></table>
         ${m.recurring.filter((x) => x.weatherNote).map((x) => `<p class="hint" style="margin:6px 0 0"><b>${esc(x.relay)}</b>, ${esc(x.label.toLowerCase())}: ${esc(x.weatherNote)}</p>`).join("")}`
-        : `<p class="hint">Set where each station is and look up the weather at each trip: storms explain some trips; repeat trips in calm weather point to the line itself.</p><button id="hx-ovWx">Set up weather</button>`}</div>
+        : `<p class="hint">Set where each station is and look up the weather at each trip: storms explain some trips; repeat trips in calm weather point to the line itself.</p><button id="hx-ovWx" class="nosnap">Set up weather</button>`}</div>
+  </div>` : ""}
+  ${m.customers || m.reviews.reviewed ? `<div class="grid2 even">
+    ${m.customers ? `<div class="card"><div class="card-head"><h2>Customer impact</h2><span class="hint">last 12 months · estimate</span></div>
+      <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.customers.saifi.toFixed(2)}</div><div class="l">SAIFI: sustained interruptions per customer</div></div>
+        <div class="stat"><div class="v">${m.customers.maifi.toFixed(2)}</div><div class="l">MAIFI: momentary per customer</div></div>
+        <div class="stat"><div class="v">${m.customers.served.toLocaleString()}</div><div class="l">customers on ${plural(m.customers.locations, "circuit")}</div></div></div>
+      <table class="t"><thead><tr><th>Location</th><th class="r">Customers</th><th class="r">Sustained</th><th class="r">Momentary</th></tr></thead><tbody>${m.customers.ranked.slice(0, 6).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="r num">${L.cust.customers.toLocaleString()}</td><td class="r num">${L.cust.ci.toLocaleString()}</td><td class="r num">${L.cust.cmi.toLocaleString()}</td></tr>`).join("")}</tbody></table>
+      <p class="hint" style="margin:6px 0 0">Customer interruptions = customers × trips${state.cfg.sustained === "all" ? "" : " (a lockout is sustained, other trips momentary)"}.${m.customers.missing ? ` ${plural(m.customers.missing, "location")} have no customer count (Files & settings).` : ""}</p></div>` : ""}
+    ${m.reviews.reviewed ? `<div class="card"><div class="card-head"><h2>PRC-004 reviews</h2><span class="hint">from the Trip Analyzer</span></div>
+      <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.reviews.reviewed}/${m.reviews.trips}</div><div class="l">trips reviewed</div></div>
+        <div class="stat"><div class="v${m.reviews.misop ? " trip" : ""}">${m.reviews.misop}</div><div class="l">misoperations</div></div>
+        <div class="stat"><div class="v${m.reviews.overdue ? " trip" : ""}">${m.reviews.overdue}</div><div class="l">overdue (over ${state.cfg.reviewDays} days)</div></div></div>
+      ${m.reviews.misopList.length ? `<table class="t"><tbody>${m.reviews.misopList.slice(0, 5).map((r) => `<tr class="click" data-id="${esc(r.id)}"><td class="num">${esc(r.date)}</td><td>${esc(r.relay)}</td><td><span class="trip">Misoperation</span> <span class="hint">${esc(r.review.category || "")}</span></td></tr>`).join("")}</tbody></table>` : ""}
+      ${m.reviews.overdue ? `<p style="margin:8px 0 0"><button class="link" data-go="events" data-show="overdue">${plural(m.reviews.overdue, "trip")} past the review deadline →</button></p>` : ""}</div>` : ""}
   </div>` : ""}
   <div class="grid2 even">
     <div class="card"><div class="card-head"><h2>Getting worse</h2></div>${changeList(worse, "No location's trips are increasing.")}</div>
@@ -596,6 +628,7 @@ function renderOverview() {
   el.querySelectorAll("[data-chg]").forEach((b) => { const c = ch[+b.dataset.chg]; b.onclick = () => { if (c.ids.length) openDrawer(c.ids[c.ids.length - 1], c.ids); else go("locations", { relay: c.relayKey }); }; b.onkeydown = (e) => { if (e.key === "Enter") b.click(); }; });
   if ($("chgSeen")) $("chgSeen").onclick = () => { state.baseline = { ids: state.records.map((r) => r.id), at: new Date().toISOString() }; kvSet("baseline", state.baseline); state.chgAll = false; rebuild(false); };
   if ($("chgAll")) $("chgAll").onclick = () => { state.chgAll = true; renderOverview(); };
+  el.querySelectorAll("tr[data-id]").forEach((b) => { b.onclick = () => openDrawer(b.dataset.id, m.reviews.misopList.map((r) => r.id)); });
   if ($("ovWx")) $("ovWx").onclick = () => { go("data"); setTimeout(() => { const el2 = $("wxCard"); if (el2) el2.scrollIntoView({ behavior: "smooth" }); }, 50); };
 }
 function changeList(list, none) {
@@ -615,11 +648,12 @@ function renderLocations() {
         <span class="scorebar"><i style="width:${(100 * x.score / maxScore).toFixed(0)}%"></i></span></span>
       ${trendHtml(x.trend, true)}</button>`;
   let list;
-  if (state.locGroup === "station") list = m.stations.map((S) => `<div class="st"><span>${esc(S.name)}</span><span>${trendHtml(S.trend, true)} ${S.score.toFixed(0)}</span></div>` + S.relays.map(item).join("")).join("");
+  if (state.locGroup === "impact") list = m.relays.slice().sort((a, b) => (b.cust ? b.cust.ci + b.cust.cmi / 1000 : -1) - (a.cust ? a.cust.ci + a.cust.cmi / 1000 : -1)).map(item).join("");
+  else if (state.locGroup === "station") list = m.stations.map((S) => `<div class="st"><span>${esc(S.name)}</span><span>${trendHtml(S.trend, true)} ${S.score.toFixed(0)}</span></div>` + S.relays.map(item).join("")).join("");
   else list = m.relays.map(item).join("");
   el.innerHTML = `<div class="loc-layout">
     <div class="card loc-list">
-      <div style="display:flex;gap:6px;padding:4px 4px 8px"><select id="hx-locGroup" aria-label="Arrange"><option value="rank">Ranked</option><option value="station">By station</option></select></div>
+      <div style="display:flex;gap:6px;padding:4px 4px 8px"><select id="hx-locGroup" aria-label="Arrange"><option value="rank">Ranked</option><option value="station">By station</option><option value="impact">By customer impact</option></select></div>
       ${list}
     </div>
     <div>${L ? locationDetail(L) : '<p class="hint">Pick a location.</p>'}</div>
@@ -632,6 +666,11 @@ function renderLocations() {
   el.querySelectorAll(".chart .bar[data-month]").forEach((b) => { b.onclick = () => go("events", { ev: { relay: L.key, month: b.dataset.month } }); });
   el.querySelectorAll("[data-recur-ids]").forEach((b) => { const ids = b.dataset.recurIds.split("\n"); b.onclick = () => openDrawer(ids[ids.length - 1], ids); });
   $("chgStation").onclick = () => openStation(L);
+  $("custIn").onchange = async (e) => {
+    const v = parseInt(e.target.value, 10);
+    if (Number.isFinite(v) && v > 0) state.customers[L.relay] = v; else delete state.customers[L.relay];
+    await kvSet("customers", state.customers); rebuild(false);
+  };
   $("wlAdd").onclick = async () => {
     const d = $("wlDate").value, t = $("wlText").value.trim();
     if (!d || !t) { toast("Enter a date and what was done."); return; }
@@ -659,7 +698,8 @@ function locationDetail(L) {
   <div class="card">
     <div class="card-head">
       <div><h2 style="font-size:20px">${esc(L.relay)}</h2>
-        <div class="hint">${esc(L.station)} <span title="Where the station name came from">(${stFrom})</span> · <button class="link" id="hx-chgStation">change</button>${L.ll ? ` · line length ${L.ll}` : ""}</div></div>
+        <div class="hint">${esc(L.station)} <span title="Where the station name came from">(${stFrom})</span> · <span class="nosnap"><button class="link" id="hx-chgStation">change</button></span>${L.ll ? ` · line length ${L.ll}` : ""}
+          · <label for="hx-custIn">customers</label> <input type="number" id="hx-custIn" min="0" step="1" style="width:96px;min-height:26px;padding:1px 6px" value="${L.cust ? L.cust.customers : ""}" placeholder="how many?"${SNAP ? " disabled" : ""}></div></div>
       <div style="text-align:right"><div class="cap">Rank ${L.rank} of ${m.relays.length}</div><div style="font-size:22px;font-weight:600">${L.score}</div><div class="hint">score</div></div>
     </div>
     <div class="stats">
@@ -668,7 +708,9 @@ function locationDetail(L) {
       <div class="stat"><div class="v">${fmtDate(L.lastTrip)}</div><div class="l">last trip</div></div>
       <div class="stat"><div class="v">${trendHtml(L.trend)}</div><div class="l">${esc(H.trendWords(L.trend))}</div></div>
       <div class="stat"><div class="v">${L.recurring.length}</div><div class="l">recurring issues</div></div>
-      <div class="stat"><div class="v">${L.review}</div><div class="l">to review</div></div>
+      <div class="stat"><div class="v">${L.review}</div><div class="l">with items to check</div></div>
+      <div class="stat"><div class="v${L.rev.misop ? " trip" : ""}">${L.rev.misop}</div><div class="l">misoperations${L.rev.overdue ? ` · <span class="trip">${L.rev.overdue} reviews overdue</span>` : L.rev.reviewed ? ` · ${L.rev.reviewed} reviewed` : ""}</div></div>
+      <div class="stat"><div class="v">${L.cust ? L.cust.ci.toLocaleString() : "–"}</div><div class="l">${L.cust ? `customer interruptions, 12 months (+${L.cust.cmi.toLocaleString()} momentary)` : "customer interruptions: set the customers"}</div></div>
     </div>
     <details><summary class="hint" style="cursor:pointer">Why this score</summary><ul class="why">${L.why.map((w) => `<li><span>${esc(w.text)}</span><b>+${w.points}</b></li>`).join("")}<li><span><b>Score</b></span><b>${L.score}</b></li></ul></details>
     <div style="margin-top:8px"><button class="small" id="hx-locReport">Export this location's report</button></div>
@@ -700,8 +742,8 @@ function locationDetail(L) {
       <p class="hint">Faulted phases: ${["A", "B", "C"].map((p) => `${p} ${L.phases[p]}`).join(" · ")} · ground ${L.phases.G}</p>
       <p class="hint">Weather: ${L.wx.known ? `${L.wx.storm} of ${L.wx.known} trips in storms${Object.keys(L.wx.kinds).length ? ` (${Object.entries(L.wx.kinds).map(([k, n]) => `${esc(H.WX_LABEL[k] || k)} ${n}`).join(", ")})` : ""}, ${L.wx.calm} in calm weather` : "not looked up (Files & settings)"}</p></div>
     <div class="card"><div class="card-head"><h2>Work log</h2><span class="hint">Shown on the chart, so you can see if it helped</span></div>
-      <ul class="wl-list">${L.worklog.map((w) => `<li><span>${esc(w.date)}</span><span class="grow">${esc(w.text)}</span><button class="small link danger" data-wl-del="${esc(w.date + "|" + w.text)}" aria-label="Delete">✕</button></li>`).join("") || '<li class="hint">Nothing yet: add tree trimming, breaker maintenance, settings changes…</li>'}</ul>
-      <div class="wl"><input type="date" id="hx-wlDate" aria-label="Date"><input type="text" id="hx-wlText" placeholder="What was done (e.g. Breaker timing test, contacts replaced)"><button id="hx-wlAdd">Add</button></div></div>
+      <ul class="wl-list">${L.worklog.map((w) => `<li><span>${esc(w.date)}</span><span class="grow">${esc(w.text)}</span><button class="small link danger nosnap" data-wl-del="${esc(w.date + "|" + w.text)}" aria-label="Delete">✕</button></li>`).join("") || '<li class="hint">Nothing yet: add tree trimming, breaker maintenance, settings changes…</li>'}</ul>
+      <div class="wl nosnap"><input type="date" id="hx-wlDate" aria-label="Date"><input type="text" id="hx-wlText" placeholder="What was done (e.g. Breaker timing test, contacts replaced)"><button id="hx-wlAdd">Add</button></div></div>
   </div>
   <div class="card section">
     <div class="card-head"><h2>Events</h2><span class="hint">${plural(L.records.length, "event")}, newest first · click for the evidence</span></div>
@@ -762,8 +804,9 @@ function filteredEvents() {
     (!f.issue || r.issues.some((x) => x.key === f.issue)) && (!f.month || (r.ms !== null && H.monthKey(r.ms) === f.month)) &&
     (f.show === "all" || (f.show === "trips" && r.tripped) || (f.show === "review" && r.checks.length) || (f.show === "faults" && r.fault) ||
      (f.show === "recurring" && m.recurring.some((x) => x.allIds.includes(r.id))) || (f.show === "hot" && m.hotspots.some((h) => h.ids.includes(r.id))) ||
-     (f.show === "storm" && r.tripped && r.storm === true) || (f.show === "calm" && r.tripped && r.storm === false) || (f.show === "breaker" && r.clearCyc !== null)) &&
-    (!q || [r.relay, r.stationName, r.et, r.targets, r.short, r.date, r.loc, state.notes[r.id] || "", ...r.checks, ...r.cause, ...r.sources.map((s) => s.path), ...r.issues.map((x) => H.ISSUE[x.key].label)].join(" ").toUpperCase().includes(q)));
+     (f.show === "storm" && r.tripped && r.storm === true) || (f.show === "calm" && r.tripped && r.storm === false) || (f.show === "breaker" && r.clearCyc !== null) ||
+     (f.show === "misop" && r.reviewStatus === "misop") || (f.show === "overdue" && r.reviewStatus === "overdue") || (f.show === "unreviewed" && (r.reviewStatus === "overdue" || r.reviewStatus === "open"))) &&
+    (!q || [r.relay, r.stationName, r.et, r.targets, r.short, r.date, r.loc, noteOf(r.id), ...r.checks, ...r.cause, ...r.sources.map((s) => s.path), ...r.issues.map((x) => H.ISSUE[x.key].label)].join(" ").toUpperCase().includes(q)));
   if (f.sort === "newest") list = list.slice().reverse();
   else if (f.sort === "relay") list = list.slice().sort((a, b) => (a.stationName + a.relay < b.stationName + b.relay ? -1 : a.stationName + a.relay > b.stationName + b.relay ? 1 : (a.ms || 0) - (b.ms || 0)));
   return list;
@@ -789,7 +832,7 @@ function renderEvents() {
   $("evStation").innerHTML = opt("", "All stations", f.station) + m.stations.map((S) => opt(S.name, S.name, f.station)).join("");
   $("evRelay").innerHTML = opt("", "All relays", f.relay) + m.relays.filter((L) => !f.station || L.station === f.station).map((L) => opt(L.key, L.relay, f.relay)).join("");
   $("evIssue").innerHTML = opt("", "Any issue", f.issue) + issueKeys.map((I) => opt(I.key, I.label, f.issue)).join("");
-  $("evShow").innerHTML = [["all", "All events"], ["trips", "Trips"], ["faults", "Faults"], ["review", "Needs review"], ["recurring", "Part of a recurring issue"], ["hot", "In a hot spot"], ["storm", "Trips in storms"], ["calm", "Trips in calm weather"], ["breaker", "Breaker timed"]].map(([v, t]) => opt(v, t, f.show)).join("");
+  $("evShow").innerHTML = [["all", "All events"], ["trips", "Trips"], ["faults", "Faults"], ["review", "Needs review"], ["recurring", "Part of a recurring issue"], ["hot", "In a hot spot"], ["storm", "Trips in storms"], ["calm", "Trips in calm weather"], ["breaker", "Breaker timed"], ["misop", "Misoperations"], ["overdue", "Reviews overdue"], ["unreviewed", "Trips not reviewed"]].map(([v, t]) => opt(v, t, f.show)).join("");
   $("evMonth").innerHTML = opt("", "Any month", f.month) + [...m.months].reverse().map((k) => opt(k, monthLabel(k), f.month)).join("");
   $("evSort").value = f.sort;
   const list = filteredEvents();
@@ -803,6 +846,13 @@ function renderEvents() {
 // ---------------------------------------------------------------- files & settings
 function renderData() {
   const el = $("page-data"), m = state.model;
+  if (SNAP) {
+    el.innerHTML = `<div class="card"><div class="card-head"><h2>About this snapshot</h2></div>
+      <p style="margin:0">A read-only copy of <b>${esc(SNAP.name || "a history")}</b>${SNAP.scope ? ` (${esc(SNAP.scope)})` : ""}, made ${esc((SNAP.made || "").slice(0, 16).replace("T", " "))}: ${plural(m.records.length, "event")} at ${plural(m.relays.length, "location")}.
+      Everything here can be explored and exported, but nothing is saved and the original relay files aren't included.</p>
+      <p class="hint">To keep your own history, use the Trip Analyzer's History tab and load your relay files there.</p></div>`;
+    return;
+  }
   const size = state.files.reduce((a, f) => a + f.size, 0);
   const batches = state.batches.slice().sort((a, b) => (a.added < b.added ? 1 : -1));
   const used = new Map();
@@ -861,7 +911,8 @@ function renderData() {
       </ul>
     </div>
   </div>`;
-  $("histCard").insertAdjacentHTML("afterend", wxCardHtml());
+  $("histCard").insertAdjacentHTML("afterend", wxCardHtml() + custCardHtml());
+  wireCustCard();
   wireWxCard();
   $("cAnalyzer").onchange = (e) => { state.cfg.analyzerUrl = e.target.value.trim(); kvSet("cfg", state.cfg); };
   el.querySelectorAll("input[data-key]").forEach((inp) => { inp.onchange = () => { const v = parseFloat(inp.value); if (Number.isFinite(v) && v >= 0) { state.cfg[inp.dataset.key] = v; kvSet("cfg", state.cfg); rebuild(false); } }; });
@@ -876,7 +927,7 @@ function renderData() {
     if (!confirm(`Delete every file, event, note and setting in "${currentName()}"? Back it up first if you might need it.`)) return;
     await tx("files", "readwrite", (s) => s.clear()); await tx("batches", "readwrite", (s) => s.clear()); await tx("kv", "readwrite", (s) => s.clear());
     stopWatch(false);
-    Object.assign(state, { files: [], batches: [], records: [], notes: {}, worklog: {}, overrides: {}, cfg: Object.assign({}, H.DEFAULTS), relay: "", weather: {}, locations: {}, baseline: null, changes: [] });
+    Object.assign(state, { files: [], batches: [], records: [], notes: {}, worklog: {}, overrides: {}, cfg: Object.assign({}, H.DEFAULTS), relay: "", weather: {}, locations: {}, customers: {}, baseline: null, changes: [] });
     state.model = H.buildModel([], state.cfg); render(); toast("Cleared.");
   };
 }
@@ -891,7 +942,7 @@ async function removeBatch(id) {
 }
 function b64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 function unb64(s) { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
-const KV_KEYS = ["cfg", "notes", "worklog", "overrides", "locations", "weather"];
+const KV_KEYS = ["cfg", "notes", "worklog", "overrides", "locations", "weather", "customers"];
 /** Everything in one history (any, not just the open one), in backup form. */
 async function readData(id) {
   const p = id === current ? db() : openDb(dbNameOf(id));
@@ -902,7 +953,7 @@ async function readData(id) {
   if (id !== current) (await p).close();
   return Object.assign({ app: "sel-trip-history", version: VERSION, name: (histList().find((h) => h.id === id) || {}).name || "", exported: new Date().toISOString(), batches,
     files: files.map((f) => ({ hash: f.hash, name: f.name, path: f.path, site: f.site, size: f.size, batch: f.batch, added: f.added, b64: b64(f.bytes) })) },
-    Object.fromEntries(KV_KEYS.map((k) => [k, kv[k] || {}])));
+    Object.fromEntries(KV_KEYS.map((k) => [k, kv[k] || {}])), { sharedNotes: shared.get("notes", {}), reviews: shared.get("reviews", {}) });
 }
 /** Merge backup data into a history: files already there (same contents) are skipped; notes, work log, locations and weather are added. */
 async function mergeInto(id, data, label) {
@@ -921,18 +972,22 @@ async function mergeInto(id, data, label) {
   const overrides = Object.assign({}, data.overrides || {}, (await kvGetP("overrides")) || {});
   const locations = Object.assign({}, data.locations || {}, (await kvGetP("locations")) || {});
   const weather = Object.assign({}, data.weather || {}, (await kvGetP("weather")) || {});
+  const customers = Object.assign({}, data.customers || {}, (await kvGetP("customers")) || {});
+  // the Trip Analyzer's notes and reviews: add the ones this browser doesn't have
+  if (data.sharedNotes) shared.set("notes", Object.assign({}, data.sharedNotes, shared.get("notes", {})));
+  if (data.reviews) shared.set("reviews", Object.assign({}, data.reviews, shared.get("reviews", {})));
   const cfg = (await kvGetP("cfg")) || (data.cfg && Object.keys(data.cfg).length ? data.cfg : null);
   await txOn(p, "files", "readwrite", (s) => { for (const f of fresh) s.put(f); });
   await txOn(p, "batches", "readwrite", (s) => { for (const b of batches) s.put(b); });
   await kvSetP("notes", notes); await kvSetP("worklog", worklog); await kvSetP("overrides", overrides);
-  await kvSetP("locations", locations); await kvSetP("weather", weather);
+  await kvSetP("locations", locations); await kvSetP("weather", weather); await kvSetP("customers", customers);
   if (cfg) await kvSetP("cfg", cfg);
   if (id !== current) (await p).close();
   return { added: fresh.length, skipped: (data.files || []).length - fresh.length };
 }
 async function reloadCurrent() {
   closeDrawer();
-  Object.assign(state, { files: [], batches: [], records: [], notes: {}, worklog: {}, overrides: {}, weather: {}, locations: {}, baseline: null, changes: [], relay: "", errors: [] });
+  Object.assign(state, { files: [], batches: [], records: [], notes: {}, worklog: {}, overrides: {}, weather: {}, locations: {}, customers: {}, baseline: null, changes: [], relay: "", errors: [] });
   await load();
 }
 async function backup() {
@@ -1136,18 +1191,27 @@ function renderDrawer() {
     ${recs.length || hot.length ? `<h4>Part of a pattern</h4><ul>${recs.map((x) => `<li><b>Recurring ${esc(x.label.toLowerCase())}</b> at ${esc(x.relay)}: ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). <button class="link" data-list="${esc(x.allIds.join("\n"))}">step through them</button></li>`).join("")}
       ${hot.map((h) => `<li><b>Fault hot spot</b>: ${h.n} faults between ${h.from.toFixed(2)} and ${h.to.toFixed(2)}. <button class="link" data-list="${esc(h.ids.join("\n"))}">step through them</button></li>`).join("")}</ul>` : ""}
     ${seqMates.length ? `<h4>Same sequence</h4><ul>${seqMates.map((x) => `<li><button class="link" data-open="${esc(x.id)}">${esc(H.fmtWhen(x))} ${esc(x.et)}</button> <span class="muted">${esc(x.targets)}</span></li>`).join("")}</ul>` : ""}
-    <div style="margin:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="hx-dAnalyzer" title="Open this event's files in the SEL Trip Analyzer${r.waveId ? ", on the Waveforms page" : ""}">${r.waveId ? "Open waveforms in Trip Analyzer ↗" : "Open in Trip Analyzer ↗"}</button></div>
+    <div class="nosnap" style="margin:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="hx-dAnalyzer" title="Open this event's files in the SEL Trip Analyzer${r.waveId ? ", on the Waveforms page" : ""}">${r.waveId ? "Open waveforms in Trip Analyzer ↗" : "Open in Trip Analyzer ↗"}</button></div>
     ${r.wx ? `<h4>Weather</h4><p style="margin:0">${wxTag(r)} ${esc(r.wx.text)}${r.wx.location ? ` <span class="hint">at ${esc(r.wx.location)}</span>` : ""}</p>${r.wx.hints ? `<ul class="hint">${r.wx.hints.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}` : ""}
+    ${r.tripped ? `<h4>PRC-004 review</h4><p style="margin:0">${reviewHtml(r)}</p>${opts.reviewEvent && !SNAP ? `<p style="margin:6px 0 0"><button class="small" id="hx-dReview">${r.review ? "Change the review" : "Review this trip"}</button></p>` : ""}` : ""}
     <h4>Details</h4><table class="kv">${kv.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
     <h4>Probable cause</h4><ul>${r.cause.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
     ${r.checks.length ? `<h4>Check</h4><ul class="checkl">${r.checks.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${r.gaps.length ? `<h4>Missing data</h4><ul class="hint">${r.gaps.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${r.evidence.length ? `<h4>Evidence</h4><ul>${r.evidence.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${r.seq.length ? `<h4>Elements that asserted (cycles)</h4><div class="seq mono">${r.seq.map(([c, e]) => `${c.toFixed(2).padStart(6, " ")}  ${esc(e)}`).join("<br>")}</div>` : ""}
-    <h4>Note</h4><textarea id="hx-dNote" rows="2" placeholder="e.g. Crew found a cracked insulator at pole 112">${esc(state.notes[r.id] || "")}</textarea>
-    <h4>Source files</h4><ul>${r.sources.map((s) => `<li class="mono" style="font-size:12px">${esc(s.path)} ${state.files.some((f) => f.hash === s.hash) ? `<button class="link" data-dl="${esc(s.hash)}">download</button>` : ""}</li>`).join("")}</ul>
+    <h4>Note</h4><textarea id="hx-dNote" rows="2" placeholder="e.g. Crew found a cracked insulator at pole 112"${SNAP ? " readonly" : ""}>${esc(noteOf(r.id))}</textarea>
+    <p class="hint" style="margin:3px 0 0">${SNAP ? "" : "The same note shows in the Trip Analyzer's events table."}</p>
+    <h4>Source files</h4><ul>${r.sources.map((s) => `<li class="mono" style="font-size:12px">${esc(s.path)} ${!SNAP && state.files.some((f) => f.hash === s.hash) ? `<button class="link" data-dl="${esc(s.hash)}">download</button>` : ""}</li>`).join("")}</ul>
     ${r.settingsFiles && r.settingsFiles.length ? `<h4>Settings for this relay</h4><ul>${r.settingsFiles.map((s) => `<li class="mono" style="font-size:12px">${esc(s.path)}</li>`).join("")}</ul>` : ""}`;
-  $("dNote").oninput = (e) => { const v = e.target.value; if (v.trim()) state.notes[r.id] = v; else delete state.notes[r.id]; clearTimeout(renderDrawer.t); renderDrawer.t = setTimeout(() => kvSet("notes", state.notes), 400); };
+  $("dNote").oninput = (e) => {
+    if (SNAP) return;
+    const v = e.target.value.trim(), sn = shared.get("notes", {});
+    if (v) { state.notes[r.id] = v; sn[r.id] = v; } else { delete state.notes[r.id]; delete sn[r.id]; }
+    shared.set("notes", sn); state.sharedNotes = sn;
+    clearTimeout(renderDrawer.t); renderDrawer.t = setTimeout(() => kvSet("notes", state.notes), 400);
+  };
+  if ($("dReview")) $("dReview").onclick = () => { const ev = eventFiles(r); if (ev) { closeDrawer(); opts.reviewEvent(ev); } };
   $("dBody").querySelectorAll("[data-list]").forEach((b) => { const ids = b.dataset.list.split("\n"); b.onclick = () => openDrawer(ids[0], ids); });
   $("dBody").querySelectorAll("[data-open]").forEach((b) => { b.onclick = () => openDrawer(b.dataset.open, state.drawer.list.includes(b.dataset.open) ? state.drawer.list : [b.dataset.open]); });
   $("dAnalyzer").onclick = () => openInAnalyzer(r);
@@ -1156,6 +1220,29 @@ function renderDrawer() {
 $("dClose").onclick = closeDrawer;
 $("dPrev").onclick = () => stepDrawer(-1);
 $("dNext").onclick = () => stepDrawer(1);
+
+// ---------------------------------------------------------------- customers per circuit
+function custCardHtml() {
+  const m = state.model;
+  return `<div class="card" id="hx-custCard" style="margin-bottom:16px">
+    <div class="card-head"><h2>Customers</h2><span class="hint">How many customers each circuit serves, for customer interruptions and SAIFI / MAIFI estimates</span></div>
+    <div class="tablewrap"><table class="t locs"><thead><tr><th>Location</th><th>Station</th><th style="width:160px">Customers</th></tr></thead><tbody>
+    ${m.relays.map((L) => `<tr><td><b>${esc(L.relay)}</b></td><td class="hint">${esc(L.station)}</td><td><input type="number" min="0" step="1" data-cust="${esc(L.relay)}" value="${L.cust ? L.cust.customers : ""}" placeholder="–" style="width:120px"></td></tr>`).join("")}
+    </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+      <label for="hx-custMode" class="hint">Sustained interruptions</label>
+      <select id="hx-custMode"><option value="lockout">a recloser lockout is sustained, other trips momentary</option><option value="all">every trip is sustained (no reclosing)</option></select>
+    </div></div>`;
+}
+function wireCustCard() {
+  $("custMode").value = state.cfg.sustained || "lockout";
+  $("custMode").onchange = (e) => { state.cfg.sustained = e.target.value; kvSet("cfg", state.cfg); rebuild(false); };
+  root.querySelectorAll("[data-cust]").forEach((inp) => { inp.onchange = async () => {
+    const v = parseInt(inp.value, 10);
+    if (Number.isFinite(v) && v > 0) state.customers[inp.dataset.cust] = v; else delete state.customers[inp.dataset.cust];
+    await kvSet("customers", state.customers); rebuild(false);
+  }; });
+}
 
 // ---------------------------------------------------------------- weather
 const HOURLY = "temperature_2m,precipitation,snowfall,weather_code,wind_speed_10m,wind_gusts_10m";
@@ -1265,6 +1352,15 @@ async function lookupWeather(quiet) {
   if (done) rebuild(false);
 }
 
+function reviewHtml(r) {
+  const rv = r.review;
+  if (!rv) return r.reviewStatus === "overdue" ? `<span class="trip">Not reviewed: overdue</span> (the decision was due ${esc(r.reviewDue)})` : `Not reviewed yet: decide by ${esc(r.reviewDue)}`;
+  const label = { correct: '<span class="ok">Correct operation</span>', misop: '<span class="trip">Misoperation</span>', na: "Not applicable" }[rv.outcome] || esc(rv.outcome);
+  const who = [rv.reviewer, rv.date].filter(Boolean).join(", ");
+  return label + (rv.outcome === "misop" && rv.category ? ` · ${esc(rv.category)}` : "") + (rv.outcome === "misop" && rv.cause ? ` · cause: ${esc(rv.cause)}` : "") +
+    (who ? ` <span class="hint">(${esc(who)})</span>` : "") + (rv.notes ? `<br><span class="hint">${esc(rv.notes)}</span>` : "");
+}
+
 // ---------------------------------------------------------------- open in the Trip Analyzer
 function defaultAnalyzerUrl() {
   if (/^https?:$/.test(location.protocol)) return new URL("SEL_Trip_Analyzer.html", location.href).href;
@@ -1275,7 +1371,8 @@ const analyzerUrl = () => state.cfg.analyzerUrl || defaultAnalyzerUrl();
 $("analyzerBtn").hidden = EMBED;
 $("analyzerBtn").onclick = () => window.open(analyzerUrl(), "sel-analyzer");
 /** Send the event's files (with its COMTRADE pair and the relay's settings) to the Analyzer page, which opens it. */
-function openInAnalyzer(r) {
+/** The event's files, its COMTRADE pair and the relay's settings, ready to hand to the Analyzer. */
+function eventFiles(r) {
   const want = new Map();
   const byHash = new Map(state.files.map((f) => [f.hash, f]));
   for (const s of r.sources.concat(r.settingsFiles || [])) {
@@ -1286,8 +1383,12 @@ function openInAnalyzer(r) {
       for (const x of state.files) if (x.path.replace(/\.[^./]+$/, "").toLowerCase() === stem) want.set(x.hash, x);
     }
   }
-  if (!want.size) { toast("This event's files aren't kept here any more."); return; }
-  const files = [...want.values()].map((f) => ({ name: f.name, path: f.path, bytes: f.bytes }));
+  if (!want.size) { toast("This event's files aren't kept here any more."); return null; }
+  return { files: [...want.values()].map((f) => ({ name: f.name, path: f.path, bytes: f.bytes })), id: r.id, rec: r.waveId || "", label: `${r.relay} ${r.date} ${r.time.slice(0, 8)}` };
+}
+function openInAnalyzer(r) {
+  const ev = eventFiles(r); if (!ev) return;
+  const files = ev.files;
   if (opts.openEvent) { closeDrawer(); opts.openEvent({ files, id: r.id, rec: r.waveId || "", label: `${r.relay} ${r.date} ${r.time.slice(0, 8)}` }); return; }
   const w = window.open(analyzerUrl() + "#from-history", "sel-analyzer");
   if (!w) { toast("The browser blocked the new window: allow pop-ups for this page and try again."); return; }
@@ -1458,8 +1559,8 @@ function exportName(fmt) {
   const recs = m.records.filter((r) => r.ms !== null && (!o.station || r.stationName === o.station) && (!o.relay || upper(r.relay) === o.relay));
   const scope = o.relay ? (m.relays.find((L) => L.key === o.relay) || {}).relay || o.relay : o.station || "All locations";
   const span = recs.length ? ` ${fmtDate(recs[0].ms)} to ${fmtDate(recs[recs.length - 1].ms)}` : "";
-  const base = fmt === "csv-ev" ? `${scope} trip events${span}` : fmt === "csv-loc" ? `${scope} problem locations${span}` : `${scope} trip history${span}`;
-  return base.replace(/[\\/:*?"<>|]+/g, "-") + "." + ({ docx: "docx", pdf: "pdf", txt: "txt", "csv-ev": "csv", "csv-loc": "csv" }[fmt]);
+  const base = fmt === "snap" ? `${scope === "All locations" ? currentName() : scope} snapshot ${new Date().toISOString().slice(0, 10)}` : fmt === "csv-ev" ? `${scope} trip events${span}` : fmt === "csv-loc" ? `${scope} problem locations${span}` : `${scope} trip history${span}`;
+  return base.replace(/[\\/:*?"<>|]+/g, "-") + "." + ({ docx: "docx", pdf: "pdf", txt: "txt", "csv-ev": "csv", "csv-loc": "csv", snap: "html" }[fmt]);
 }
 let nameEdited = false;
 function openExport(pre) {
@@ -1473,10 +1574,11 @@ function openExport(pre) {
   nameEdited = false;
   const update = () => {
     const fmt = root.querySelector("#hx-expFmt input:checked").value;
-    $("expSections").hidden = fmt.startsWith("csv");
+    $("expSections").hidden = fmt.startsWith("csv") || fmt === "snap";
     if (!nameEdited) $("expName").value = exportName(fmt);
     $("expHint").textContent = { docx: "A Word document with tables and charts, ready to edit.", pdf: "Opens the print window: choose Save as PDF.", txt: "Plain text, for an email or a log.",
-      "csv-ev": "One row per event, with its issues and whether it's part of a recurring issue or hot spot.", "csv-loc": "One row per location, in rank order, with its score, trend and issues." }[fmt];
+      "csv-ev": "One row per event, with its issues and whether it's part of a recurring issue or hot spot.", "csv-loc": "One row per location, in rank order, with its score, trend and issues.",
+      snap: "One web page with this history (or the locations picked above) built in. Whoever opens it sees these pages, read-only; the original relay files aren't included." }[fmt];
   };
   $("expStation").onchange = () => { fillRelays(); update(); };
   $("expRelay").onchange = update;
@@ -1490,7 +1592,8 @@ $("expGo").onclick = () => {
   const m = state.model, o = exportOpts(), fmt = root.querySelector("#hx-expFmt input:checked").value;
   prefs.set("export", { fmt, sections: o.sections });
   const name = $("expName").value.trim() || exportName(fmt);
-  if (fmt === "csv-ev") download(name, new Blob(["﻿" + H.eventsCsv(m, o)], { type: "text/csv" }));
+  if (fmt === "snap") makeSnapshot(o, name);
+  else if (fmt === "csv-ev") download(name, new Blob(["﻿" + H.eventsCsv(m, o)], { type: "text/csv" }));
   else if (fmt === "csv-loc") download(name, new Blob(["﻿" + H.locationsCsv(m, o)], { type: "text/csv" }));
   else {
     const charts = o.sections.charts !== false && fmt !== "txt";
@@ -1508,6 +1611,36 @@ $("expGo").onclick = () => {
   }
   $("expDlg").close();
 };
+/** One HTML file: this page with the history built in, opening read-only. */
+function makeSnapshot(o, name) {
+  const src = typeof opts.pageSource === "function" ? opts.pageSource() : opts.pageSource;
+  if (!src) { toast("This copy can't make snapshots."); return; }
+  const m = state.model;
+  const recs = m.records.filter((r) => (!o.station || r.stationName === o.station) && (!o.relay || upper(r.relay) === o.relay));
+  const ids = new Set(recs.map((r) => r.id));
+  const pick = (map) => Object.fromEntries(Object.entries(map || {}).filter(([k]) => ids.has(k)));
+  const DROP = new Set(["wx", "storm", "review", "reviewStatus", "reviewDue", "stationName", "stationFrom2", "occ", "occSize"]);
+  const scope = o.relay ? (m.relays.find((L) => L.key === o.relay) || {}).relay || o.relay : o.station || "";
+  const data = { app: "sel-trip-history-snapshot", version: VERSION, name: SNAP ? SNAP.name : currentName(), scope, made: new Date().toISOString(),
+    records: recs.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !DROP.has(k)))),
+    cfg: Object.assign({}, state.cfg), notes: pick(Object.assign({}, state.notes, state.sharedNotes)), reviews: pick(reviewsMap()), weather: pick(state.weather),
+    worklog: state.worklog, overrides: state.overrides, customers: state.customers || {} };
+  const empty = (html, id) => {
+    const tag = `<script id="${id}" type="application/json">`, a = html.indexOf(tag);
+    if (a < 0) return html;
+    const b = html.indexOf("<\/script>", a + tag.length);
+    return html.slice(0, a + tag.length) + (id === "hx-snapshot" ? "" : "[]") + html.slice(b);
+  };
+  let html = ["sample-data", "history-samples"].reduce(empty, src);
+  const TAG = '<script id="hx-' + 'snapshot" type="application/json">';    // split so this code never matches itself
+  const old = html.lastIndexOf(TAG);
+  if (old >= 0) html = html.slice(0, old) + html.slice(html.indexOf("<\/script>", old) + 9);
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  const at = html.indexOf(">", html.indexOf("<body")) + 1;          // first thing in the body, so it's there before the page's code runs
+  html = html.slice(0, at) + "\n" + TAG + json + "<\/script>" + html.slice(at);
+  download(name, new Blob([html], { type: "text/html" }));
+  toast(`Snapshot saved: ${plural(recs.length, "event")}. Send the file; it opens in any browser, read-only.`, 6000);
+}
 function printBlocks(blocks, title) {
   const out = [];
   for (const b of blocks) {
@@ -1548,8 +1681,15 @@ document.addEventListener("keydown", (e) => {
 async function load() {
   state.locGroup = prefs.get("locGroup", "rank");
   state.colorBy = prefs.get("colorBy", "type");
+  if (SNAP) {
+    Object.assign(state, { records: SNAP.records || [], cfg: Object.assign({}, H.DEFAULTS, SNAP.cfg || {}), notes: {}, worklog: SNAP.worklog || {}, overrides: SNAP.overrides || {},
+      weather: SNAP.weather || {}, customers: SNAP.customers || {}, files: [], batches: [], locations: {} });
+    await rebuild(false);
+    return;
+  }
   try {
-    const [files, batches, cfg, notes, worklog, overrides, weather, locations, baseline] = await Promise.all([allOf("files"), allOf("batches"), kvGet("cfg"), kvGet("notes"), kvGet("worklog"), kvGet("overrides"), kvGet("weather"), kvGet("locations"), kvGet("baseline")]);
+    const [files, batches, cfg, notes, worklog, overrides, weather, locations, baseline, customers] = await Promise.all([allOf("files"), allOf("batches"), kvGet("cfg"), kvGet("notes"), kvGet("worklog"), kvGet("overrides"), kvGet("weather"), kvGet("locations"), kvGet("baseline"), kvGet("customers")]);
+    state.customers = customers || {};
     state.weather = weather || {}; state.locations = locations || {}; state.baseline = baseline || null;
     state.files = files || []; state.batches = batches || [];
     state.cfg = Object.assign({}, H.DEFAULTS, cfg || {}); state.notes = notes || {}; state.worklog = worklog || {}; state.overrides = overrides || {};
@@ -1561,7 +1701,7 @@ async function load() {
 
 const ready = load().catch((e) => { console.error(e); toast("Couldn't open the history: " + (e.message || e)); });
 return {
-  ready, state, render: () => (state.model ? render() : undefined), go, openDrawer, rebuild, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h),
+  ready, state, render: () => (state.model ? render() : undefined), refresh: () => (state.model ? rebuild(false) : undefined), go, openDrawer, rebuild, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h),
   addFiles: async (list, label) => { await ready; return addFiles(list, label); },
   currentName, histories: histList, switchTo, readData, mergeInto, createHistory,
 };

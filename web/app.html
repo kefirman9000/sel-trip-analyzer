@@ -858,6 +858,8 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
 <script>
 (function () {
 "use strict";
+// this page as it arrived (before anything is drawn), for the History tab's read-only snapshots
+const PAGE_SOURCE = "<!doctype html>\n" + document.documentElement.outerHTML;
 const VERSION = "{{VERSION}}";
 const REPO = "{{REPO}}";
 const HTML_ASSET = "SEL_Trip_Analyzer.html";
@@ -1642,19 +1644,23 @@ function showPage(which, recId, focus) {
     $(page).hidden = k !== which; $(tab).setAttribute("aria-selected", String(k === which));
   }
   store.set("page", which);
-  if (which === "history") ensureHistory().ready.then(() => hist.render());
+  if (which === "history") ensureHistory().ready.then(() => hist.refresh());
   if (which === "wave") ensureWave().show(recId, focus);
   if (which === "events") renderEvents();
 }
 // ---------------------------------------------------------------- Trip History link and hand-off
 // The History tab (the same screen as the standalone Trip History page), loaded the first time it's needed
 let hist = null;
+const snapEl = document.getElementById("hx-snapshot");
+let SNAPSHOT = null;
+try { SNAPSHOT = snapEl ? JSON.parse(snapEl.textContent) : null; } catch (e) { SNAPSHOT = null; }
 const histSamples = () => { try { return JSON.parse($("history-samples").textContent || "[]"); } catch (e) { return []; } };
 function ensureHistory() {
   if (!hist) {
     hist = window.SELHistoryUI.mount($("pageHistory"), {
       version: VERSION, repo: REPO, embedded: true, isActive: histShown, download, printRoot: $("print-root"), samples: histSamples,
-      openEvent: (ev) => openFromHistory(ev),
+      openEvent: (ev) => openFromHistory(ev), reviewEvent: (ev) => reviewFromHistory(ev),
+      pageSource: PAGE_SOURCE, snapshot: SNAPSHOT,
       onChange: (h) => { $("histBadge").textContent = h.events ? String(h.events) : ""; $("histTarget").textContent = `into “${h.name}”`; },
     });
   }
@@ -1672,6 +1678,19 @@ async function openFromHistory(ev) {
   if (added || !state.cache) await generate();
   setStatus(`From the history: ${ev.label}`);
   if (ev.rec) showPage("wave", ev.rec); else jumpToEvent(ev.id);
+}
+/** "Review this trip" on the History tab: load the event here and open the PRC-004 review. */
+async function reviewFromHistory(ev) {
+  let added = 0;
+  for (const f of ev.files) {
+    const key = "history|" + f.path + "|" + f.bytes.length;
+    if (state.files.some((x) => x.key === key)) continue;
+    state.files.push({ key, name: f.name, path: f.path, bytes: f.bytes }); added++;
+  }
+  renderFiles();
+  if (added || !state.cache) await generate();
+  showPage("events");
+  openReview(ev.id);
 }
 const sentToHistory = new Set();
 const historyable = (f) => !f.key.startsWith("sample|") && !f.key.startsWith("history|");
@@ -2157,7 +2176,8 @@ document.addEventListener("keydown", (e) => {
 if (DESK) $("footVer").textContent = `v${VERSION} · desktop app · files never leave your computer`;
 renderFiles();
 showEmpty();
-showPage(store.get("page", "events"));
+if (SNAPSHOT) { document.querySelector(".hist-row").hidden = true; showPage("history"); }
+else showPage(store.get("page", "events"));
 // test hook
 window.__selApp = { state, generate, summaryText, reportHtml, reportBlocks, exportAs, showPage, jumpToEvent, wave: () => wave, history: () => ensureHistory(), addToHistory };
 })();

@@ -97,6 +97,7 @@ h1 { font: 600 22px/1.2 "Segoe UI Variable Display", "Segoe UI", Inter, system-u
 <script>
 (function () {
 "use strict";
+const PAGE_SOURCE = "<!doctype html>\n" + document.documentElement.outerHTML;   // for snapshots, before anything is drawn
 const prefs = {
   get(k, d) { try { const v = localStorage.getItem("sel-history:" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("sel-history:" + k, JSON.stringify(v)); } catch (e) { /* unavailable */ } },
@@ -113,6 +114,8 @@ document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && !e
 const app = window.SELHistoryUI.mount(document.getElementById("history"), {
   version: "{{VERSION}}", repo: "{{REPO}}", printRoot: document.getElementById("print-root"),
   samples: () => JSON.parse(document.getElementById("sample-data").textContent || "[]"),
+  pageSource: PAGE_SOURCE,
+  snapshot: (() => { const el = document.getElementById("hx-snapshot"); try { return el ? JSON.parse(el.textContent) : null; } catch (e) { return null; } })(),
 });
 window.SELHistoryApp = app;   // for tests
 })();

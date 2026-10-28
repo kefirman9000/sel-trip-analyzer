@@ -101,7 +101,7 @@
 .hx .rl li { display: grid; grid-template-columns: 28px minmax(0, 1fr) 96px 92px; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 6px; }
 .hx .rl li:hover { background: var(--surface-2); }
 .hx .rl .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hx .rl .meta { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx .rl .meta { display: block;  font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hx .recur { border: 1px solid var(--border); border-left: 3px solid var(--trip); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; cursor: pointer; background: var(--surface); }
 .hx .recur:hover { background: var(--surface-2); }
 .hx .recur .top { display: flex; justify-content: space-between; gap: 8px; }
@@ -211,3 +211,6 @@
 .hx .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .hx .toolbar .grow { flex: 1; }
 .hx .toolbar select { max-width: 240px; font-weight: 600; }
+.hx.hx-snap .nosnap { display: none !important; }
+.hx .stat .v.trip { color: var(--trip); }
+.hx .stats { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }

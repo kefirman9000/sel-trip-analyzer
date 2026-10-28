@@ -12,6 +12,8 @@
  *   reference.png   the reference library (CT saturation)
  *   weather.png     the Stations & weather window
  *   export.png      the export options dialog
+ *   history.png     the History tab: overview of two years of made-up events at five stations
+ *   history-location.png  one location on the History tab: recurring issue, fault hot spot along the line, breaker
  */
 const { chromium } = require("playwright");
 const path = require("path"), fs = require("fs");
@@ -157,6 +159,26 @@ const W = 1360;
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.mouse.move(5, 5);
   await shot("reference.png");
+
+  // History tab: the two-year sample history, with customer counts and one review
+  await page.setViewportSize({ width: W, height: 900 });
+  await page.evaluate(() => window.__selApp.showPage("history"));
+  await page.evaluate(async () => { const h = window.__selApp.history(); await h.ready; h.state.cfg.autoWeather = false; });
+  await page.click("#hx-samples");
+  await page.waitForFunction(() => window.__selApp.history().state.records.length > 80, null, { timeout: 60000 });
+  await page.evaluate(async () => {
+    const h = window.__selApp.history();
+    Object.assign(h.state.customers, { "FEEDER 12": 1850, "FEEDER 8": 2400, "FEEDER 11": 3100, "FEEDER 9": 900, "FEEDER 7": 1500, "FEEDER 3": 1200, "FEEDER 14": 1100 });
+    await h.refresh();
+    h.go("overview");
+    document.getElementById("hx-toast").hidden = true;
+  });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.mouse.move(5, 5);
+  await shot("history.png", { fullPage: true, clip: await clipOf("#pageHistory", 0, 1500) });
+  await page.evaluate(() => { const h = window.__selApp.history(); h.go("locations", { relay: "FEEDER 12" }); document.getElementById("hx-toast").hidden = true; });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot("history-location.png", { fullPage: true, clip: await clipOf("#pageHistory .loc-layout", 0, 1700) });
 
   await browser.close();
   console.log("wrote screenshots to " + OUT);

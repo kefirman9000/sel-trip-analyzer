@@ -257,6 +257,8 @@ name before saving.
 
 ## Trip History (many stations, many dates)
 
+![History tab](docs/screenshots/history.png)
+
 **It's built into the Analyzer as a fourth tab, *History*** (`Alt+4`), and
 also runs on its own as **`SEL_Trip_History.html`** (the same screen) for
 people who only want the history.
@@ -315,6 +317,24 @@ where, and is it getting worse?*
   seen*), a list at the top of the Overview: new recurring issues, hot spots
   that grew, locations that moved up the ranking, trends that turned, breakers
   that started slowing, and the new events at each location.
+- **Customer impact**: enter how many customers each circuit serves (*Files &
+  settings → Customers*, or on a location's page) and the History shows
+  customer interruptions per location and SAIFI / MAIFI estimates for the last
+  12 months. A recloser lockout counts as sustained and other trips as
+  momentary (or every trip as sustained, if you choose). Locations can be
+  ranked *By customer impact*.
+- **Notes and PRC-004 reviews are shared** with the Analyzer: a note typed on
+  either shows on both, and the History shows each trip's review (correct
+  operation, misoperation, not applicable), misoperations per location and the
+  trips past their 120-day review deadline. *Review this trip* on the History
+  tab opens the Analyzer's review for that event.
+- **Snapshot to share**: *Export report → Snapshot to share (.html)* saves one
+  web page with the history built in (everything, one station or one relay).
+  Whoever opens it gets the History pages to explore and export, read-only,
+  with nothing to import; the original relay files aren't included.
+
+<img src="docs/screenshots/history-location.png" width="900" alt="One location on the History tab">
+
 - **Breaker health**: the time from trip to breaker open for every record with
   element data (`.CEV`, COMTRADE), plotted over time with its trend. A breaker
   rising 0.5+ cycles a year is flagged *getting slower* (with when it will pass

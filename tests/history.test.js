@@ -145,3 +145,32 @@ test("events carry what the Trip Analyzer needs", async () => {
   assert.equal(cev.waveId, cev.id);
   assert.deepEqual(cev.settingsFiles.map((s) => s.name), ["LINE5_settings.set"]);
 });
+
+test("PRC-004 reviews from the Trip Analyzer: misoperations and overdue reviews", async () => {
+  const { r } = await model();
+  const trips = r.records.filter((x) => x.relay === "FEEDER 9" && x.core === "TRIP");
+  const m = H.buildModel(r.records, { today: "2026-10-28", reviews: { [trips[0].id]: { outcome: "misop", category: "Unnecessary Trip - Other Than Fault" }, [trips[1].id]: { outcome: "correct" } } });
+  const L = relay(m, "FEEDER 9");
+  assert.equal(L.rev.misop, 1);
+  assert.equal(L.rev.reviewed, 2);
+  assert.equal(m.reviews.misopList.length, 1);
+  const recent = r.records.find((x) => x.tripped && x.date === "2026-10-24");
+  assert.equal(m.byId.get(recent.id).reviewStatus, "open", "within 120 days");
+  assert.equal(m.byId.get(trips[2].id).reviewStatus, "overdue");
+  assert.ok(H.blocksToText(H.reportBlocks(m, {})).includes("PRC-004 REVIEWS"));
+  assert.ok(H.eventsCsv(m).includes("Misoperation - Unnecessary Trip"));
+});
+
+test("customer impact: lockouts are sustained, other trips momentary", async () => {
+  const { r } = await model();
+  const m = H.buildModel(r.records, { customers: { "FEEDER 12": 1000, "FEEDER 8": 2000 } });
+  const L = relay(m, "FEEDER 12").cust;
+  assert.equal(L.ci, 1000 * L.sustained);
+  assert.ok(L.sustained >= 2, "the two lockouts");
+  assert.equal(m.customers.served, 3000);
+  assert.ok(Math.abs(m.customers.saifi - (L.ci + relay(m, "FEEDER 8").cust.ci) / 3000) < 1e-9);
+  const all = H.buildModel(r.records, { customers: { "FEEDER 12": 1000 }, sustained: "all" });
+  assert.equal(relay(all, "FEEDER 12").cust.sustained, relay(all, "FEEDER 12").cust.occ);
+  assert.equal(relay(m, "FEEDER 3").cust, null);
+  assert.ok(H.blocksToText(H.reportBlocks(m, {})).includes("SAIFI (estimate)"));
+});
