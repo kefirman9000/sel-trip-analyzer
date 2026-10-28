@@ -340,6 +340,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .evt td.act { white-space: nowrap; }
 .evt td.act button { min-height: 28px; padding: 2px 9px; margin: 0 4px 4px 0; }
 .evt .evt-empty { color: var(--muted); padding: 24px; text-align: center; }
+.evt tr.why > td { background: var(--surface-2); padding: 10px 14px 12px 40px; }
+.evt tr.why:hover { background: transparent; }
+.why-h { font-weight: 600; margin-bottom: 6px; }
+.why-h .hint { font-weight: 400; margin-left: 6px; }
+.why ul { margin: 0 0 6px; padding-left: 18px; }
+.why li { margin: 3px 0; line-height: 1.45; }
+.why li.chk { color: var(--warn); }
+.why li button { min-height: 24px; padding: 0 8px; margin-left: 8px; font-size: 12px; }
+.evt td.act button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .chip2 { font-size: 11px; border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; color: var(--muted); background: var(--surface-2); }
 .chip2.warn { color: var(--warn); border-color: var(--warn); }
@@ -450,7 +459,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
   </div>
   <div class="box evt-wrap"><table class="evt" id="evTable" aria-label="Events"></table></div>
   <p class="hint">Click a column heading to sort. Notes are saved in this browser and added to the event in the summary and exports.
-    <b>Details</b> jumps to the event in the summary; <b>Waveforms</b> opens its graphs.</p>
+    <b>Why?</b> shows what each conclusion rests on, with a link to that moment on the graph; <b>Details</b> jumps to the event in the summary; <b>Waveforms</b> opens its graphs.</p>
   </div><!-- /pageEvents -->
 
   <div id="pageSummary" role="tabpanel" aria-labelledby="tabSummary" hidden>
@@ -1766,6 +1775,35 @@ function analyzeEvent(rec, settings, how, label) {
     if (rec.prefault_short) checks.push("The record triggered very early, so 'prefault' values may include fault data.");
   }
 
+  // what each conclusion rests on, with the sample to look at in the record (for "Show on graph")
+  const sam = rec.wave ? rec.wave.sam : null;
+  const at = (c) => (sam && c !== null && c !== undefined ? Math.round(c * sam) : null);
+  const firstAt = (el) => { const hit = asserted.find((x) => x[1] === el); return hit ? hit[0] : null; };
+  const evidence = [];
+  if (rec.event_type) evidence.push({ text: `The relay recorded event type ${strip(rec.event_type)}` + (desc ? ` (${desc})` : ""), idx: null, elements: [] });
+  if (tdesc.length) evidence.push({ text: `Front-panel targets ${strip(rec.targets)}: ${tdesc.join(", ")}`, idx: null, elements: [] });
+  for (const [key, hits] of eqHits) {
+    const c = Math.min(...hits.map(firstAt).filter((x) => x !== null));
+    evidence.push({ text: `${key} = ${strip(settings[key])}: ${hits.join(", ")} asserted before the trip`, idx: Number.isFinite(c) ? at(c) : null, elements: hits.slice() });
+  }
+  const inEq = new Set([...eqHits.values()].flat());
+  for (const el of primary) {
+    const c = firstAt(el);
+    if (inEq.has(el)) continue;
+    if (c !== null) evidence.push({ text: `${el} (${elementClass(el) || "relay element"}) asserted at ${fx(c, 2)} cyc`, idx: at(c), elements: [el] });
+  }
+  if (tc !== null) {
+    const trips = asserted.filter((x) => TRIP_NAMES.has(x[1].toUpperCase()) && Math.abs(x[0] - tc) < 1e-9).map((x) => x[1]);
+    evidence.push({ text: `TRIP asserted at ${fx(tc, 2)} cyc`, idx: at(tc), elements: trips });
+  }
+  if (rec.open_cycle !== null) {
+    const bk = BREAKER_NAMES.filter((b) => rec.wave && rec.wave.digitals.some((d) => d.name === b));
+    evidence.push({ text: `Breaker status (${bk[0] || "52A"}) dropped at ${fx(rec.open_cycle, 2)} cyc` +
+                    (tc !== null && rec.open_cycle > tc ? `: cleared ${fx(rec.open_cycle - tc, 2)} cyc after the trip` : ""), idx: at(rec.open_cycle), elements: bk.slice(0, 1) });
+  }
+  if (loc && v !== null) evidence.push({ text: `Fault location ${loc}` + (ll ? ` on a ${settings.LL} line (${fx(100 * v / ll, 0)}%)` : ""), idx: null, elements: [] });
+  if (settings.TR && !eqHits.size && tripped && rec.sequence.length) evidence.push({ text: `TR = ${strip(settings.TR)}: none of these asserted before the trip`, idx: null, elements: [] });
+
   let level;
   if (rec.kind === "history") level = 1;
   else if (rec.sequence.length && settings.TR) level = 3;
@@ -1775,7 +1813,7 @@ function analyzeEvent(rec, settings, how, label) {
   level = Math.max(1, level);
   let basis = rec.kind === "history" ? "history row" : rec.sequence.length ? "element data" : rec.targets ? "targets only" : "event type only";
   if (settings.TR) basis += ", settings" + (label ? ` from ${label}` : " in event file");
-  return { tripped, desc, cause, checks, gaps, confidence: { 3: "High", 2: "Medium", 1: "Low" }[level], basis, primary };
+  return { tripped, desc, cause, checks, gaps, confidence: { 3: "High", 2: "Medium", 1: "Low" }[level], basis, primary, evidence };
 }
 
 function shortCause(rec, settings, a) {
@@ -4828,7 +4866,20 @@ function create(ctx) {
 
   setAdv(st.adv);
   return {
-    show(id) { refresh(id || (st.idx < 0 ? ctx.store.get("w.last", null) : null)); if (st.rec) { redraw(); renderCursorPanels(); } },
+    show(id, focus) {
+      refresh(id || (st.idx < 0 ? ctx.store.get("w.last", null) : null));
+      if (!st.rec) return;
+      if (focus && focus.idx !== null && focus.idx !== undefined) {
+        for (const el of focus.elements || []) if (st.an.elements.some((x) => x.name === el)) st.digSel.add(el);
+        const idx = clamp(focus.idx, 0, st.rec.n - 1), t = st.rec.t[idx], f = st.rec.freq;
+        if (t < st.view.t0 || t > st.view.t1) st.view = { t0: Math.max(st.rec.t[0], t - 3 / f), t1: Math.min(st.rec.t[st.rec.n - 1], t + 3 / f) };
+        renderElements();
+        setCursor(idx, true);
+        if (focus.label) ctx.setStatus("Cursor on: " + focus.label);
+        return;
+      }
+      redraw(); renderCursorPanels();
+    },
     refresh() {
       if (st.idx < 0) return;
       const before = new Set(st.list.filter((x) => x.group === "file").map((x) => x.id));
@@ -5310,6 +5361,19 @@ function comtradeIndex() {
   return ctIndex.list;
 }
 const evSort = { key: "time", dir: 1 };
+const whyOpen = new Set();
+/** The evidence under an event: each fact the conclusion rests on, with a jump to that moment in the record. */
+function whyRow(it, recId) {
+  const a = it.a, ev = a.evidence || [];
+  const li = ev.map((x, k) => `<li>${esc(x.text)}${recId && x.idx !== null ? ` <button data-act="goto" data-rec="${esc(recId)}" data-k="${k}" title="Open the waveforms at this moment">Show on graph</button>` : ""}</li>`);
+  const chk = a.checks.concat(a.gaps).map((c) => `<li class="chk">${esc(c)}</li>`);
+  return `<tr class="why" data-for="${esc(it.id)}"><td colspan="9">
+    <div class="why-h">Based on <span class="hint">confidence ${esc(a.confidence)}, from ${esc(a.basis)}</span></div>
+    ${li.length ? `<ul>${li.join("")}</ul>` : `<p class="hint">This file only has the event type, so there is nothing more to show.</p>`}
+    ${chk.length ? `<div class="why-h">To check</div><ul>${chk.join("")}</ul>` : ""}
+    ${recId ? "" : `<p class="hint">Load this event's .CEV report to see these moments on the graph.</p>`}
+  </td></tr>`;
+}
 function renderEvents() {
   const tbl = $("evTable");
   tbl.textContent = "";
@@ -5393,8 +5457,8 @@ function renderEvents() {
       <td class="chk">${nc ? `<span class="badge-w" title="${esc(it.a.checks.concat(it.a.gaps).join("\n"))}">${nc}</span>` : `<span class="okmark" title="Nothing to check">✓</span>`}</td>
       <td class="wx${stormy(it) ? " storm" : ""}" title="${esc(w ? w.text + "\n" + (w.hints || []).map((h) => h.text).join("\n") : "")}">${esc(wtxt) || '<span class="hint">-</span>'}</td>
       <td class="note"><input type="text" value="${esc(notes[id] || "")}" placeholder="Add a note…" aria-label="Note for event ${num.get(it)}"></td>
-      <td class="act"><button data-act="details" title="Show this event in the summary">Details</button>${waveId(it) ? `<button data-act="wave" data-rec="${esc(waveId(it))}" title="Open its waveforms">Waveforms</button>` : ""}</td>
-    </tr>`;
+      <td class="act"><button data-act="why" aria-expanded="${whyOpen.has(id)}" title="What this conclusion is based on">Why?</button><button data-act="details" title="Show this event in the summary">Details</button>${waveId(it) ? `<button data-act="wave" data-rec="${esc(waveId(it))}" title="Open its waveforms">Waveforms</button>` : ""}</td>
+    </tr>` + (whyOpen.has(id) ? whyRow(it, e.wave ? id : null) : "");
   }).join("");
   tbl.innerHTML = head + `<tbody>${body || `<tr><td colspan="9" class="evt-empty">No events match.</td></tr>`}</tbody>`;
 }
@@ -5402,7 +5466,13 @@ $("evTable").addEventListener("click", (e) => {
   const h = e.target.closest("th[data-sort]");
   if (h) { const k = h.dataset.sort; if (evSort.key === k) evSort.dir *= -1; else { evSort.key = k; evSort.dir = k === "checks" ? -1 : 1; } renderEvents(); return; }
   const b = e.target.closest("button[data-act]"); if (!b) return;
-  const id = b.closest("tr").dataset.id;
+  const row = b.closest("tr"), id = row.dataset.id || row.dataset.for;
+  if (b.dataset.act === "why") { if (whyOpen.has(id)) whyOpen.delete(id); else whyOpen.add(id); renderEvents(); return; }
+  if (b.dataset.act === "goto") {
+    const it = allItems().find((x) => x.id === id), x = it && it.a.evidence[+b.dataset.k];
+    if (x) showPage("wave", b.dataset.rec, { idx: x.idx, elements: x.elements, label: x.text });
+    return;
+  }
   if (b.dataset.act === "wave") showPage("wave", b.dataset.rec || id); else jumpToEvent(id);
 });
 $("evTable").addEventListener("change", (e) => {
@@ -5583,13 +5653,13 @@ function ensureWave() {
   if (!wave) wave = window.SELWaveUI.create({ core, store, setStatus, download, version: VERSION, getCache: () => state.cache, onNotesChanged: notesChanged, openExport });
   return wave;
 }
-function showPage(which, recId) {
+function showPage(which, recId, focus) {
   if (!["events", "summary", "wave"].includes(which)) which = "events";
   for (const [k, page, tab] of [["events", "pageEvents", "tabEvents"], ["summary", "pageSummary", "tabSummary"], ["wave", "pageWave", "tabWave"]]) {
     $(page).hidden = k !== which; $(tab).setAttribute("aria-selected", String(k === which));
   }
   store.set("page", which);
-  if (which === "wave") ensureWave().show(recId);
+  if (which === "wave") ensureWave().show(recId, focus);
   if (which === "events") renderEvents();
 }
 $("tabEvents").addEventListener("click", () => showPage("events"));
