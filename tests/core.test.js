@@ -213,3 +213,24 @@ test("export options: leave sections and lines out, choose CSV columns", async (
   assert.equal(csv[0], "Relay,Weather");
   assert.equal(csv[1].split(",").length, 2);
 });
+
+test("zip archives and settings saved as text", async () => {
+  const { execFileSync } = require("child_process"), os = require("os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "selzip-"));
+  for (const n of ["Feeder12_AG_Zone1.cev", "Feeder3_CG_51G.cfg", "Feeder3_CG_51G.dat"]) fs.copyFileSync(path.join(SAMPLES, n), path.join(dir, n));
+  let zipBytes;
+  try { execFileSync("python3", ["-c", `import shutil,sys; shutil.make_archive(sys.argv[1], "zip", sys.argv[2])`, path.join(dir, "out"), dir]); zipBytes = fs.readFileSync(path.join(dir, "out.zip")); }
+  catch (e) { zipBytes = null; }
+  if (zipBytes) {
+    const r = await core.loadFiles([{ name: "events.zip", bytes: new Uint8Array(zipBytes) }]);
+    assert.deepEqual(r.events.map((e) => e.source), ["Feeder12_AG_Zone1.cev"]);
+    assert.deepEqual(r.comtrade.map((f) => f.name).sort(), ["Feeder3_CG_51G.cfg", "Feeder3_CG_51G.dat"]);
+  }
+  const sho = "SHO\r\nRID     =FEEDER 3          TID     =OAK HILL SUB\r\nCTR     =240       LL      =8.00\r\n51GP    =1.00      51GC    =U3        51GTD   =2.00\r\n";
+  const r2 = await core.loadFiles([{ name: "settings.set", bytes: new TextEncoder().encode(sho) }, { name: "Feeder3_CG_51G.eve", bytes: new Uint8Array(fs.readFileSync(path.join(SAMPLES, "Feeder3_CG_51G.eve"))) }]);
+  assert.equal(r2.rdb.get("FEEDER 3")["51GC"], "U3");
+  assert.deepEqual(r2.errors, []);
+  assert.match(core.buildReport(r2.events, r2.rdb, r2.errors, 2, "", { detail: "full" }), /settings file settings\.set/);
+  const bad = await core.loadFiles([{ name: "x.zip", bytes: new Uint8Array([1, 2, 3]) }]);
+  assert.match(bad.errors[0], /not a zip file/);
+});

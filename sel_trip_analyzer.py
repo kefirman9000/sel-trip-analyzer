@@ -42,7 +42,7 @@ GITHUB_REPO = "kefirman9000/sel-trip-analyzer"
 EXE_ASSET_NAME = "SEL_Trip_Analyzer.exe"
 HTML_ASSET_NAME = "SEL_Trip_Analyzer.html"
 PORT = 47615                       # fixed, so the page keeps its saved notes and settings between runs
-FILE_EXTS = {".cev", ".eve", ".txt", ".sum", ".his", ".ser", ".hdr", ".log", ".chi", ".rdb", ".cfg", ".dat", ".cff"}
+FILE_EXTS = {".cev", ".eve", ".txt", ".sum", ".his", ".ser", ".hdr", ".log", ".chi", ".rdb", ".set", ".cfg", ".dat", ".cff", ".zip"}
 MAX_FILE = 64 * 1024 * 1024
 WIN = sys.platform == "win32"
 
