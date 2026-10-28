@@ -257,3 +257,29 @@ test("add_fixture.js scrubs names, keeps the analysis and writes expected.json",
   assert.equal(exp.event_count, 2);
   assert.deepEqual(exp.events[0].cause_contains, []);
 });
+
+test("operation review (PRC-004): suggestions, due dates, report section, CSV log", async () => {
+  const { events, rdb, errors } = await load();
+  const items = core.prepareView(events, rdb, {}).items.filter((it) => it.e.dup_of === null);
+  const by = (src) => items.find((it) => it.e.source === src);
+  assert.equal(core.suggestReview(by("Feeder12_AG_Zone1.cev")).outcome, "correct");
+  assert.equal(core.suggestReview(by("Feeder9_AG_needs_review.cev")).category, "Unnecessary Trip - During Fault");
+  assert.equal(core.suggestReview(by("Feeder14_underfrequency.txt")).outcome, "correct");
+  assert.match(core.suggestReview(by("Feeder7_transfer_trip.sum")).text, /remote end/);
+  assert.equal(core.MISOP_CATEGORIES.length, 6);
+  assert.equal(core.MISOP_CAUSES.length, 10);
+  assert.equal(core.reviewDue(by("Line5_Hill_BC_Zone1.cev").e), "2027-02-19");
+  const id = by("Line5_Hill_BC_Zone1.cev").id;
+  const reviews = { [id]: { outcome: "misop", category: "Unnecessary Trip - During Fault", cause: "Incorrect Settings", causeFound: "2026-10-28", reviewer: "J", date: "2026-10-28" } };
+  const plain = core.buildReport(events, rdb, errors, 16, "", { now: "X" });
+  assert.ok(!plain.includes("OPERATION REVIEW") && !plain.includes("Review      :"), "no review section until reviews exist");
+  const t = core.buildReport(events, rdb, errors, 16, "", { now: "X", reviews });
+  assert.match(t, /OPERATION REVIEW \(NERC PRC-004\)\n-+\n {2}1 of \d+ trips reviewed, 1 misoperation\./);
+  assert.match(t, /Review {6}: Misoperation - Unnecessary Trip - During Fault; cause: Incorrect Settings; corrective action plan due 2026-12-27 \(J, 2026-10-28\)/);
+  assert.ok(!core.filterReportText(t, { review: false }).includes("OPERATION REVIEW"));
+  assert.ok(!core.filterReportText(t, { review: false }).includes("Review      :"));
+  const csv = core.reviewCsv(events, rdb, reviews).split("\r\n");
+  assert.equal(csv[0], core.REVIEW_COLUMNS.join(","));
+  assert.ok(csv.some((l) => l.startsWith("10/22/2026,09:41:17.506,LINE 5 HILL,HILL SUB,BC T,") && l.includes(",Misoperation,Unnecessary Trip - During Fault,Incorrect Settings,J,2026-10-28,2027-02-19,2026-10-28,2026-12-27,")));
+  assert.equal(csv.filter(Boolean).length - 1, items.filter((it) => it.a.tripped).length);
+});

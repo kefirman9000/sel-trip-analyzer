@@ -200,6 +200,44 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await pott.locator('button[data-act="why"]').click();
   ok("Why? closes again", (await page.locator("#evTable tr.why").count()) === 0);
 
+  // 6c3) operation review (PRC-004): suggestion, misoperation with category and cause, summary section, review log
+  const hill = page.locator("#evTable tbody tr[data-id]", { hasText: "via M1P @ 0.70" }).first();
+  ok("trips show when the PRC-004 decision is due", /Review by 2027-02-19/.test(await hill.textContent()));
+  await hill.locator('button[data-act="review"]').click();
+  await page.waitForSelector("#rvDlg[open]");
+  ok("review dialog suggests a starting point with its reason", /Starting point:.*M1P/.test(await page.textContent("#rvSug")) && /Decide by 2027-02-19/.test(await page.textContent("#rvDates")));
+  ok("category and cause hidden until Misoperation is chosen", await page.isHidden("#rvCat"));
+  await page.selectOption("#rvOutcome", "misop");
+  await page.selectOption("#rvCat", "Unnecessary Trip - During Fault");
+  await page.selectOption("#rvCause", "Incorrect Settings");
+  await page.fill("#rvCauseFound", "2026-10-28");
+  await page.fill("#rvWho", "J. Smith");
+  await page.fill("#rvCap", "Reduce Z1 reach to 85%");
+  ok("corrective action plan due 60 days after the cause was found", /Corrective action plan due 2026-12-27/.test(await page.textContent("#rvDates")));
+  await page.click("#rvSave");
+  ok("saved review shows on the event", /Misoperation/.test(await hill.textContent()) && (await hill.locator(".chip2.trip").count()) === 1);
+  await page.selectOption("#evShow", "misop");
+  ok("filter: misoperations", (await page.locator("#evTable tbody tr[data-id]").count()) === 1);
+  await page.selectOption("#evShow", "unreviewed");
+  const nUnrev = await page.locator("#evTable tbody tr[data-id]").count();
+  ok("filter: trips not reviewed", nUnrev >= 8 && !(await page.locator("#evTable tbody tr[data-id]", { hasText: "via M1P @ 0.70" }).count()), String(nUnrev));
+  await page.selectOption("#evShow", "all");
+  const sumRv = await page.evaluate(() => window.__selApp.summaryText());
+  ok("summary gets an OPERATION REVIEW section and a Review line", /OPERATION REVIEW \(NERC PRC-004\)/.test(sumRv) &&
+     /LINE 5 HILL BC T 10\/22\/2026: Misoperation - Unnecessary Trip - During Fault; cause: Incorrect Settings; corrective action plan due 2026-12-27 \(J\. Smith/.test(sumRv) &&
+     /Review {6}: not reviewed yet - decide by/.test(sumRv));
+  await page.click("#tabSummary");
+  await page.click("#exportBtn");
+  const [dRv] = await Promise.all([page.waitForEvent("download"), page.click('[data-exp="review"]')]);
+  const rvCsv = fs.readFileSync(await dRv.path(), "utf8").replace(/^\ufeff/, "").split("\r\n");
+  ok("review log CSV: one row per trip with category, cause and due dates", rvCsv[0].startsWith("Date,Time,Relay,Station,Event type,What happened,Review,Category,Cause") &&
+     rvCsv.some((l) => l.includes("LINE 5 HILL") && l.includes("Misoperation,Unnecessary Trip - During Fault,Incorrect Settings,J. Smith") && l.includes("2026-12-27")),
+     dRv.suggestedFilename());
+  await page.click("#tabEvents");
+  await hill.locator('button[data-act="review"]').click();
+  await page.click("#rvClear");
+  ok("review can be cleared", /Review by/.test(await hill.textContent()) && !/OPERATION REVIEW/.test(await page.evaluate(() => window.__selApp.summaryText())));
+
   // 6d) waveform analysis page
   await page.click("#tabWave");
   await page.waitForSelector("#pageWave:not([hidden])");

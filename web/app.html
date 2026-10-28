@@ -349,6 +349,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .why li.chk { color: var(--warn); }
 .why li button { min-height: 24px; padding: 0 8px; margin-left: 8px; font-size: 12px; }
 .evt td.act button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.chip2.ok { color: var(--ok); border-color: var(--ok); } .chip2.trip { color: var(--trip); border-color: var(--trip); }
+#rvDlg .dlg-body { padding-top: 12px; }
+.rv-grid { display: grid; grid-template-columns: 170px 1fr; gap: 9px 14px; align-items: center; }
+.rv-grid label { font-weight: 600; font-size: 13px; }
+#rvDlg .rv-grid select, #rvDlg .rv-grid input, #rvDlg .rv-grid textarea { width: 100%; max-width: none; box-sizing: border-box; }
+.rv-grid textarea { min-height: 54px; }
+.rv-sug { border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 9px 12px; margin: 0 0 14px; font-size: 13px; background: var(--surface-2); }
+.rv-sug button { margin-top: 6px; min-height: 26px; padding: 0 10px; }
+.rv-dates { margin: 12px 0 0; }
+.rv-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 22px 16px; border-top: 1px solid var(--border); }
+.rv-foot .grow { flex: 1; }
+@media (max-width: 560px) { .rv-grid { grid-template-columns: 1fr; gap: 4px; } .rv-grid label { margin-top: 6px; } }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .chip2 { font-size: 11px; border: 1px solid var(--border); border-radius: 10px; padding: 0 7px; color: var(--muted); background: var(--surface-2); }
 .chip2.warn { color: var(--warn); border-color: var(--warn); }
@@ -451,7 +463,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
     <input type="search" id="evSearch" placeholder="Filter events" aria-label="Filter events">
     <select id="evShow" aria-label="Which events">
       <option value="all">All events</option><option value="trips">Trips only</option><option value="review">Needs review</option>
-      <option value="wave">With waveforms</option><option value="notes">With notes</option><option value="weather">Weather could explain it</option><option value="related">Two-ended or incident</option>
+      <option value="wave">With waveforms</option><option value="notes">With notes</option><option value="weather">Weather could explain it</option><option value="related">Two-ended or incident</option><option value="unreviewed">Trips not reviewed (PRC-004)</option><option value="misop">Misoperations</option>
     </select>
     <label class="check hint"><input type="checkbox" id="evDups" checked> Hide duplicates</label>
     <button id="stationsBtn2" title="Where each relay is, and the weather at each event">Stations &amp; weather…</button>
@@ -489,6 +501,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
         <button role="menuitem" data-exp="pdf">PDF / Print…<small>Choose "Save as PDF" in the print window · Ctrl+P</small></button>
         <button role="menuitem" data-exp="csv">Spreadsheet for Excel (.csv)…<small>One row per event; choose the columns</small></button>
         <button role="menuitem" data-exp="txt">Plain text (.txt)…</button>
+        <button role="menuitem" data-exp="review">Operation review log (.csv)<small>Every trip: decision, NERC category and cause, due dates</small></button>
       </div>
     </div>
   </div>
@@ -745,6 +758,27 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
   </div>
 </dialog>
 
+<dialog id="rvDlg" aria-labelledby="rvTitle">
+  <div class="dlg-head"><h2 id="rvTitle">Operation review</h2><button id="rvClose">Close</button></div>
+  <div class="dlg-body">
+    <p class="hint" id="rvEvent" style="margin-top:0"></p>
+    <div class="rv-sug" id="rvSug"></div>
+    <div class="rv-grid">
+      <label for="rvOutcome">Decision</label><select id="rvOutcome"></select>
+      <label for="rvCat" class="rv-mis">Misoperation category</label><select id="rvCat" class="rv-mis"></select>
+      <label for="rvCause" class="rv-mis">Cause</label><select id="rvCause" class="rv-mis"></select>
+      <label for="rvCauseFound" class="rv-mis">Cause found on</label><input type="date" id="rvCauseFound" class="rv-mis">
+      <label for="rvWho">Reviewed by</label><input type="text" id="rvWho" placeholder="Your name">
+      <label for="rvDate">Reviewed on</label><input type="date" id="rvDate">
+      <label for="rvNotes">Notes</label><textarea id="rvNotes" placeholder="What the review found, e.g. remote end confirmed a BC fault at 9.8 mi"></textarea>
+      <label for="rvCap" class="rv-mis">Corrective action</label><textarea id="rvCap" class="rv-mis" placeholder="e.g. Reduce Z1 reach to 85%; settings change ticket 1234"></textarea>
+    </div>
+    <p class="hint rv-dates" id="rvDates"></p>
+    <p class="hint">NERC PRC-004 gives 120 calendar days from the breaker operation to decide whether it was a misoperation, and 60 days from finding
+      the cause to have a corrective action plan. Reviews are saved in this browser and go into the summary, the exports and the review log.</p>
+  </div>
+  <div class="rv-foot"><button id="rvClear">Clear review</button><span class="grow"></span><button id="rvCancel">Cancel</button><button class="accent" id="rvSave">Save</button></div>
+</dialog>
 <dialog id="stDlg" aria-labelledby="stTitle" class="wide">
   <div class="dlg-head"><h2 id="stTitle">Stations &amp; weather <span class="hint" id="wxHint"></span></h2><button id="stClose">Close</button></div>
   <div class="dlg-body wx-box">
@@ -854,7 +888,9 @@ function refreshChoices(ch) {
 }
 const currentOpts = () => ({ show: view.show, relay: view.relay, sort: view.sort, detail: view.detail,
                              hide_duplicates: $("vDups").checked, search: $("vSearch").value.trim(), notes: store.get("notes", {}),
-                             weather: store.get("wxOn", true) ? store.get("wxResults", {}) : {} });
+                             weather: store.get("wxOn", true) ? store.get("wxResults", {}) : {}, reviews: reviewsOrNull() });
+/** Operation reviews (PRC-004), or null until the first one is saved (the summary then gets a review section). */
+const reviewsOrNull = () => { const r = store.get("reviews", {}); return Object.keys(r).length ? r : null; };
 function editsOk() {
   if (state.empty || !state.edited) return true;
   return confirm("Changing the view rebuilds the summary, so the edits you made in the summary box will be lost.\n\n" +
@@ -1111,6 +1147,65 @@ function comtradeIndex() {
 }
 const evSort = { key: "time", dir: 1 };
 const whyOpen = new Set();
+// ---------------------------------------------------------------- operation review (PRC-004)
+let rvId = null;
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+$("rvOutcome").innerHTML = core.REVIEW_OUTCOMES.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("");
+$("rvCat").innerHTML = `<option value="">Choose…</option>` + core.MISOP_CATEGORIES.map((c) => `<option>${esc(c)}</option>`).join("");
+$("rvCause").innerHTML = `<option value="">Not known yet</option>` + core.MISOP_CAUSES.map((c) => `<option>${esc(c)}</option>`).join("");
+function rvSync() {
+  const mis = $("rvOutcome").value === "misop";
+  for (const el of document.querySelectorAll("#rvDlg .rv-mis")) el.hidden = !mis;
+  const it = allItems().find((x) => x.id === rvId); if (!it) return;
+  const due = core.reviewDue(it.e), found = $("rvCauseFound").value, cap = mis && $("rvCause").value && found ? core.addDays(found, core.CAP_DAYS) : "";
+  $("rvDates").textContent = (due ? `Decide by ${due} (120 days after the event).` : "The file has no date, so the 120-day deadline can't be worked out.") +
+    (cap ? ` Corrective action plan due ${cap} (60 days after the cause was found).` : "");
+}
+function openReview(id) {
+  const it = allItems().find((x) => x.id === id); if (!it) return;
+  rvId = id;
+  const r = store.get("reviews", {})[id] || {}, sug = core.suggestReview(it);
+  $("rvEvent").textContent = `${it.e.date} ${it.e.time} · ${core.relayKey(it.e)}${it.e.terminal_id ? " (" + it.e.terminal_id + ")" : ""} · ${it.e.event_type || "?"} · ${core.shortCause(it.e, it.s, it.a)}`;
+  const sugText = [sug.outcome ? core.REVIEW_OUTCOMES.find((o) => o[0] === sug.outcome)[1] : "", sug.category, sug.cause].filter(Boolean).join(" · ");
+  $("rvSug").innerHTML = `<b>Starting point:</b> ${esc(sug.text)}` + (sugText ? `<br><button id="rvUse">Fill in: ${esc(sugText)}</button>` : "") +
+    `<div class="hint" style="margin-top:4px">A suggestion from the event data only. The decision depends on how the protection was designed to work.</div>`;
+  if ($("rvUse")) $("rvUse").addEventListener("click", () => {
+    if (sug.outcome) $("rvOutcome").value = sug.outcome; else if (sug.category) $("rvOutcome").value = "misop";
+    if (sug.category) $("rvCat").value = sug.category;
+    if (sug.cause) $("rvCause").value = sug.cause;
+    rvSync();
+  });
+  $("rvOutcome").value = r.outcome || ""; $("rvCat").value = r.category || ""; $("rvCause").value = r.cause || "";
+  $("rvCauseFound").value = r.causeFound || ""; $("rvWho").value = r.reviewer || store.get("rvWho", "");
+  $("rvDate").value = r.date || todayIso(); $("rvNotes").value = r.notes || ""; $("rvCap").value = r.cap || "";
+  rvSync();
+  $("rvDlg").showModal();
+}
+for (const id of ["rvOutcome", "rvCause", "rvCauseFound"]) $(id).addEventListener("change", rvSync);
+$("rvCause").addEventListener("change", () => { if ($("rvCause").value && !$("rvCauseFound").value) { $("rvCauseFound").value = todayIso(); rvSync(); } });
+$("rvClose").addEventListener("click", () => $("rvDlg").close());
+$("rvCancel").addEventListener("click", () => $("rvDlg").close());
+$("rvDlg").addEventListener("click", (e) => { if (e.target === $("rvDlg")) $("rvDlg").close(); });
+function saveReview(r) {
+  const all = store.get("reviews", {});
+  if (r) all[rvId] = r; else delete all[rvId];
+  store.set("reviews", all);
+  $("rvDlg").close();
+  renderEvents();
+  notesChanged();
+}
+$("rvSave").addEventListener("click", () => {
+  const outcome = $("rvOutcome").value, mis = outcome === "misop";
+  if (mis && !$("rvCat").value) { setStatus("Choose the misoperation category"); $("rvCat").focus(); return; }
+  const r = { outcome, reviewer: $("rvWho").value.trim(), date: $("rvDate").value, notes: $("rvNotes").value.trim() };
+  if (mis) Object.assign(r, { category: $("rvCat").value, cause: $("rvCause").value, causeFound: $("rvCauseFound").value, cap: $("rvCap").value.trim() });
+  if (r.reviewer) store.set("rvWho", r.reviewer);
+  const empty = !outcome && !r.notes;
+  saveReview(empty ? null : r);
+  setStatus(empty ? "Review cleared" : `Review saved: ${core.REVIEW_OUTCOMES.find((o) => o[0] === outcome)[1]}`);
+});
+$("rvClear").addEventListener("click", () => { saveReview(null); setStatus("Review cleared"); });
+
 /** The evidence under an event: each fact the conclusion rests on, with a jump to that moment in the record. */
 function whyRow(it, recId) {
   const a = it.a, ev = a.evidence || [];
@@ -1135,7 +1230,8 @@ function renderEvents() {
   }
   const v = core.prepareView(state.cache.events, state.cache.rdb, { hide_duplicates: $("evDups").checked, notes: store.get("notes", {}),
                                                                     weather: store.get("wxOn", true) ? store.get("wxResults", {}) : {} });
-  const notes = store.get("notes", {}), wxr = store.get("wxResults", {});
+  const notes = store.get("notes", {}), wxr = store.get("wxResults", {}), reviews = store.get("reviews", {});
+  const soon = new Date(Date.now() + 14 * 86400e3).toISOString().slice(0, 10);
   const all = v.items.filter((it) => !$("evDups").checked || it.e.dup_of === null);
   const rep = new Set(v.repeats.flatMap((r) => r.items));
   const cts = comtradeIndex();
@@ -1168,6 +1264,8 @@ function renderEvents() {
     if (show === "notes" && !notes[it.id]) return false;
     if (show === "weather" && !stormy(it)) return false;
     if (show === "related" && !it.pair && !it.incident) return false;
+    if (show === "unreviewed" && !(it.a.tripped && it.e.dup_of === null && !(reviews[it.id] && reviews[it.id].outcome))) return false;
+    if (show === "misop" && !(reviews[it.id] && reviews[it.id].outcome === "misop")) return false;
     if (q) {
       const hay = [it.e.date, it.e.time, core.relayKey(it.e), it.e.terminal_id, it.e.event_type, it.e.source, core.shortCause(it.e, it.s, it.a), notes[it.id], (wxr[it.id] || {}).text].join(" ").toUpperCase();
       if (!hay.includes(q)) return false;
@@ -1193,6 +1291,9 @@ function renderEvents() {
     if (it.incident) chips.push(`<span class="chip2" title="${esc(it.incident.items.length + " events within " + Math.round(it.incident.spanUs / 1e6) + " s")}">Incident ${it.incident.n}</span>`);
     if (rep.has(it)) chips.push(`<span class="chip2 warn" title="3 or more trips on this relay within 30 days">Repeat</span>`);
     if (e.dup_of !== null) chips.push(`<span class="chip2">Same as a CEV</span>`);
+    const rv = reviews[id];
+    if (rv && rv.outcome) chips.push(`<span class="chip2 ${rv.outcome === "correct" ? "ok" : rv.outcome === "misop" ? "trip" : ""}" title="${esc(rv.outcome === "misop" ? [rv.category, rv.cause].filter(Boolean).join("; ") : "Operation review")}">${esc(core.REVIEW_OUTCOMES.find((o) => o[0] === rv.outcome)[1])}</span>`);
+    else if (it.a.tripped && e.dup_of === null) { const due = core.reviewDue(e), late = due && due <= soon; chips.push(`<span class="chip2${late ? " warn" : ""}" title="NERC PRC-004: decide within 120 days of the breaker operation">Review by ${esc(due || "?")}</span>`); }
     const nc = nChecks(it);
     const w = wxr[id];
     const wparts = w ? w.text.replace(/ \(hour of .*\)$/, "").split(", ") : [];
@@ -1206,7 +1307,7 @@ function renderEvents() {
       <td class="chk">${nc ? `<span class="badge-w" title="${esc(it.a.checks.concat(it.a.gaps).join("\n"))}">${nc}</span>` : `<span class="okmark" title="Nothing to check">✓</span>`}</td>
       <td class="wx${stormy(it) ? " storm" : ""}" title="${esc(w ? w.text + "\n" + (w.hints || []).map((h) => h.text).join("\n") : "")}">${esc(wtxt) || '<span class="hint">-</span>'}</td>
       <td class="note"><input type="text" value="${esc(notes[id] || "")}" placeholder="Add a note…" aria-label="Note for event ${num.get(it)}"></td>
-      <td class="act"><button data-act="why" aria-expanded="${whyOpen.has(id)}" title="What this conclusion is based on">Why?</button><button data-act="details" title="Show this event in the summary">Details</button>${waveId(it) ? `<button data-act="wave" data-rec="${esc(waveId(it))}" title="Open its waveforms">Waveforms</button>` : ""}</td>
+      <td class="act">${it.a.tripped || reviews[id] ? `<button data-act="review" title="Correct operation or misoperation? (NERC PRC-004)">Review</button>` : ""}<button data-act="why" aria-expanded="${whyOpen.has(id)}" title="What this conclusion is based on">Why?</button><button data-act="details" title="Show this event in the summary">Details</button>${waveId(it) ? `<button data-act="wave" data-rec="${esc(waveId(it))}" title="Open its waveforms">Waveforms</button>` : ""}</td>
     </tr>` + (whyOpen.has(id) ? whyRow(it, e.wave ? id : null) : "");
   }).join("");
   tbl.innerHTML = head + `<tbody>${body || `<tr><td colspan="9" class="evt-empty">No events match.</td></tr>`}</tbody>`;
@@ -1216,6 +1317,7 @@ $("evTable").addEventListener("click", (e) => {
   if (h) { const k = h.dataset.sort; if (evSort.key === k) evSort.dir *= -1; else { evSort.key = k; evSort.dir = k === "checks" ? -1 : 1; } renderEvents(); return; }
   const b = e.target.closest("button[data-act]"); if (!b) return;
   const row = b.closest("tr"), id = row.dataset.id || row.dataset.for;
+  if (b.dataset.act === "review") { openReview(id); return; }
   if (b.dataset.act === "why") { if (whyOpen.has(id)) whyOpen.delete(id); else whyOpen.add(id); renderEvents(); return; }
   if (b.dataset.act === "goto") {
     const it = allItems().find((x) => x.id === id), x = it && it.a.evidence[+b.dataset.k];
@@ -1616,7 +1718,7 @@ const SUMMARY_EXPORT = {
   groups: [
     { title: "Sections", only: ["docx", "pdf", "txt"], items: [
       { key: "comments", label: "Comments & suggestions", def: true }, { key: "overview", label: "Overview", def: true },
-      { key: "quick", label: "Quick summary table", def: true }, { key: "relations", label: "Two-ended, incidents, repeat trips", def: true },
+      { key: "quick", label: "Quick summary table", def: true }, { key: "relations", label: "Two-ended, incidents, repeat trips", def: true }, { key: "review", label: "Operation review (PRC-004)", def: true },
       { key: "details", label: "Event details", def: true }, { key: "ser", label: "SER lines (Full detail)", def: true },
       { key: "settings", label: "Settings loaded", def: true }, { key: "errors", label: "Files that couldn't be read", def: true }] },
     { title: "In each event", only: ["docx", "pdf", "txt"], items: [
@@ -1707,7 +1809,15 @@ $("exportBtn").addEventListener("click", (e) => {
   $("exportBtn").setAttribute("aria-expanded", String(open));
 });
 document.addEventListener("click", (e) => { if (!e.target.closest(".menu-wrap")) closeMenu(); });
-$("exportMenu").addEventListener("click", (e) => { const b = e.target.closest("[data-exp]"); if (b) askExport(b.dataset.exp); });
+$("exportMenu").addEventListener("click", (e) => { const b = e.target.closest("[data-exp]"); if (!b) return; if (b.dataset.exp === "review") exportReviewLog(); else askExport(b.dataset.exp); });
+function exportReviewLog() {
+  closeMenu();
+  if (!state.cache) { setStatus("Load event files first"); return; }
+  const name = safeName(summaryName().replace(/ trip summary$/i, "") + " operation review");
+  download(name + ".csv", new Blob(["\ufeff", core.reviewCsv(state.cache.events, state.cache.rdb, store.get("reviews", {}))], { type: "text/csv;charset=utf-8" }));
+  flash($("exportBtn"), "Exported ✓");
+  if (!DESK) setStatus("Saved " + name + ".csv to your downloads (one row per trip)");
+}
 
 // ---------------------------------------------------------------- feedback
 $("send").addEventListener("click", () => {
