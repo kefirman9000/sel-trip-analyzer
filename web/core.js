@@ -1386,6 +1386,16 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
     });
     out.push("");
     out.push(...relationSections(view, number));
+    if (opts.reviews) {
+      const rows = reviewRows(shown, opts.reviews);
+      if (rows.length) {
+        const done = rows.filter((r) => r.outcome).length, mis = rows.filter((r) => r.outcome === "misop").length;
+        out.push("OPERATION REVIEW (NERC PRC-004)", "-".repeat(60));
+        out.push(`  ${done} of ${rows.length} trip${rows.length === 1 ? "" : "s"} reviewed` + (mis ? `, ${mis} misoperation${mis === 1 ? "" : "s"}` : "") + ".");
+        for (const row of rows) out.push(`  ${ref(number, row.it)} ${relayKey(row.it.e)} ${row.it.e.event_type || "?"} ${strip(row.it.e.date)}: ${reviewLine(row)}`);
+        out.push("");
+      }
+    }
     if (detail !== "summary" && !(items.length && !shown.length)) {
       out.push("EVENT DETAILS", "-".repeat(60));
       const shownSettings = new Map();
@@ -1416,6 +1426,10 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
         out.push(`  Confidence  : ${a.confidence} (${a.basis})` + (nChk ? ` - ${nChk} item(s) to check` : ""));
         if (it.note) out.push(`  Notes       : ${splitlines(strip(it.note)).map((x) => strip(x)).filter(Boolean).join(" / ")}`);
         if (it.weather) out.push(`  Weather     : ${it.weather.text}`);
+        if (opts.reviews && (a.tripped || opts.reviews[it.id]) && e.dup_of === null) {
+          const rr = reviewRows([it], opts.reviews)[0];
+          if (rr) out.push(`  Review      : ${reviewLine(rr)}`);
+        }
         out.push("  Probable cause:");
         for (const c of a.cause.concat(dupNote(e), relationNotes(it, number), weatherNotes(it))) out.push(`    - ${c}`);
         if (nChk) { out.push("  Check before relying on this:"); for (const c of a.checks.concat(a.gaps)) out.push(`    - CHECK: ${c}`); }
@@ -1632,7 +1646,7 @@ function parseReportText(text) {
  * (missing keys count as true).
  */
 const SECTION_KEYS = [["ANALYST COMMENTS", "comments"], ["OVERVIEW", "overview"], ["QUICK SUMMARY", "quick"], ["TWO-ENDED EVENTS", "relations"],
-  ["INCIDENTS", "relations"], ["REPEAT TRIPS", "relations"], ["EVENT DETAILS", "details"], ["SEQUENTIAL EVENTS RECORDER", "ser"],
+  ["INCIDENTS", "relations"], ["REPEAT TRIPS", "relations"], ["OPERATION REVIEW", "review"], ["EVENT DETAILS", "details"], ["SEQUENTIAL EVENTS RECORDER", "ser"],
   ["SETTINGS LOADED", "settings"], ["FILES THAT COULD NOT BE READ", "errors"]];
 function filterReportText(text, inc) {
   inc = inc || {};
@@ -1664,6 +1678,7 @@ function filterReportText(text, inc) {
       } else if (dropSub && (ln.startsWith("   ") || !s)) { if (!s) dropSub = false; else continue; }
       else if (/^ {2}\S/.test(ln)) dropSub = false;
       if (/^ {2}Notes {7}:/.test(ln) && !on("notes")) continue;
+      if (/^ {2}Review {6}:/.test(ln) && !on("review")) continue;
       if ((/^ {2}Weather {5}:/.test(ln) || /^ {4}- Weather: /.test(ln)) && !on("weather")) continue;
       if (/^ {4}- CHECK: /.test(ln) && !on("checks")) continue;
     }
@@ -1688,10 +1703,95 @@ function tripRuns(text) {
   return runs;
 }
 
+// ---------------------------------------------------------------------------
+// Operation review (NERC PRC-004): was each trip a correct operation or a misoperation?
+// ---------------------------------------------------------------------------
+const MISOP_CATEGORIES = ["Failure to Trip - During Fault", "Failure to Trip - Other Than Fault", "Slow Trip - During Fault",
+  "Slow Trip - Other Than Fault", "Unnecessary Trip - During Fault", "Unnecessary Trip - Other Than Fault"];
+const MISOP_CAUSES = ["Incorrect Settings", "Logic Errors", "Design Errors", "As-left Personnel Errors", "Relay Failures/Malfunctions",
+  "Communication Failures", "AC System", "DC System", "Unknown/Unexplainable", "Other/Explainable"];
+const REVIEW_OUTCOMES = [["", "Not reviewed"], ["correct", "Correct operation"], ["misop", "Misoperation"],
+  ["na", "Not applicable"]];
+const REVIEW_DAYS = 120, CAP_DAYS = 60;   // PRC-004-6 R1 (decide) and R5 (corrective action plan)
+const isoDay = (us) => new Date(us / 1000).toISOString().slice(0, 10);
+const addDays = (iso, d) => { const t = Date.parse(iso + "T00:00:00Z"); return Number.isFinite(t) ? isoDay((t + d * 86400e3) * 1000) : ""; };
+const reviewLabel = (k) => (REVIEW_OUTCOMES.find((o) => o[0] === k) || REVIEW_OUTCOMES[0])[1];
+
+/** When the decision is due: 120 calendar days after the breaker operation. */
+function reviewDue(e) { const dt = eventDatetime(e); return dt === null ? "" : isoDay(dt + REVIEW_DAYS * 86400e6); }
+
+/** A starting point for the reviewer, with the reason. Never a verdict: the protection design decides. */
+function suggestReview(it) {
+  const e = it.e, a = it.a, isFault = has(FAULT_TYPES, eventCore(e.event_type));
+  const chk = a.checks.join("\n"), causeText = a.cause.join("\n");
+  if (!a.tripped) {
+    if (isFault) return { outcome: "", category: "Failure to Trip - During Fault", text: "The relay saw a fault but didn't trip. Correct if another device was meant to clear it; " +
+                          "a Failure to Trip if this relay should have." };
+    return { outcome: "na", category: "", text: "No trip, so there's usually nothing to review unless this relay should have tripped." };
+  }
+  if (/beyond typical Zone 1 reach/.test(chk))
+    return { outcome: "misop", category: "Unnecessary Trip - During Fault", cause: "Incorrect Settings",
+             text: "Zone 1 tripped for a fault beyond its usual reach: if the fault was outside this line, Zone 1 overreached." };
+  if (/beyond the end of the line/.test(chk) && /instantaneous|Zone 1/i.test(causeText))
+    return { outcome: "misop", category: "Unnecessary Trip - During Fault",
+             text: "An instantaneous element tripped for a fault located beyond the end of the line: check whether this relay should have cleared it." };
+  if (/No element from the trip equations asserted|No protection element asserted/.test(chk))
+    return { outcome: "", category: "Unnecessary Trip - Other Than Fault",
+             text: "No protection element explains the trip. A manual or SCADA open is not a protection operation (Not applicable); otherwise it may be an Unnecessary Trip." };
+  if (!isFault && eventCore(e.event_type) === "TRIP" && !/transfer trip|Frequency|Voltage element|Breaker-failure|Out-of-step/.test(causeText))
+    return { outcome: "", category: "Unnecessary Trip - Other Than Fault",
+             text: "A trip with no fault and no transfer-trip, frequency or voltage reason found." };
+  if (!isFault && /underfrequency|Frequency element tripped/i.test(causeText))
+    return { outcome: "correct", category: "", text: "Underfrequency load shedding: a correct operation if the frequency really fell below the setting for the set time." };
+  if (!isFault && /transfer trip/i.test(causeText))
+    return { outcome: "", category: "", text: "A trip received from the remote end: correct if the remote end sent it for a real fault. Review it together with the remote end's event." };
+  if (/took [\d.]+ cycles to open/.test(chk))
+    return { outcome: "", category: "", text: "The breaker was slow to open. A slow breaker isn't a Protection System misoperation by itself, but check the trip circuit (DC System)." };
+  if (isFault && a.primary.length && !a.checks.length)
+    return { outcome: "correct", category: "", text: `The expected kind of element (${a.primary.join(", ")}) tripped for a fault, with nothing flagged.` };
+  return { outcome: "", category: "", text: isFault ? "Confirm the right element tripped, in the expected time, for this fault." : "Confirm what caused this trip and whether the relay should have operated." };
+}
+
+/** One review line per trip (and per reviewed event), oldest first. */
+function reviewRows(items, reviews) {
+  reviews = reviews || {};
+  return items.filter((it) => it.e.dup_of === null && (it.a.tripped || reviews[it.id])).map((it) => {
+    const r = reviews[it.id] || {}, due = reviewDue(it.e);
+    const capDue = r.outcome === "misop" && r.cause && r.causeFound ? addDays(r.causeFound, CAP_DAYS) : "";
+    return { it, r, due, capDue, outcome: r.outcome || "", label: reviewLabel(r.outcome || "") };
+  });
+}
+
+function reviewLine(row) {
+  const { it, r } = row;
+  if (!r.outcome) return `not reviewed yet - decide by ${row.due || "(no date in the file)"}`;
+  let t = row.label;
+  if (r.outcome === "misop") t += (r.category ? ` - ${r.category}` : "") + (r.cause ? `; cause: ${r.cause}` : "") + (row.capDue ? `; corrective action plan due ${row.capDue}` : "");
+  const who = [r.reviewer, r.date].filter(Boolean).join(", ");
+  return t + (who ? ` (${who})` : "") + (r.notes ? `. ${splitlines(strip(r.notes)).map((x) => strip(x)).filter(Boolean).join(" / ")}` : "") +
+         (r.cap ? `. Corrective action: ${strip(r.cap)}` : "");
+}
+
+const REVIEW_COLUMNS = ["Date", "Time", "Relay", "Station", "Event type", "What happened", "Review", "Category", "Cause", "Reviewer",
+  "Reviewed on", "Decide by", "Cause found on", "Corrective action plan due", "Notes", "Corrective action"];
+/** The review log as CSV (one row per trip), for a compliance spreadsheet. */
+function reviewCsv(events, rdb, reviews) {
+  const v = prepareView(events, rdb, {});
+  const rows = [REVIEW_COLUMNS.join(",")];
+  for (const row of reviewRows(v.items, reviews)) {
+    const { it, r } = row, e = it.e;
+    rows.push([e.date, e.time, relayKey(e), e.terminal_id, e.event_type, shortCause(e, it.s, it.a), row.label,
+               r.outcome === "misop" ? r.category || "" : "", r.outcome === "misop" ? r.cause || "" : "", r.reviewer || "", r.date || "",
+               row.due, r.causeFound || "", row.capDue, r.notes || "", r.cap || ""].map((x) => csvField(String(x || ""))).join(","));
+  }
+  return rows.join("\r\n") + "\r\n";
+}
+
 const api = {
   loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
   parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, ARCHIVE_EXTS, SETTINGS_TEXT_EXTS, unzip, settingsFromText, nowStamp, eventDatetime, eventCore,
   interpretEventType, interpretTargets, extractSettings, splitWS, strip, splitlines, csvLine, latin1, FAULT_TYPES, fx, fc, pyTitle, elementClass,
+  MISOP_CATEGORIES, MISOP_CAUSES, REVIEW_OUTCOMES, REVIEW_COLUMNS, REVIEW_DAYS, CAP_DAYS, reviewDue, suggestReview, reviewRows, reviewLine, reviewCsv, addDays,
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.SELCore = api;
