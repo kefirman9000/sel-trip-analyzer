@@ -35,7 +35,7 @@
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--text);
-  font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 ::selection { background: var(--sel); }
@@ -46,7 +46,7 @@ body {
 header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
 header img { width: 42px; height: 42px; flex: none; }
 .titles { flex: 1 1 260px; min-width: 0; }
-h1 { font: 600 22px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -.01em; }
+h1 { font: 600 22px/1.2 "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif; margin: 0; letter-spacing: -.01em; }
 .sub { color: var(--muted); margin-top: 2px; }
 .head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
@@ -89,7 +89,7 @@ input[type="search"]::placeholder { color: var(--muted); }
 }
 .drop:hover, .drop.over { background: var(--drop-hover); border-color: var(--accent); }
 .drop svg { width: 34px; height: 34px; color: var(--accent); display: block; margin: 0 auto 6px; }
-.drop .big { font: 600 16px/1.3 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
+.drop .big { font: 600 16px/1.3 "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif; }
 .drop .formats { color: var(--muted); font-size: 12px; margin-top: 5px; word-spacing: 2px; }
 
 /* sections */
@@ -124,7 +124,7 @@ textarea::placeholder { color: var(--muted); }
   tab-size: 4; outline: none;
 }
 #out:empty::before { content: attr(data-placeholder); color: var(--muted); white-space: pre-wrap;
-  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 14px; }
+  font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif; font-size: 14px; }
 #out .h1 { font-weight: 700; font-size: 15px; }
 #out .h2 { font-weight: 700; color: var(--accent); }
 #out .rule { color: var(--rule); }
@@ -208,7 +208,7 @@ input[type="text"], .evlist input, #wPins input {
 .wv-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 2px 0 8px; }
 .wv-head h2 { margin: 0; font-size: 18px; }
 .verdict { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; margin-bottom: 12px; }
-.verdict .code { font: 700 26px/1 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; min-width: 76px; text-align: center;
+.verdict .code { font: 700 26px/1 "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif; min-width: 76px; text-align: center;
   padding: 12px 10px; border-radius: 8px; background: var(--surface-2); }
 .verdict .code.trip { color: var(--trip); } .verdict .code.ok { color: var(--ok); } .verdict .code.warn { color: var(--warn); }
 .verdict .name { font-weight: 700; font-size: 15px; }
@@ -3480,7 +3480,7 @@ const LIGHT = { bg: "#ffffff", ink: "#1b1b1b", muted: "#616161", grid: "#e6e6e6"
                 trip: "#c42b1c", warn: "#9a5800", shade: "rgba(0,95,184,0.06)", zoom: "rgba(0,95,184,0.14)", pin: "#9a5800" };
 const DARK = { bg: "#252525", ink: "#e9e9e9", muted: "#9e9e9e", grid: "#333333", axis: "#474747", accent: "#4cc2ff",
                trip: "#ff8f85", warn: "#ffb74d", shade: "rgba(76,194,255,0.07)", zoom: "rgba(76,194,255,0.18)", pin: "#ffb74d" };
-const FONT = '"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Arial,sans-serif';
+const FONT = '"Segoe UI Variable Text","Segoe UI",Inter,system-ui,-apple-system,Arial,sans-serif';
 
 // Plain-English meaning of each fault type, for the verdict card
 const MEANS = {
@@ -4493,7 +4493,7 @@ function create(ctx) {
     const fig = currentFigure(v);
     fig.canvas.toBlob((b) => { ctx.download(`${(v && v.fileName) || fileNameFor("png")}.png`, b); ctx.setStatus("Saved the graph picture (with your notes)"); }, "image/png");
   }
-  const fileSafe = (s) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80);
+  const fileSafe = (s) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 120);
   /** e.g. "FEEDER 3 2026-10-21 14-22-05 CG" or "Reference - CT saturation during a ground fault" */
   function baseName() {
     const rec = st.rec;
@@ -4505,7 +4505,9 @@ function create(ctx) {
       when = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}-${p2(d.getUTCMinutes())}-${p2(d.getUTCSeconds())}`;
     }
     const code = st.an.cls.code === "NONE" ? "no fault" : st.an.cls.code;
-    return fileSafe(`${rec.relay || rec.station || rec.source} ${when} ${code}`);
+    const loc = (ctx.store.get("locations", {})[String(rec.relay || "").toUpperCase()] || null);
+    const at = loc ? ` (${loc.label.split(",").slice(0, 2).map((x) => x.trim()).join(", ")})` : "";
+    return fileSafe(`${rec.relay || rec.station || rec.source}${at} ${when} ${code}`);
   }
   const fileNameFor = (f) => `${baseName()} ${f === "docx" ? "waveform analysis" : f === "png" ? "graph" : "samples"}`;
   function exportCsv(v) {
@@ -5497,7 +5499,13 @@ const SUMMARY_EXPORT = {
 };
 const safeName = (s) => String(s || "").replace(/[\\/:*?"<>|\x00-\x1f]+/g, "-").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "").slice(0, 120);
 const isoDay = (dt) => { const d = new Date(dt / 1000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`; };
-/** A file name that says what's in the export: the relay(s), event type and dates. */
+/** "Ocala, Florida" for the relays' saved locations (one or two places), else "". */
+function placeText(relays) {
+  const locs = store.get("locations", {});
+  const places = [...new Set(relays.map((r) => locs[String(r).toUpperCase()]).filter(Boolean).map((l) => l.label.split(",").slice(0, 2).map((x) => x.trim()).join(", ")))];
+  return places.length && places.length <= 2 ? places.join(" & ") : "";
+}
+/** A file name that says what's in the export: the relay(s), place, event type and dates. */
 function summaryName() {
   if (!state.cache) return `Trip summary ${stamp()}`;
   const shown = core.prepareView(state.cache.events, state.cache.rdb, currentOpts()).shown;
@@ -5506,11 +5514,13 @@ function summaryName() {
   const dts = shown.map((it) => it.dt).filter((x) => x !== null).sort((a, b) => a - b);
   if (shown.length === 1) {
     const e = shown[0].e, d = shown[0].dt !== null ? new Date(shown[0].dt / 1000) : null;
-    return safeName(`${core.relayKey(e)} ${e.event_type || "event"} ${d ? isoDay(shown[0].dt) + " " + String(d.getUTCHours()).padStart(2, "0") + String(d.getUTCMinutes()).padStart(2, "0") : ""} trip summary`);
+    const at = placeText([core.relayKey(e)]);
+    return safeName(`${core.relayKey(e)}${at ? " (" + at + ")" : ""} ${e.event_type || "event"} ${d ? isoDay(shown[0].dt) + " " + String(d.getUTCHours()).padStart(2, "0") + String(d.getUTCMinutes()).padStart(2, "0") : ""} trip summary`);
   }
   const span = dts.length ? (isoDay(dts[0]) === isoDay(dts[dts.length - 1]) ? isoDay(dts[0]) : `${isoDay(dts[0])} to ${isoDay(dts[dts.length - 1])}`) : stamp();
   const who = relays.length === 1 ? relays[0] : relays.length <= 3 ? relays.join(", ") : `${relays.length} relays`;
-  return safeName(`${who} trip summary ${span} (${shown.length} events)`);
+  const at = placeText(relays);
+  return safeName(`${who}${at ? " (" + at + ")" : ""} trip summary ${span} (${shown.length} events)`);
 }
 function exportDefaults() {
   const saved = store.get(SUMMARY_EXPORT.storeKey, {});
