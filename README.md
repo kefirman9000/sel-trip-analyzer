@@ -1,3 +1,5 @@
+<img src="assets/icon.png" width="72" align="left" alt="">
+
 # SEL Trip Event Analyzer
 
 A Windows drag-and-drop tool that reads SEL relay event files and AcSELerator
@@ -24,7 +26,11 @@ built-in updater can replace it.
 - Anything typed in **Comments & suggestions** is added to the top of the
   summary. Press F5 or **Generate summary** to refresh.
 - The summary is editable and colour-coded (trips in red, no-trip events in
-  green). **Copy all** puts plain text on the clipboard; **Save .txt** writes a file.
+  green). **Copy all** puts plain text on the clipboard.
+- **Export** saves the summary as a formatted **Word** document or **PDF**
+  report (title, quick-summary table, per-event details, cause bullets, element
+  timeline), or as plain text. Whatever you edited in the box is what gets
+  exported. Word and PDF files open automatically once saved.
 - **Feedback on this output**: type what was wrong, missing, or should be
   added, then **Send feedback**. It opens a pre-filled issue on this repo in
   your browser (click *Create* to submit; needs a free GitHub account), and a
@@ -39,7 +45,8 @@ built-in updater can replace it.
   new `.exe`, verifies its SHA-256, swaps it in and restarts.
 
 Shortcuts: `Ctrl+O` add files, `F5` / `Ctrl+Enter` generate, `Ctrl+Shift+C`
-copy summary, `Ctrl+D` dark mode, `Delete` removes selected files.
+copy summary, `Ctrl+S` export Word, `Ctrl+P` export PDF, `Ctrl+D` dark mode,
+`Delete` removes selected files.
 
 The summary covers, per event: relay ID, date/time, decoded event type
 (`AG T` = A-to-ground fault, tripped), fault location (as % of line when `LL`
@@ -65,9 +72,23 @@ The interpretation is automated, so confirm it against the oscillography.
 Install Python 3.9+ (tick "Add python.exe to PATH"), then double-click
 `build_exe.bat`. The program lands in `dist\SEL_Trip_Analyzer.exe`.
 
-To run from source: `pip install tkinterdnd2 olefile sv-ttk` then
+To run from source: `pip install -r requirements.txt` then
 `python sel_trip_analyzer.py`. When run from source, the updater replaces the
 `.py` file with the release's version instead.
 
-Command line: `python sel_trip_analyzer.py --cli <files or folders>` prints the
-report to the console.
+Command line:
+
+```
+python sel_trip_analyzer.py --cli <files or folders> [--comments "text"] [--out report.docx] [--out report.pdf]
+```
+
+prints the report and writes any `--out` files (`.docx`, `.pdf` or `.txt`).
+
+## Tests
+
+`python -m unittest discover -s tests -v` covers parsing, cause analysis,
+Word/PDF export and the updater. They run on every push, and each release also
+test-drives the built `.exe`. To lock in behaviour on real relay files, add a
+scrubbed case under `tests/fixtures/` (see the README there).
+
+The icon is drawn by `scripts/make_icon.py`.

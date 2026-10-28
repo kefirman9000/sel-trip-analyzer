@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover
     olefile = None
 
 APP_NAME = "SEL Trip Event Analyzer"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 # GitHub "owner/repo" that publishes releases. Each release must attach
 # SEL_Trip_Analyzer.exe (the GitHub Actions workflow in this repo does that).
 GITHUB_REPO = "kefirman9000/sel-trip-analyzer"
@@ -913,6 +913,416 @@ def build_report(events, rdb, errors, files, comments="", opts=None):
 
 
 # --------------------------------------------------------------------------
+# Report export (Word / PDF) - built from the summary text *as edited*
+# --------------------------------------------------------------------------
+REPORT_COLORS = {"ink": "1B1B1B", "muted": "666666", "accent": "0B5CAD", "rule": "D6DCE4",
+                 "head_bg": "EAF1FA", "trip": "C42B1C", "ok": "0F7B0F", "band": "F7F9FC"}
+
+KV_RE = re.compile(r"^ {2}([A-Za-z][A-Za-z ./]{1,14}?)\s*:\s?(.*)$")
+SUB_RE = re.compile(r"^ {2}(\S.*?):\s*$")
+SEQ_RE = re.compile(r"^\s{3,}([\d.]+)\s+(\S+)\s+(already asserted at start|asserted)\s+\((.*)\)\s*$")
+QS_RE = re.compile(r"^\s*(\d+)\.\s+(.*)$")
+
+
+def parse_report_text(text):
+    """Turn the plain-text summary into typed blocks for the Word/PDF writers.
+    Anything unrecognised (e.g. lines the user typed) becomes a paragraph."""
+    blocks, para = [], []
+    section, sub = "", ""
+    lines = text.replace("\r\n", "\n").split("\n")
+
+    def flush():
+        if para:
+            blocks.append(("para", "\n".join(para)))
+            para.clear()
+
+    def add(kind, *payload):
+        flush()
+        if blocks and blocks[-1][0] == kind and kind in ("kv", "bullets", "mono", "meta"):
+            blocks[-1][1].extend(payload[0])
+        elif blocks and kind == "table" and blocks[-1][0] == "table" and blocks[-1][1] == payload[0]:
+            blocks[-1][2].extend(payload[1])
+        else:
+            blocks.append((kind,) + tuple(list(p) if isinstance(p, list) else p for p in payload))
+
+    for idx, ln in enumerate(lines):
+        s = ln.strip()
+        if not s:
+            flush()
+            continue
+        if re.fullmatch(r"[=\-]{6,}", s):
+            continue
+        if not blocks and not para and s.upper().startswith("SEL TRIP"):
+            blocks.append(("title", s.title().replace("Sel ", "SEL ")))
+            continue
+        if not section and re.match(r"^(Generated|Files analyzed)\b", s):
+            add("meta", [s])
+            continue
+        if ln == s and re.fullmatch(r"[A-Z][A-Z /&\-]{3,}(\s*\(.*\))?", s):
+            section, sub = s, ""
+            add("h1", s.title().replace("Ser", "SER").replace("Rdb", "RDB").replace("/ ", "/ "))
+            continue
+        if s.startswith("Note:") and ln == s:
+            add("note", s)
+            continue
+        if section == "QUICK SUMMARY":
+            m = QS_RE.match(ln)
+            if m and m.group(2).count("|") >= 3:
+                parts = [p.strip() for p in m.group(2).split("|", 3)]
+                add("table", ["#", "Date / time", "Relay", "Type", "Cause"], [[m.group(1)] + parts])
+                continue
+        if re.match(r"^Event \d+ of \d+", ln):
+            sub = ""
+            add("h2", s)
+            continue
+        m = SUB_RE.match(ln)
+        if m and not KV_RE.match(ln) or (m and m.group(1).startswith(("Probable", "Element", "Settings", "From"))):
+            sub = m.group(1)
+            add("sub", sub)
+            continue
+        if ln.startswith("    "):  # content under a sub-heading
+            if s.startswith("- "):
+                add("bullets", [s[2:]])
+                continue
+            m = SEQ_RE.match(ln)
+            if m:
+                add("table", ["Cycle", "Element", "State", "Function"],
+                    [[m.group(1), m.group(2), m.group(3), m.group(4)]])
+                continue
+            m = re.match(r"^\s+([A-Z0-9_]+) := (.*)$", ln)
+            if m:
+                add("kv", [(m.group(1), m.group(2), True)])
+                continue
+            if sub.startswith("From") or section.startswith("SEQUENTIAL"):
+                add("mono", [s])
+                continue
+            add("note", s)
+            continue
+        m = KV_RE.match(ln)
+        if m and section == "EVENT DETAILS":
+            add("kv", [(m.group(1).strip(), m.group(2).strip(), False)])
+            continue
+        if section.startswith("FILES THAT") and ln.startswith("  "):
+            add("bullets", [s])
+            continue
+        para.append(s)
+    flush()
+    return blocks
+
+
+def _trip_runs(text):
+    """Split a cause string so the TRIP / No trip prefix can be coloured."""
+    for word, color in (("TRIP", "trip"), ("Relay TRIPPED", "trip"), ("No trip", "ok"),
+                        ("No trip recorded", "ok")):
+        if text.startswith(word):
+            return [(word, color), (text[len(word):], None)]
+    return [(text, None)]
+
+
+def export_docx(text, path):
+    from docx import Document
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Inches, Pt, RGBColor
+
+    C = {k: RGBColor.from_string(v) for k, v in REPORT_COLORS.items()}
+    doc = Document()
+    sec = doc.sections[0]
+    sec.left_margin = sec.right_margin = Inches(0.8)
+    sec.top_margin = sec.bottom_margin = Inches(0.7)
+    normal = doc.styles["Normal"]
+    normal.font.name = "Calibri"
+    normal.font.size = Pt(10.5)
+    normal.paragraph_format.space_after = Pt(4)
+    for name, size, color in (("Heading 1", 14, C["accent"]), ("Heading 2", 12, C["ink"]),
+                              ("Heading 3", 10.5, C["muted"])):
+        st = doc.styles[name]
+        st.font.name, st.font.size, st.font.color.rgb, st.font.bold = "Calibri", Pt(size), color, True
+        st.paragraph_format.space_before = Pt(14 if name == "Heading 1" else 10)
+        st.paragraph_format.space_after = Pt(4)
+        rpr = st.element.get_or_add_rPr()
+        fonts = rpr.find(qn("w:rFonts"))
+        if fonts is None:
+            fonts = OxmlElement("w:rFonts")
+            rpr.append(fonts)
+        for a in ("w:ascii", "w:hAnsi", "w:cs"):
+            fonts.set(qn(a), "Calibri")
+
+    def shade(cell, hexcolor):
+        tcpr = cell._tc.get_or_add_tcPr()
+        sh = OxmlElement("w:shd")
+        sh.set(qn("w:val"), "clear")
+        sh.set(qn("w:color"), "auto")
+        sh.set(qn("w:fill"), hexcolor)
+        tcpr.append(sh)
+
+    def borders(table, color=REPORT_COLORS["rule"], inside=True):
+        tblpr = table._tbl.tblPr
+        b = OxmlElement("w:tblBorders")
+        for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+            e = OxmlElement(f"w:{edge}")
+            on = edge in ("top", "bottom", "insideH") and (inside or edge != "insideH")
+            e.set(qn("w:val"), "single" if on else "nil")
+            e.set(qn("w:sz"), "4")
+            e.set(qn("w:color"), color)
+            b.append(e)
+        tblpr.append(b)
+
+    def set_widths(t, inches):
+        t.autofit = False
+        tblpr = t._tbl.tblPr
+        lay = OxmlElement("w:tblLayout")
+        lay.set(qn("w:type"), "fixed")
+        tblpr.append(lay)
+        for col, w in zip(t.columns, inches):
+            col.width = Inches(w)
+        for row in t.rows:
+            for c, w in zip(row.cells, inches):
+                c.width = Inches(w)
+
+    def keep_together(t):
+        if len(t.rows) > 18:
+            return
+        for row in t.rows[:-1]:
+            for c in row.cells:
+                for p in c.paragraphs:
+                    p.paragraph_format.keep_with_next = True
+
+    def cell_text(cell, txt, bold=False, color=None, mono=False, size=9.5, runs=None):
+        p = cell.paragraphs[0]
+        p.paragraph_format.space_after = Pt(0)
+        for t, col in (runs or [(txt, None)]):
+            r = p.add_run(t)
+            r.bold = bold or col is not None
+            r.font.size = Pt(size)
+            if col or color:
+                r.font.color.rgb = C[col] if col else color
+            if mono:
+                r.font.name = "Consolas"
+
+    def field(par, instr):
+        r = par.add_run()
+        for tag, txt in (("begin", None), (None, instr), ("end", None)):
+            if tag:
+                f = OxmlElement("w:fldChar")
+                f.set(qn("w:fldCharType"), tag)
+                r._r.append(f)
+            else:
+                it = OxmlElement("w:instrText")
+                it.set(qn("xml:space"), "preserve")
+                it.text = txt
+                r._r.append(it)
+        return r
+
+    # footer: app + page x of y
+    fp = sec.footer.paragraphs[0]
+    fp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    for t in (f"{APP_NAME} v{VERSION}    Page ",):
+        r = fp.add_run(t)
+        r.font.size, r.font.color.rgb = Pt(8), C["muted"]
+    for instr, tail in (("PAGE", " of "), ("NUMPAGES", "")):
+        field(fp, instr).font.size = Pt(8)
+        if tail:
+            r = fp.add_run(tail)
+            r.font.size, r.font.color.rgb = Pt(8), C["muted"]
+
+    for blk in parse_report_text(text):
+        kind = blk[0]
+        if kind == "title":
+            p = doc.add_paragraph()
+            r = p.add_run(blk[1])
+            r.bold, r.font.size, r.font.color.rgb = True, Pt(22), C["ink"]
+            p.paragraph_format.space_after = Pt(2)
+        elif kind == "meta":
+            p = doc.add_paragraph()
+            r = p.add_run("    ".join(blk[1]))
+            r.font.size, r.font.color.rgb = Pt(9), C["muted"]
+            p.paragraph_format.space_after = Pt(10)
+        elif kind == "h1":
+            doc.add_heading(blk[1], level=1)
+        elif kind == "h2":
+            doc.add_heading(blk[1], level=2)
+        elif kind == "sub":
+            doc.add_heading(blk[1], level=3)
+        elif kind == "para":
+            p = doc.add_paragraph()
+            for k, ln in enumerate(blk[1].split("\n")):
+                if k:
+                    p.add_run().add_break()
+                p.add_run(ln)
+        elif kind == "note":
+            p = doc.add_paragraph()
+            r = p.add_run(blk[1])
+            r.italic, r.font.size, r.font.color.rgb = True, Pt(9), C["muted"]
+        elif kind == "bullets":
+            for b in blk[1]:
+                p = doc.add_paragraph(style="List Bullet")
+                for t, col in _trip_runs(b):
+                    r = p.add_run(t)
+                    if col:
+                        r.bold, r.font.color.rgb = True, C[col]
+        elif kind == "mono":
+            p = doc.add_paragraph()
+            for k, ln in enumerate(blk[1]):
+                if k:
+                    p.add_run().add_break()
+                r = p.add_run(ln)
+                r.font.name, r.font.size = "Consolas", Pt(8.5)
+        elif kind == "kv":
+            t = doc.add_table(rows=0, cols=2)
+            borders(t)
+            for k, v, mono in blk[1]:
+                row = t.add_row().cells
+                cell_text(row[0], k, bold=True, color=C["muted"], mono=mono)
+                cell_text(row[1], v, mono=mono)
+            set_widths(t, [1.5, 5.4])
+            keep_together(t)
+        elif kind == "table":
+            headers, rows = blk[1], blk[2]
+            t = doc.add_table(rows=1, cols=len(headers))
+            t.alignment = WD_TABLE_ALIGNMENT.LEFT
+            borders(t)
+            for c, h in zip(t.rows[0].cells, headers):
+                shade(c, REPORT_COLORS["head_bg"])
+                cell_text(c, h, bold=True, color=C["accent"], size=9)
+            for i, r in enumerate(rows):
+                cells = t.add_row().cells
+                for j, (c, v) in enumerate(zip(cells, r)):
+                    if i % 2:
+                        shade(c, REPORT_COLORS["band"])
+                    is_cause = headers[j] == "Cause"
+                    cell_text(c, v, size=9, runs=_trip_runs(v) if is_cause else None,
+                              mono=headers[0] == "Cycle" and j < 2)
+            if headers[0] == "#":
+                widths = [0.35, 1.45, 1.0, 0.6, 3.5]
+            elif headers[0] == "Cycle":
+                widths = [0.7, 1.1, 1.8, 3.3]
+            else:
+                widths = [6.9 / len(headers)] * len(headers)
+            set_widths(t, widths)
+            keep_together(t)
+            doc.add_paragraph().paragraph_format.space_after = Pt(2)
+    doc.save(path)
+
+
+def export_pdf(text, path):
+    from xml.sax.saxutils import escape
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (KeepTogether, ListFlowable, ListItem, Paragraph,
+                                    SimpleDocTemplate, Spacer, Table, TableStyle)
+
+    H = {k: colors.HexColor("#" + v) for k, v in REPORT_COLORS.items()}
+
+    def ps(name, **kw):
+        base = dict(fontName="Helvetica", fontSize=9.5, leading=12.5, textColor=H["ink"], alignment=TA_LEFT)
+        base.update(kw)
+        return ParagraphStyle(name, **base)
+
+    S = {
+        "title": ps("t", fontName="Helvetica-Bold", fontSize=20, leading=24, spaceAfter=2),
+        "meta": ps("m", fontSize=8.5, textColor=H["muted"], spaceAfter=10),
+        "h1": ps("h1", keepWithNext=1, fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=H["accent"],
+                 spaceBefore=12, spaceAfter=5),
+        "h2": ps("h2", keepWithNext=1, fontName="Helvetica-Bold", fontSize=11, leading=14, spaceBefore=10, spaceAfter=4),
+        "sub": ps("h3", keepWithNext=1, fontName="Helvetica-Bold", fontSize=9.5, textColor=H["muted"], spaceBefore=7, spaceAfter=3),
+        "body": ps("b", spaceAfter=4),
+        "note": ps("n", fontName="Helvetica-Oblique", fontSize=8.5, textColor=H["muted"], spaceAfter=4),
+        "cell": ps("c", fontSize=8.5, leading=10.5),
+        "cellb": ps("cb", fontName="Helvetica-Bold", fontSize=8.5, leading=10.5, textColor=H["muted"]),
+        "head": ps("hd", fontName="Helvetica-Bold", fontSize=8.5, leading=10.5, textColor=H["accent"]),
+        "mono": ps("mo", fontName="Courier", fontSize=8, leading=10),
+    }
+
+    def rich(t):
+        out = ""
+        for part, col in _trip_runs(t):
+            e = escape(part)
+            out += f'<font color="#{REPORT_COLORS[col]}"><b>{e}</b></font>' if col else e
+        return out
+
+    width = letter[0] - 1.6 * inch
+    story = []
+    for blk in parse_report_text(text):
+        kind = blk[0]
+        if kind == "title":
+            story.append(Paragraph(escape(blk[1]), S["title"]))
+        elif kind == "meta":
+            story.append(Paragraph(escape("    ".join(blk[1])), S["meta"]))
+        elif kind in ("h1", "h2", "sub"):
+            story.append(Paragraph(escape(blk[1]), S[kind]))
+        elif kind == "para":
+            story.append(Paragraph(escape(blk[1]).replace("\n", "<br/>"), S["body"]))
+        elif kind == "note":
+            story.append(Paragraph(escape(blk[1]), S["note"]))
+        elif kind == "bullets":
+            story.append(ListFlowable([ListItem(Paragraph(rich(b), S["body"]), leftIndent=12)
+                                       for b in blk[1]], bulletType="bullet", start="•", leftIndent=12))
+        elif kind == "mono":
+            story.append(Paragraph("<br/>".join(escape(x) for x in blk[1]), S["mono"]))
+        elif kind == "kv":
+            data = [[Paragraph(escape(k), S["cellb"]),
+                     Paragraph(escape(v), S["mono"] if mono else S["cell"])] for k, v, mono in blk[1]]
+            t = Table(data, colWidths=[1.45 * inch, width - 1.45 * inch])
+            t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, H["rule"]),
+                                   ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5)]))
+            story.append(t)
+        elif kind == "table":
+            headers, rows = blk[1], blk[2]
+            if headers[0] == "#":
+                fr = [0.05, 0.21, 0.15, 0.08, 0.51]
+            elif headers[0] == "Cycle":
+                fr = [0.1, 0.16, 0.26, 0.48]
+            else:
+                fr = [1 / len(headers)] * len(headers)
+            data = [[Paragraph(escape(h), S["head"]) for h in headers]]
+            for r in rows:
+                data.append([Paragraph(rich(v) if headers[j] == "Cause" else escape(v), S["cell"])
+                             for j, v in enumerate(r)])
+            t = Table(data, colWidths=[f * width for f in fr], repeatRows=1)
+            style = [("BACKGROUND", (0, 0), (-1, 0), H["head_bg"]),
+                     ("LINEBELOW", (0, 0), (-1, -1), 0.4, H["rule"]),
+                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                     ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]
+            style += [("BACKGROUND", (0, i), (-1, i), H["band"]) for i in range(2, len(data), 2)]
+            t.setStyle(TableStyle(style))
+            story.append(t)
+            story.append(Spacer(1, 4))
+
+    def footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(H["muted"])
+        canvas.drawString(0.8 * inch, 0.5 * inch, f"{APP_NAME} v{VERSION}")
+        canvas.drawRightString(letter[0] - 0.8 * inch, 0.5 * inch, f"Page {doc.page}")
+        canvas.setStrokeColor(H["rule"])
+        canvas.line(0.8 * inch, 0.65 * inch, letter[0] - 0.8 * inch, 0.65 * inch)
+        canvas.restoreState()
+
+    doc = SimpleDocTemplate(path, pagesize=letter, leftMargin=0.8 * inch, rightMargin=0.8 * inch,
+                            topMargin=0.7 * inch, bottomMargin=0.85 * inch,
+                            title="SEL Trip Event Summary", author=APP_NAME)
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+
+
+def export_report(text, path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".docx":
+        export_docx(text, path)
+    elif ext == ".pdf":
+        export_pdf(text, path)
+    else:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+
+# --------------------------------------------------------------------------
 # GUI
 # --------------------------------------------------------------------------
 PALETTES = {
@@ -967,6 +1377,27 @@ def system_prefers_dark():
         return False
 
 
+def resource_path(*parts):
+    """Locate bundled files both from source and inside the PyInstaller .exe."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, *parts)
+
+
+def set_window_icon(root):
+    try:
+        ico = resource_path("assets", "icon.ico")
+        if sys.platform == "win32" and os.path.exists(ico):
+            root.iconbitmap(default=ico)
+            return
+        png = resource_path("assets", "icon.png")
+        if os.path.exists(png):
+            import tkinter as tk
+            root._icon_img = tk.PhotoImage(file=png)
+            root.iconphoto(True, root._icon_img)
+    except Exception:
+        pass
+
+
 def set_windows_titlebar(root, dark):
     if sys.platform != "win32":
         return
@@ -1014,6 +1445,13 @@ def run_gui():
           "placeholder": True, "empty": True, "pal": None}
 
     root.title(APP_NAME)
+    set_window_icon(root)
+    if sys.platform == "win32":  # own taskbar group/icon instead of python's
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SELTripAnalyzer.App")
+        except Exception:
+            pass
     root.geometry(cfg.get("geometry", "1180x920"))
     root.minsize(920, 720)
 
@@ -1104,8 +1542,10 @@ def run_gui():
     oh.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
     ttk.Label(oh, text="TRIP SUMMARY", style="Cap.TLabel").pack(side="left")
     ttk.Label(oh, text="  editable", style="Hint.TLabel").pack(side="left")
-    save_btn = ttk.Button(oh, text="Save .txt")
+    save_btn = ttk.Menubutton(oh, text="Export")
     save_btn.pack(side="right")
+    export_menu = tk.Menu(save_btn, tearoff=False)
+    save_btn["menu"] = export_menu
     copy_btn = ttk.Button(oh, text="Copy all")
     copy_btn.pack(side="right", padx=(0, 8))
     out = tk.Text(outf, wrap="word", undo=True, relief="flat", bd=0, highlightthickness=1,
@@ -1353,16 +1793,43 @@ def run_gui():
         flash(copy_btn, "Copied ✓", "Copy all")
         set_status("Summary copied to clipboard")
 
-    def save_txt():
+    EXPORT_TYPES = {".docx": ("Word document", "*.docx"), ".pdf": ("PDF", "*.pdf"),
+                    ".txt": ("Text file", "*.txt")}
+
+    def export_as(ext):
         if st["empty"]:
+            set_status("Generate a summary first")
             return
-        p = filedialog.asksaveasfilename(defaultextension=".txt", initialfile="trip_summary.txt",
-                                         filetypes=[("Text", "*.txt"), ("All files", "*.*")])
-        if p:
-            with open(p, "w", encoding="utf-8") as f:
-                f.write(out.get("1.0", "end-1c"))
-            flash(save_btn, "Saved ✓", "Save .txt")
-            set_status(f"Saved {p}")
+        name, pattern = EXPORT_TYPES[ext]
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d")
+        p = filedialog.asksaveasfilename(
+            title=f"Export summary as {name}", defaultextension=ext,
+            initialfile=f"Trip summary {stamp}{ext}",
+            initialdir=cfg.get("export_dir") or os.path.expanduser("~"),
+            filetypes=[(name, pattern), ("All files", "*.*")])
+        if not p:
+            return
+        cfg["export_dir"] = os.path.dirname(p)
+        root.config(cursor="watch")
+        root.update_idletasks()
+        try:
+            export_report(out.get("1.0", "end-1c"), p)
+        except PermissionError:
+            messagebox.showerror("Export failed", f"Couldn't write {os.path.basename(p)}.\n"
+                                                  "Is it open in Word or a PDF viewer? Close it and try again.")
+            return
+        except Exception as e:
+            messagebox.showerror("Export failed", f"{type(e).__name__}: {e}")
+            return
+        finally:
+            root.config(cursor="")
+        flash(save_btn, "Exported ✓", "Export")
+        set_status(f"Saved {p}")
+        if ext != ".txt" and sys.platform == "win32":
+            try:
+                os.startfile(p)  # open it in Word / the PDF viewer
+            except Exception:
+                pass
 
     def toggle_dark(_=None):
         if _ is not None:  # keyboard shortcut
@@ -1508,7 +1975,7 @@ def run_gui():
         set_status("Feedback opened on GitHub - click 'Create' there to submit (a copy was saved locally)")
 
     def on_close(save_only=False):
-        save_settings({"dark": st["dark"], "geometry": root.geometry(),
+        save_settings({"dark": st["dark"], "geometry": root.geometry(), "export_dir": cfg.get("export_dir"),
                        "seq": v_seq.get(), "set": v_set.get(), "ser": v_ser.get()})
         if not save_only:
             root.destroy()
@@ -1518,7 +1985,9 @@ def run_gui():
     dark_sw.config(command=toggle_dark)
     gen_btn.config(command=generate)
     copy_btn.config(command=copy_all)
-    save_btn.config(command=save_txt)
+    for ext, label in ((".docx", "Word document (.docx)"), (".pdf", "PDF (.pdf)"),
+                       (".txt", "Plain text (.txt)")):
+        export_menu.add_command(label=label, command=lambda e=ext: export_as(e))
     send_btn.config(command=send_feedback)
     feedback.bind("<FocusIn>", lambda e: fb_placeholder(False))
     feedback.bind("<FocusOut>", lambda e: fb_placeholder(True))
@@ -1568,6 +2037,8 @@ def run_gui():
     root.bind("<Control-Return>", generate)
     root.bind("<F5>", generate)
     root.bind("<Control-d>", toggle_dark)
+    root.bind("<Control-s>", lambda e: export_as(".docx"))
+    root.bind("<Control-p>", lambda e: export_as(".pdf"))
     root.bind("<Control-Shift-C>", copy_all)
     root.protocol("WM_DELETE_WINDOW", on_close)
 
@@ -1593,8 +2064,22 @@ def run_gui():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--cli":
-        paths = expand_paths(sys.argv[2:])
+        # --cli <files/folders> [--comments "text"] [--out report.docx|.pdf|.txt ...]
+        args, outs, note = sys.argv[2:], [], ""
+        while "--out" in args:
+            i = args.index("--out")
+            outs.append(args[i + 1])
+            del args[i:i + 2]
+        if "--comments" in args:
+            i = args.index("--comments")
+            note = args[i + 1]
+            del args[i:i + 2]
+        paths = expand_paths(args)
         ev, rdb, err = load_files(paths)
-        print(build_report(ev, rdb, err, paths))
+        report = build_report(ev, rdb, err, paths, note)
+        for o in outs:
+            export_report(report, o)
+        if sys.stdout is not None:  # the windowed .exe has no console
+            print(report)
     else:
         run_gui()
