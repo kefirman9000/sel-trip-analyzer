@@ -1,11 +1,11 @@
 name: Build and release
 
-# Push a tag like v1.0.1 (matching VERSION in sel_trip_analyzer.py) to publish
-# a release with SEL_Trip_Analyzer.exe attached. Installed copies of the app
-# pick it up through their "Check for updates" button.
+# Publish a GitHub release tagged like v1.0.1 (matching VERSION in
+# sel_trip_analyzer.py). This builds SEL_Trip_Analyzer.exe and attaches it to
+# that release; installed copies pick it up via "Check for updates".
 on:
-  push:
-    tags: ["v*"]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -44,7 +44,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/SEL_Trip_Analyzer.exe
-          generate_release_notes: true
 
       - name: Keep build as artifact
         uses: actions/upload-artifact@v4
