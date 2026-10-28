@@ -234,3 +234,26 @@ test("zip archives and settings saved as text", async () => {
   const bad = await core.loadFiles([{ name: "x.zip", bytes: new Uint8Array([1, 2, 3]) }]);
   assert.match(bad.errors[0], /not a zip file/);
 });
+
+test("add_fixture.js scrubs names, keeps the analysis and writes expected.json", async () => {
+  const { execFileSync } = require("child_process"), os = require("os");
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "fixture-"));
+  const files = ["Feeder3_CG_51G.eve", "Feeder3_settings.rdb", "Feeder3_CG_51G.cfg", "Feeder3_CG_51G.dat", "Line5_Hill_BC_Zone1.cev"].map((n) => path.join(SAMPLES, n));
+  execFileSync("node", [path.join(__dirname, "..", "scripts", "add_fixture.js"), "scrub-test", ...files, "--out", out, "--replace", "Ocala=Townx"], { stdio: "pipe" });
+  const dir = path.join(out, "scrub-test"), names = fs.readdirSync(dir).sort();
+  assert.ok(names.every((n) => n === "expected.json" || n.startsWith("scrub-test-")), names.join());
+  for (const n of names) {
+    const body = fs.readFileSync(path.join(dir, n), "latin1").toUpperCase();
+    for (const secret of ["FEEDER 3", "OAK HILL", "LINE 5 HILL", "HILL SUB"]) assert.ok(!body.includes(secret), `${n} still has ${secret}`);
+  }
+  const before = await core.loadFiles(read(SAMPLES, files.map((f) => path.basename(f))));
+  const after = await core.loadFiles(read(dir));
+  assert.deepEqual(after.errors, []);
+  assert.deepEqual(after.events.map((e) => [e.event_type, e.location, e.targets]), before.events.map((e) => [e.event_type, e.location, e.targets]));
+  assert.ok(after.events[0].relay_id.startsWith("RELAY"));
+  const [s] = core.matchSettings(after.events.find((e) => e.source.endsWith(".eve")), after.rdb);
+  assert.ok(s.TR, "settings still match the scrubbed relay");
+  const exp = JSON.parse(fs.readFileSync(path.join(dir, "expected.json"), "utf8"));
+  assert.equal(exp.event_count, 2);
+  assert.deepEqual(exp.events[0].cause_contains, []);
+});
