@@ -130,7 +130,12 @@ It also connects events to each other:
 The summary box is **fully editable**: whatever you change is what gets copied
 or exported. **Export** gives Word (`.docx`, with a waveform picture for each
 event that has one), PDF (through the print window), a spreadsheet for Excel
-(`.csv`, one row per event) or plain text.
+(`.csv`, one row per event) or plain text. Each export first shows a short list
+of **what to include**: sections (overview, quick summary, two-ended and
+incidents, event details, SER, settings), what goes in each event (CHECK lines,
+notes, weather, element sequence), waveform pictures (none, compact or large,
+with or without your graph notes), paper size (Letter or A4), or, for the
+spreadsheet, which columns. Your choices are remembered.
 
 ### Event notes
 
@@ -192,8 +197,10 @@ or one of the **reference waveforms**, and step through them with ◀ ▶
   drawn on the graph and included in the picture and Word exports.
 - **Simple / Advanced**: Advanced adds angles, secondary amps, multiples of
   pickup, all harmonics, every element and a samples export.
-- **Export**: Word report, picture of the graph, or every sample as a
-  spreadsheet.
+- **Export**: Word report (choose which parts: fault type, graph, notes,
+  phasors, sequence, harmonics, overcurrent check, elements), picture of the
+  graph (on-screen range, the fault or the whole record; three sizes), or the
+  samples as a spreadsheet (whole record or the range on screen).
 
 ![Reference waveforms](docs/screenshots/reference.png)
 

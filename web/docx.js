@@ -68,7 +68,9 @@ const X = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(
   .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
 const COLORS = { ink: "1B1B1B", muted: "666666", accent: "0B5CAD", rule: "D6DCE4", head: "EAF1FA", band: "F7F9FC",
                  trip: "C42B1C", ok: "0F7B0F", warn: "A15C00" };
-const PAGE_W = 12240, MARGIN = 1152, CONTENT_W = PAGE_W - 2 * MARGIN;  // twips (8.5in, 0.8in margins)
+const MARGIN = 1152;                       // twips (0.8in margins)
+const PAPER = { letter: [12240, 15840], a4: [11906, 16838] };
+let PAGE_W = PAPER.letter[0], PAGE_H = PAPER.letter[1], CONTENT_W = PAGE_W - 2 * MARGIN;
 
 function run(text, o) {
   o = o || {};
@@ -123,7 +125,7 @@ function table(headers, rows, widthsPct, o) {
 }
 
 function image(rid, id, wpx, hpx, maxIn) {
-  const maxW = (maxIn || 6.9) * 914400;
+  const maxW = Math.min((maxIn || 6.9) * 914400, (CONTENT_W / 1440) * 914400);
   let cx = wpx * 9525, cy = hpx * 9525;          // 96 dpi
   if (cx > maxW) { cy = Math.round((cy * maxW) / cx); cx = maxW; }
   return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/>` +
@@ -150,6 +152,8 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 /** blocks -> .docx bytes */
 function build(blocks, opts) {
   opts = opts || {};
+  [PAGE_W, PAGE_H] = PAPER[(opts.paper || "letter").toLowerCase()] || PAPER.letter;
+  CONTENT_W = PAGE_W - 2 * MARGIN;
   const body = [], media = [];
   let imgId = 1;
   for (const blk of blocks) {
@@ -184,7 +188,7 @@ function build(blocks, opts) {
     }
   }
   const footerText = opts.footer || "SEL Trip Event Analyzer";
-  const sect = `<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter"/><w:pgSz w:w="${PAGE_W}" w:h="15840"/>` +
+  const sect = `<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter"/><w:pgSz w:w="${PAGE_W}" w:h="${PAGE_H}"/>` +
     `<w:pgMar w:top="1008" w:right="${MARGIN}" w:bottom="1008" w:left="${MARGIN}" w:header="576" w:footer="576" w:gutter="0"/></w:sectPr>`;
   const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +

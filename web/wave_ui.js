@@ -990,16 +990,25 @@ function create(ctx) {
     draw(g, m, W, "light", { lineWidth: 1.5, cursor: opts.cursorIdx !== undefined });
     return { canvas: c, width: W, height: l.H + head };
   }
-  function currentFigure() {
-    return figure(st.rec, st.an, { view: st.view, mode: st.mode, xunit: st.xunit, channels: st.channels, digRows: model().digRows,
-                                   pins: pins(), cursorIdx: st.cursor, title: titleText() });
+  function viewFor(range) {
+    if (range === "all") return { t0: st.rec.t[0], t1: st.rec.t[st.rec.n - 1] };
+    if (range === "fault") { const keep = st.view; fitFault(); const v = st.view; st.view = keep; return v; }
+    return st.view;
+  }
+  function currentFigure(v) {
+    v = v || {};
+    return figure(st.rec, st.an, { view: viewFor(v.range), mode: st.mode, xunit: st.xunit, channels: st.channels,
+                                   digRows: v.graphElements === false ? [] : model().digRows, pins: v.pins === false ? [] : pins(),
+                                   cursorIdx: v.cursor === false ? undefined : st.cursor, title: titleText(), width: parseInt(v.width, 10) || 1400 });
   }
   function titleText() {
     const rec = st.rec;
     return st.item.refInfo ? `Reference: ${st.item.refInfo.title}` : `${rec.relay || rec.station || rec.source}  ${[rec.date, rec.time].filter(Boolean).join(" ")}`;
   }
   /** Compact picture of one record for the trip summary export. */
-  function summaryFigure(e) {
+  function summaryFigure(e, fo) {
+    fo = fo || {};
+    const large = fo.size === "large";
     const rec = A.recordFromEvent(e);
     if (!rec) return null;
     const an = A.analyze(rec, {});
@@ -1009,49 +1018,57 @@ function create(ctx) {
     const els = an.elements.filter((x) => x.changed);
     els.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) || (a.firstOn || 0) - (b.firstOn || 0));
     const id = core.eventId(e);
-    const list = (ctx.store.get("pins", {})[id] || []).slice().sort((a, b) => a.t - b.t);
-    const fig = figure(rec, an, { view, channels: rec.analogs.map((c) => ({ ...c, on: true })), digRows: els.slice(0, 8), pins: list, width: 1200, curH: 150, volH: 110 });
+    const list = fo.pins === false ? [] : (ctx.store.get("pins", {})[id] || []).slice().sort((a, b) => a.t - b.t);
+    const fig = figure(rec, an, { view, channels: rec.analogs.map((c) => ({ ...c, on: true })), digRows: els.slice(0, large ? 16 : 8), pins: list,
+                                  width: large ? 1400 : 1200, curH: large ? 210 : 150, volH: large ? 160 : 110 });
     return { png: pngBytes(fig.canvas), dataUrl: fig.canvas.toDataURL("image/png"), width: fig.width, height: fig.height,
              caption: `Waveforms: ${A.FAULT_NAMES[an.cls.code] || an.cls.code} (shaded: trigger to breaker open)` + (list.length ? `. Notes: ${list.map((p, i) => `${i + 1}) ${p.text}`).join("  ")}` : "") };
   }
 
-  function exportPng() {
-    const fig = currentFigure();
+  function exportPng(v) {
+    const fig = currentFigure(v);
     fig.canvas.toBlob((b) => { ctx.download(`Waveform ${fileSafe(titleText())}.png`, b); ctx.setStatus("Saved the graph picture (with your notes)"); }, "image/png");
   }
   const fileSafe = (s) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80);
-  function exportCsv() {
+  function exportCsv(v) {
     const rec = st.rec;
-    const head = ["Time (s)", "Cycles"].concat(rec.analogs.map((c) => `${c.name} (${c.unit})`)).concat(rec.digitals.map((d) => d.name));
+    const vw = v && v.csvRange === "view" ? st.view : null;
+    const head = ["Time (s)", "Cycles"].concat(rec.analogs.map((c) => `${c.name} (${c.unit})`)).concat(!v || v.csvDigitals !== false ? rec.digitals.map((d) => d.name) : []);
     const lines = [head.map((x) => (/[",]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x)).join(",")];
     for (let k = 0; k < rec.n; k++) {
+      if (vw && (rec.t[k] < vw.t0 || rec.t[k] > vw.t1)) continue;
       const row = [rec.t[k].toFixed(6), (rec.t[k] * rec.freq).toFixed(4)];
       for (const c of rec.analogs) row.push(c.values[k].toFixed(c.unit === "kV" ? 4 : 2));
-      for (const d of rec.digitals) row.push(d.values[k]);
+      if (!v || v.csvDigitals !== false) for (const d of rec.digitals) row.push(d.values[k]);
       lines.push(row.join(","));
     }
     ctx.download(`Samples ${fileSafe(titleText())}.csv`, new Blob([lines.join("\r\n")], { type: "text/csv" }));
     ctx.setStatus("Saved the samples as a spreadsheet (primary units)");
   }
-  function exportDocx() {
+  function exportDocx(v) {
+    v = Object.assign({ classification: true, graph: true, pins: true, phasors: true, sequence: true, harmonics: true, oc: true, elements: true, eventNote: true }, v || {});
     const rec = st.rec, an = st.an, cls = an.cls, adv = st.adv;
     const blocks = [];
     blocks.push(["title", "Waveform Analysis"]);
     blocks.push(["meta", [titleText(), `Generated ${core.nowStamp()}`, $("wMeta").textContent]]);
     const note = $("wEventNote").value.trim();
-    if (note) { blocks.push(["h1", "Notes"]); blocks.push(["para", note]); }
+    if (note && v.eventNote) { blocks.push(["h1", "Notes"]); blocks.push(["para", note]); }
+    if (v.classification) {
     blocks.push(["h1", "Classification"]);
     blocks.push(["kv", [["Fault type", `${cls.code === "NONE" ? "None" : cls.code}: ${cls.name}`], ["Meaning", meaningOf(cls.code) || "-"]]]);
     if (st.item.event && st.item.event.event_type) blocks[blocks.length - 1][1].push(["Relay reported", st.item.event.event_type]);
     if (cls.evidence.length) blocks.push(["bullets", cls.evidence.slice()]);
     if (cls.notes.length) blocks.push(["bullets", cls.notes.map((n) => "CHECK: " + n)]);
-    const fig = currentFigure();
+    }
+    if (v.graph) {
+    const fig = currentFigure(v);
     blocks.push(["h1", "Waveforms"]);
     blocks.push(["image", { png: pngBytes(fig.canvas), width: fig.width, height: fig.height,
       caption: `${$("wSpan").textContent}. Shaded: trigger to breaker open. Blue line: analysis cursor at ${$("wCursorAt").textContent}.` }]);
+    }
     const list = pins();
-    if (list.length) blocks.push(["table", ["#", "Time (cyc)", "Note"], list.map((p, i) => [String(i + 1), fmt(p.t * rec.freq, 2), p.text]), [6, 16, 78]]);
-    // phasors
+    if (list.length && v.pins) blocks.push(["table", ["#", "Time (cyc)", "Note"], list.map((p, i) => [String(i + 1), fmt(p.t * rec.freq, 2), p.text]), [6, 16, 78]]);
+    if (v.phasors) {
     blocks.push(["h1", `Phasors at ${$("wCursorAt").textContent}`]);
     const pc = document.createElement("canvas"); pc.width = 640; pc.height = 640;
     const g = pc.getContext("2d"); g.scale(2, 2); drawPhasors(g, 320, st.snap, rec, "light", { I: true, V: true });
@@ -1059,6 +1076,7 @@ function create(ctx) {
     blocks.push(["table", ["Channel", "Magnitude (rms)", "Angle"], rec.analogs.filter((c) => c.kind === "I" || c.kind === "V").map((c) => {
       const z = st.snap.phasors[c.name]; return [c.name, fmtMag(A.cabs(z), c.unit), fmtAng(A.cang(z))];
     }), [25, 40, 35]]);
+    }
     const seq = [];
     const ch = A.channels(rec);
     for (const [kind, s, unit] of [["I", st.snap.seq.I, ch.IA ? ch.IA.unit : "A"], ["V", st.snap.seq.V, "kV"]]) {
@@ -1068,15 +1086,15 @@ function create(ctx) {
         seq.push([sym, fmtMag(A.cabs(s[k]), unit), fmtAng(A.cang(s[k])), SEQ_WORDS[k][1]]);
       }
     }
-    if (seq.length) { blocks.push(["h2", "Sequence components"]); blocks.push(["table", ["", "Magnitude", "Angle", "Meaning"], seq, [8, 18, 14, 60]]); }
+    if (seq.length && v.sequence) { blocks.push(["h2", "Sequence components"]); blocks.push(["table", ["", "Magnitude", "Angle", "Meaning"], seq, [8, 18, 14, 60]]); }
     const c = rec.analogs.find((x) => x.name === st.hChan) || rec.analogs[0];
     const h = A.harmonics(c.values, st.cursor - rec.spc * st.hCycles + 1, rec.spc, st.hCycles, 15);
-    if (h) {
+    if (h && v.harmonics) {
       blocks.push(["h2", `Harmonics of ${c.name}`]);
       blocks.push(["kv", [["Fundamental", fmtMag(h.list[0].rms, c.unit)], ["THD", `${fmt(h.thd, 1)}%`], ["DC offset", `${fmt(h.dcPct, 0)}%`]]]);
       blocks.push(["table", ["Harmonic", "% of fundamental", "Magnitude"], h.list.slice(1, adv ? 15 : 7).map((x) => [String(x.h), `${fmt(x.pct, 1)}%`, fmtMag(x.rms, c.unit)]), [20, 40, 40]]);
     }
-    if (an.oc.rows.length) {
+    if (an.oc.rows.length && v.oc) {
       blocks.push(["h1", "Overcurrent Elements vs. Settings"]);
       blocks.push(["table", ["Element", "Pickup", "Measured", "Result", "Expected", "Actual"], an.oc.rows.map((r) => [
         r.element, an.oc.ctr ? `${fmt(r.pickup * an.oc.ctr, 0)} A` : `${fmt(r.pickup, 2)} A sec`, `${fmt(r.measuredPrimary, 0)} A`, r.verdict,
@@ -1084,20 +1102,44 @@ function create(ctx) {
       blocks.push(["note", `Settings: ${st.settingsLabel}. Primary amps${an.oc.ctr ? `, CTR ${fmt(an.oc.ctr, 0)}` : ""}.`]);
     }
     const els = an.elements.filter((e) => e.changed);
-    if (els.length) {
+    if (els.length && v.elements) {
       blocks.push(["h1", "Relay Elements That Changed"]);
       blocks.push(["table", ["Element", "Meaning", "On (cyc)", "Off (cyc)"], els.map((e) => [e.name, e.meaning,
         (e.initial ? ["on at start"] : []).concat(e.intervals.filter(([a]) => !(a === 0 && e.initial)).map(([a]) => fmt(rec.t[a] * rec.freq, 2))).join(", "), e.intervals.map(([, b]) => (b >= rec.n - 1 ? "end" : fmt(rec.t[b] * rec.freq, 2))).join(", ")]), [14, 54, 16, 16]]);
     }
     blocks.push(["note", "Automated analysis from the recorded waveforms. Confirm against the relay's own event report and settings."]);
-    const bytes = DOCX.build(blocks, { title: "Waveform analysis", footer: `SEL Trip Event Analyzer v${ctx.version}`, runs: core.tripRuns });
+    const bytes = DOCX.build(blocks, { title: "Waveform analysis", footer: `SEL Trip Event Analyzer v${ctx.version}`, runs: core.tripRuns, paper: v.paper });
     ctx.download(`Waveform analysis ${fileSafe(titleText())}.docx`, new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
     ctx.setStatus("Saved the waveform analysis as a Word document");
   }
+  const WAVE_EXPORT = {
+    title: "Export this waveform analysis", storeKey: "exp.wave",
+    formats: [["docx", "Word report (.docx)"], ["png", "Picture of the graph (.png)"], ["csv", "Samples (.csv)"]],
+    groups: [
+      { title: "Include", only: ["docx"], items: [
+        { key: "eventNote", label: "Event notes", def: true }, { key: "classification", label: "Fault type and evidence", def: true },
+        { key: "graph", label: "Graph", def: true }, { key: "pins", label: "Notes pinned on the graph", def: true },
+        { key: "phasors", label: "Phasors at the cursor", def: true }, { key: "sequence", label: "Sequence components", def: true },
+        { key: "harmonics", label: "Harmonics", def: true }, { key: "oc", label: "Overcurrent check vs. settings", def: true },
+        { key: "elements", label: "Relay elements that changed", def: true }] },
+      { title: "Graph", only: ["docx", "png"], items: [
+        { key: "range", label: "Time range", def: "view", options: [["view", "What's on screen now"], ["fault", "The fault (trigger to breaker open)"], ["all", "Whole record"]] },
+        { key: "width", label: "Picture width", def: "1400", only: ["png"], options: [["1000", "Small (1000 px)"], ["1400", "Medium (1400 px)"], ["2000", "Large (2000 px)"]] },
+        { key: "graphElements", label: "Relay elements under the graph", def: true, only: ["png"] }, { key: "pins", label: "Notes pinned on the graph", def: true, only: ["png"] },
+        { key: "cursor", label: "Show the cursor line", def: true }] },
+      { title: "Page", only: ["docx"], items: [{ key: "paper", label: "Paper", def: "letter", options: [["letter", "Letter (8.5 × 11 in)"], ["a4", "A4"]] }] },
+      { title: "Samples", only: ["csv"], items: [
+        { key: "csvRange", label: "Rows", def: "all", options: [["all", "Whole record"], ["view", "Only the time range on screen"]] },
+        { key: "csvDigitals", label: "Relay element columns (0/1)", def: true }] },
+    ],
+    hint: (f) => (f === "csv" ? "Primary amps and kV, one row per sample." : "Uses the channels, mode and notes you have on screen."),
+    go: (f, v) => ({ docx: exportDocx, png: exportPng, csv: exportCsv })[f](v),
+  };
   $("wExportMenu").addEventListener("click", (e) => {
     const b = e.target.closest("[data-wexp]"); if (!b || !st.rec) return;
     $("wExportMenu").classList.remove("open");
-    ({ docx: exportDocx, png: exportPng, csv: exportCsv })[b.dataset.wexp]();
+    if (ctx.openExport) ctx.openExport(Object.assign({}, WAVE_EXPORT, { format: b.dataset.wexp }));
+    else ({ docx: exportDocx, png: exportPng, csv: exportCsv })[b.dataset.wexp]();
   });
   $("wExportBtn").addEventListener("click", (e) => { e.stopPropagation(); const o = $("wExportMenu").classList.toggle("open"); $("wExportBtn").setAttribute("aria-expanded", String(o)); });
   document.addEventListener("click", (e) => { if (!e.target.closest("#wExportWrap")) $("wExportMenu").classList.remove("open"); });
@@ -1118,7 +1160,7 @@ function create(ctx) {
       refresh(id);
     },
     theme() { if (st.rec && !$("pageWave").hidden) { renderStatic(); redraw(); renderCursorPanels(); } },
-    summaryFigure, state: st,
+    summaryFigure, state: st, exportDocx, exportPng, exportCsv,
   };
 }
 
