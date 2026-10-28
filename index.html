@@ -4236,7 +4236,7 @@ function create(ctx) {
     // settings choice
     const ss = $("wSettings"), cache = ctx.getCache();
     ss.textContent = "";
-    for (const [v, t] of [["auto", "Settings: matched automatically"], ...[...(cache ? cache.rdb.keys() : [])].map((k) => [k, `Settings: ${k}`]), ["none", "Settings: none"]]) {
+    for (const [v, t] of [["auto", "Settings: automatic"], ...[...(cache ? cache.rdb.keys() : [])].map((k) => [k, `Settings: ${k}`]), ["none", "Settings: none"]]) {
       const o = document.createElement("option"); o.value = v; o.textContent = t; ss.appendChild(o);
     }
     ss.value = st.settingsChoice;
