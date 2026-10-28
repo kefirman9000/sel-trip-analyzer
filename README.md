@@ -6,6 +6,7 @@ Drop in SEL relay event files and get a plain-English summary of **what tripped
 and why**, ready to paste into an outage report or export to Word or PDF.
 
 **[⬇ Download for Windows](../../releases/latest/download/SEL_Trip_Analyzer.exe)** ·
+**[Browser version](../../releases/latest/download/SEL_Trip_Analyzer.html)** (any computer, nothing to install) ·
 **[Sample files](../../releases/latest/download/SEL_sample_files.zip)** ·
 [Report a problem](../../issues/new)
 
@@ -21,7 +22,8 @@ and why**, ready to paste into an outage report or export to Word or PDF.
   event's confidence High, Medium or Low, so you know what to verify.
 - Gives you an editable summary you can copy, or export as a formatted Word or
   PDF report.
-- Runs entirely on your PC. No install, no account.
+- Runs entirely on your computer. No install, no account, nothing uploaded.
+  Use the Windows program or the [browser version](#browser-version).
 
 ## Get started
 
@@ -36,6 +38,31 @@ and why**, ready to paste into an outage report or export to Word or PDF.
 
 Want to see it work first? Click **Try samples** in the program, or download the
 [sample files](../../releases/latest/download/SEL_sample_files.zip).
+
+## Browser version
+
+Can't run `.exe` files, or not on Windows? Use **`SEL_Trip_Analyzer.html`**, a
+single file that does the same analysis inside your web browser.
+
+1. Download [SEL_Trip_Analyzer.html](../../releases/latest/download/SEL_Trip_Analyzer.html)
+   (or open the online copy, if it has been enabled for this project:
+   `https://kefirman9000.github.io/sel-trip-analyzer/`).
+2. Double-click it. It opens in Chrome, Edge, Firefox or Safari, on Windows, Mac
+   or Linux. It also works offline.
+3. Drag your event files or a folder onto the page, exactly like the Windows program.
+
+Your files are read inside the browser tab and **never uploaded**. The summary,
+the CHECK flags and the confidence ratings are identical to the Windows program
+(automated tests compare the two on every change).
+
+A few things differ from the Windows program:
+
+| | Windows program | Browser version |
+|---|---|---|
+| Word export | `.docx` | `.doc` (opens in Word) |
+| PDF export | Saves a PDF file | Opens the print window: choose **Save as PDF** |
+| Updates | Installs itself after you say yes | Shows a banner with a download link; save the new file over the old one (the online copy is always current) |
+| Feedback log | Also saved on your PC | Opened on GitHub only |
 
 ## Which files to use
 

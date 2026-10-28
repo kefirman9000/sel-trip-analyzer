@@ -43,6 +43,26 @@ release. To change a scenario, edit the script and regenerate; don't hand-edit
 the files. The `.rdb` is a real OLE compound file, written by a minimal writer
 in the script.
 
+## Browser version
+
+`web/core.js` is a line-for-line JavaScript port of the parsing and analysis in
+`sel_trip_analyzer.py`, and `web/app.html` is the page. `python scripts/build_html.py`
+inlines both, the sample files and the icon into one file,
+`dist/SEL_Trip_Analyzer.html`, with no outside dependencies.
+
+**Keep the two versions in step.** When you change parsing or analysis in the
+Python file, make the same change in `web/core.js`. `tests/test_web_parity.py`
+runs both on the sample files and a set of edge cases, and fails on any
+difference in the report. `node web/cli.js <files>` runs the browser core from
+the command line.
+
+`tests/browser_test.js` drives the built page in Chromium (Playwright): samples,
+upload, folder upload, edits, Word/text/print export, feedback, the update
+banner, dark mode, help and the phone layout. CI runs it on every push.
+
+`.github/workflows/pages.yml` publishes the page to GitHub Pages once Pages is
+enabled for the repo (Settings → Pages → Source: **GitHub Actions**).
+
 ## Building the .exe
 
 On Windows, double-click `build_exe.bat`. The output is `dist\SEL_Trip_Analyzer.exe`.
@@ -55,7 +75,8 @@ On Windows, double-click `build_exe.bat`. The output is `dist\SEL_Trip_Analyzer.
    notes in the update prompt.
 3. `.github/workflows/release.yml` builds the `.exe` on Windows, runs the
    tests, smoke-tests the `.exe` (parse + Word/PDF export), and attaches
-   `SEL_Trip_Analyzer.exe` and `SEL_sample_files.zip` to the release.
+   `SEL_Trip_Analyzer.exe`, `SEL_Trip_Analyzer.html` and `SEL_sample_files.zip`
+   to the release.
    Installed copies then offer the update.
 
 The workflow can also be run by hand (**Actions → Build and release → Run

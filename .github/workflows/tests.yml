@@ -13,11 +13,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - run: python -m pip install olefile python-docx reportlab
-      - run: python -m unittest discover -s tests -v
+      - run: python -m unittest discover -s tests -v   # includes Python-vs-browser parity
       - name: Export sample report
         run: python sel_trip_analyzer.py --cli sample_files --out sample_report.docx --out sample_report.pdf > /dev/null
       - uses: actions/upload-artifact@v4
         with:
           name: sample-report
           path: sample_report.*
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the browser version
+        run: python scripts/build_html.py
+      - name: Install Playwright
+        working-directory: tests
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: End-to-end test in Chromium
+        run: node tests/browser_test.js screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-version
+          path: |
+            dist/SEL_Trip_Analyzer.html
+            screenshots/

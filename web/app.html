@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEL Trip Analyzer</title>
+<meta name="description" content="Drop SEL relay event files and get an editable summary of what tripped and why. Runs entirely in your browser.">
+<link rel="icon" type="image/png" href="{{ICON}}">
+<style>
+:root {
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f3f3f3; --text: #1b1b1b; --muted: #616161;
+  --border: #d9d9d9; --accent: #005fb8; --accent-hover: #0a6cc7; --on-accent: #ffffff;
+  --drop: #f4f8fd; --drop-hover: #e3eefb; --drop-line: #9fb9d9; --sel: #cce4f7;
+  --trip: #c42b1c; --ok: #0f7b0f; --warn: #9a5800; --rule: #c9c9c9; --shadow: 0 8px 28px rgba(0,0,0,.14);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1c1c; --surface: #252525; --surface-2: #2c2c2c; --text: #e9e9e9; --muted: #9e9e9e;
+    --border: #3a3a3a; --accent: #4cc2ff; --accent-hover: #6dccff; --on-accent: #000000;
+    --drop: #20262d; --drop-hover: #22344a; --drop-line: #4d6a8b; --sel: #264f78;
+    --trip: #ff8f85; --ok: #6ccb5f; --warn: #ffb74d; --rule: #474747; --shadow: 0 8px 28px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1c1c1c; --surface: #252525; --surface-2: #2c2c2c; --text: #e9e9e9; --muted: #9e9e9e;
+  --border: #3a3a3a; --accent: #4cc2ff; --accent-hover: #6dccff; --on-accent: #000000;
+  --drop: #20262d; --drop-hover: #22344a; --drop-line: #4d6a8b; --sel: #264f78;
+  --trip: #ff8f85; --ok: #6ccb5f; --warn: #ffb74d; --rule: #474747; --shadow: 0 8px 28px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+.no-anim, .no-anim * { transition: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--sel); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 18px 22px 12px; }
+.mono { font-family: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* header */
+header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+header img { width: 42px; height: 42px; flex: none; }
+.titles { flex: 1 1 260px; min-width: 0; }
+h1 { font: 600 22px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -.01em; }
+.sub { color: var(--muted); margin-top: 2px; }
+.head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* controls */
+button, .btn {
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 13px; min-height: 32px; cursor: pointer; white-space: nowrap;
+  transition: background .12s, border-color .12s;
+}
+button:hover { background: var(--surface-2); }
+button:active { transform: translateY(.5px); }
+button:focus-visible, .drop:focus-visible, [contenteditable]:focus-visible, textarea:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+button.accent { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+button.accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button:disabled { opacity: .55; cursor: default; }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.switch input { appearance: none; -webkit-appearance: none; width: 40px; height: 20px; border-radius: 10px; margin: 0;
+  border: 1px solid var(--muted); background: transparent; position: relative; cursor: pointer; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--muted); transition: transform .15s, background .15s; }
+.switch input:checked { background: var(--accent); border-color: var(--accent); }
+.switch input:checked::after { transform: translateX(20px); background: var(--on-accent); }
+label.check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+label.check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+
+/* drop zone */
+.drop {
+  border: 1.6px dashed var(--drop-line); background: var(--drop); border-radius: 14px; padding: 20px 16px 18px;
+  text-align: center; cursor: pointer; transition: background .12s, border-color .12s; user-select: none;
+}
+.drop:hover, .drop.over { background: var(--drop-hover); border-color: var(--accent); }
+.drop svg { width: 34px; height: 34px; color: var(--accent); display: block; margin: 0 auto 6px; }
+.drop .big { font: 600 16px/1.3 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
+.drop .formats { color: var(--muted); font-size: 12px; margin-top: 5px; word-spacing: 2px; }
+
+/* sections */
+.cap { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); }
+.bar { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+.box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.files { height: 150px; overflow: auto; padding: 4px 0; margin: 0; list-style: none; }
+.files li { display: flex; align-items: center; gap: 8px; padding: 3px 6px 3px 12px; }
+.files li:hover { background: var(--surface-2); }
+.files .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files .fsize { color: var(--muted); font-size: 12px; }
+.files .x { border: 0; background: transparent; min-height: 24px; padding: 0 7px; color: var(--muted); font-size: 16px; line-height: 1; }
+.files .x:hover { color: var(--trip); background: transparent; }
+.files .empty { color: var(--muted); padding: 10px 12px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+textarea {
+  width: 100%; resize: vertical; font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px;
+}
+textarea::placeholder { color: var(--muted); }
+#comments { height: 150px; }
+.actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 16px 0 10px; }
+.actions .grow { flex: 1; }
+
+/* summary */
+.summary-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.summary-head .grow { flex: 1; }
+#out {
+  min-height: 52vh; padding: 16px 20px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5;
+  tab-size: 4; outline: none;
+}
+#out:empty::before { content: attr(data-placeholder); color: var(--muted); white-space: pre-wrap;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 14px; }
+#out .h1 { font-weight: 700; font-size: 15px; }
+#out .h2 { font-weight: 700; color: var(--accent); }
+#out .rule { color: var(--rule); }
+#out .lbl { color: var(--muted); }
+#out .b { font-weight: 700; }
+#out .trip { font-weight: 700; color: var(--trip); }
+#out .ok { font-weight: 700; color: var(--ok); }
+#out .warn { color: var(--warn); }
+#out .warnb { color: var(--warn); font-weight: 700; }
+
+.menu-wrap { position: relative; }
+.menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 230px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); display: none; }
+.menu.open { display: block; }
+.menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 5px; }
+.menu button:hover { background: var(--surface-2); }
+.menu small { color: var(--muted); display: block; font-size: 11.5px; }
+
+/* feedback + status */
+.feedback { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-top: 16px; align-items: stretch; }
+.feedback .side { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+#feedback { height: 70px; }
+footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0 6px; }
+#status { min-height: 1.4em; }
+
+.banner { display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; padding: 9px 14px;
+  border-radius: 8px; border: 1px solid var(--accent); background: var(--drop-hover); }
+.banner.show { display: flex; }
+.banner .grow { flex: 1; }
+
+/* help dialog */
+dialog { max-width: min(760px, calc(100vw - 32px)); width: 100%; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); color: var(--text); padding: 0; box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+.dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.dlg-head h2 { margin: 0; font-size: 17px; }
+.dlg-body { padding: 6px 22px 18px; max-height: 70vh; overflow: auto; }
+.dlg-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin: 18px 0 6px; }
+.dlg-body table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.dlg-body td { padding: 3px 10px 3px 0; vertical-align: top; border-bottom: 1px solid var(--border); }
+.dlg-body td:first-child { white-space: nowrap; font-weight: 600; }
+.dlg-body p, .dlg-body li { font-size: 13.5px; }
+.dlg-body kbd { font-family: inherit; font-size: 12px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface-2); }
+
+#print-root { display: none; }
+@media (max-width: 760px) {
+  .wrap { padding: 14px 16px 10px; }
+  .grid, .feedback { grid-template-columns: 1fr; }
+  .feedback .side { flex-direction: row; align-items: center; }
+  #out { padding: 12px; font-size: 12px; }
+}
+@media print {
+  body { background: #fff; color: #000; }
+  .wrap, dialog { display: none !important; }
+  #print-root { display: block; }
+  @page { margin: 0.7in 0.8in; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="{{ICON}}" alt="">
+    <div class="titles">
+      <h1>SEL Trip Event Analyzer</h1>
+      <div class="sub">Trip-cause summaries from SEL relay event reports and QuickSet settings</div>
+    </div>
+    <div class="head-actions">
+      <button id="helpBtn" title="Help (F1)">Help</button>
+      <label class="switch" title="Dark mode (Ctrl+D)"><input type="checkbox" id="dark"> Dark mode</label>
+      <button id="updBtn">Check for updates</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" role="status">
+    <div class="grow" id="bannerText"></div>
+    <button class="accent" id="bannerGet">Download</button>
+    <button id="bannerClose" aria-label="Dismiss">Later</button>
+  </div>
+
+  <div class="drop" id="drop" role="button" tabindex="0" aria-label="Add SEL event files: drop them here or press Enter to browse">
+    <svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M17 4v16M11 14.5 17 20.5 23 14.5"/><path d="M5 20v7h24v-7"/>
+    </svg>
+    <div class="big">Drop SEL event files or folders here</div>
+    <div class="formats">CEV · EVE · TXT · SUM · HIS · SER · HDR · RDB &nbsp;&nbsp; or click to browse</div>
+  </div>
+  <input type="file" id="pickFiles" multiple hidden>
+  <input type="file" id="pickFolder" webkitdirectory directory multiple hidden>
+
+  <div class="grid">
+    <section>
+      <div class="bar"><span class="cap">Files</span><span class="hint" id="count">none loaded</span></div>
+      <ul class="files box" id="files" aria-label="Loaded files"></ul>
+      <div class="row">
+        <button id="addFiles" title="Ctrl+O">Add files</button>
+        <button id="addFolder">Add folder</button>
+        <button id="clear">Clear</button>
+        <button id="samples">Try samples</button>
+      </div>
+    </section>
+    <section>
+      <div class="bar"><label class="cap" for="comments">Comments &amp; suggestions</label><span class="hint">added to the top of the summary</span></div>
+      <textarea id="comments" placeholder="Notes to include at the top of the summary, e.g.&#10;Crew found a cracked insulator at pole 47. Recommend checking Z1 reach."></textarea>
+    </section>
+  </div>
+
+  <div class="actions">
+    <span class="hint">Include:</span>
+    <label class="check"><input type="checkbox" id="optSeq" checked> Element timeline</label>
+    <label class="check"><input type="checkbox" id="optSet" checked> Settings context</label>
+    <label class="check"><input type="checkbox" id="optSer" checked> SER lines</label>
+    <span class="grow"></span>
+    <button class="accent" id="generate" title="F5 or Ctrl+Enter">Generate summary</button>
+  </div>
+
+  <div class="summary-head">
+    <span class="cap">Trip summary</span><span class="hint">editable</span>
+    <span class="grow"></span>
+    <button id="copy" title="Ctrl+Shift+C">Copy all</button>
+    <div class="menu-wrap">
+      <button id="exportBtn" aria-haspopup="true" aria-expanded="false">Export ▾</button>
+      <div class="menu" id="exportMenu" role="menu">
+        <button role="menuitem" data-exp="doc">Word document (.doc)<small>Formatted report, opens in Word · Ctrl+S</small></button>
+        <button role="menuitem" data-exp="pdf">PDF / Print<small>Choose "Save as PDF" in the print window · Ctrl+P</small></button>
+        <button role="menuitem" data-exp="txt">Plain text (.txt)</button>
+      </div>
+    </div>
+  </div>
+  <div id="out" class="box mono" spellcheck="false" aria-label="Trip summary, editable"
+       data-placeholder="Drop SEL event files or a folder above and the trip summary will appear here.&#10;New here? Click &quot;Try samples&quot; (under the file list) to load example files.&#10;&#10;Everything in this box is editable before you copy or export it."></div>
+
+  <div class="feedback">
+    <div>
+      <div class="bar"><label class="cap" for="feedback">Feedback on this output</label><span class="hint">what was wrong, missing, or should be added?</span></div>
+      <textarea id="feedback" placeholder="e.g. Event 3 was a DTT from the remote end, not a local fault. Would be nice to show the breaker number in the quick summary."></textarea>
+    </div>
+    <div class="side">
+      <label class="check"><input type="checkbox" id="attach"> Attach summary</label>
+      <button id="send">Send feedback</button>
+    </div>
+  </div>
+
+  <footer>
+    <span class="hint" id="status" aria-live="polite">Ready</span>
+    <span class="hint">v{{VERSION}} · runs in your browser, files never leave your computer</span>
+  </footer>
+</div>
+
+<dialog id="help" aria-labelledby="helpTitle">
+  <div class="dlg-head"><h2 id="helpTitle">How to use</h2><button id="helpClose">Close</button></div>
+  <div class="dlg-body">
+    <h3>Quick start</h3>
+    <ol>
+      <li>Drag your relay's event files (or a whole folder) onto the drop zone. Best: the <b>.CEV</b> event report plus the relay's <b>.RDB</b> settings file.</li>
+      <li>Read the summary. Lines marked <b style="color:var(--warn)">CHECK</b> are things the program is unsure about.</li>
+      <li>Edit the text if needed, then <b>Copy all</b> or <b>Export</b> to Word or PDF.</li>
+    </ol>
+    <p>Your files are read inside this browser tab and are never uploaded. Nothing is installed.</p>
+    <h3>Which files to use</h3>
+    <table>
+      <tr><td>.CEV</td><td>Compressed event report: the most complete (elements, currents, usually the settings)</td></tr>
+      <tr><td>.RDB</td><td>QuickSet settings database: adds the trip equation (TR) and line length (LL)</td></tr>
+      <tr><td>.EVE .TXT</td><td>Text event report or a saved terminal capture</td></tr>
+      <tr><td>.SUM .HDR</td><td>Event summary / COMTRADE header written by the relay</td></tr>
+      <tr><td>.HIS</td><td>Event history list: one line per event, least detail</td></tr>
+      <tr><td>.SER</td><td>Sequential events recorder: element on/off times</td></tr>
+    </table>
+    <p>To get a CEV, download the event from the relay with AcSELerator QuickSet and choose the compressed (CEV) format, or save the output of the <code>CEV</code> command from a terminal session.</p>
+    <h3>Event types</h3>
+    <table>
+      <tr><td>AG BG CG</td><td>Single phase-to-ground fault</td></tr>
+      <tr><td>AB BC CA</td><td>Phase-to-phase fault</td></tr>
+      <tr><td>ABG BCG CAG</td><td>Two phases to ground</td></tr>
+      <tr><td>ABC</td><td>Three-phase fault</td></tr>
+      <tr><td>TRIP</td><td>Tripped, but no fault type found (transfer trip, manual/SCADA, external input)</td></tr>
+      <tr><td>ER</td><td>Event recorded by the ER trigger; no trip</td></tr>
+      <tr><td>TRIG</td><td>Manually triggered event</td></tr>
+      <tr><td>… T</td><td>A trailing T (for example "AG T") means the relay tripped</td></tr>
+    </table>
+    <h3>Common targets</h3>
+    <p>INST instantaneous · TIME time-delayed · COMM communications-assisted · ZONE1/2/3 distance zones ·
+       50 instantaneous overcurrent · 51 time-overcurrent · 81 frequency · SOTF switch-onto-fault ·
+       A B C G N faulted phases / ground · RS recloser reset (ready) · CY recloser cycling · LO recloser locked out</p>
+    <h3>Confidence and checks</h3>
+    <table>
+      <tr><td>High</td><td>Element data and settings, and nothing looked wrong</td></tr>
+      <tr><td>Medium</td><td>Some data missing, or one item to check</td></tr>
+      <tr><td>Low</td><td>History row only, very little data, or several items to check</td></tr>
+    </table>
+    <p>CHECK lines say exactly what to confirm: missing data (such as no settings), disagreements (targets vs. event type vs.
+       currents), or unusual results (reverse or beyond-line location, slow breaker, off-nominal frequency).</p>
+    <h3>Fault location</h3>
+    <p>Shown in the relay's line-length units. With settings loaded it's also shown as a percentage of the line.
+       Negative means behind the relay; $$$$$ means the relay couldn't calculate it.</p>
+    <h3>Shortcuts</h3>
+    <p><kbd>Ctrl</kbd>+<kbd>O</kbd> add files · <kbd>F5</kbd> generate · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> copy ·
+       <kbd>Ctrl</kbd>+<kbd>S</kbd> Word · <kbd>Ctrl</kbd>+<kbd>P</kbd> PDF · <kbd>Ctrl</kbd>+<kbd>D</kbd> dark mode · <kbd>F1</kbd> help</p>
+    <p class="hint">The analysis is automated. Always confirm against the oscillography and settings.
+       <a href="https://github.com/{{REPO}}#readme" target="_blank" rel="noopener">Full guide on GitHub</a></p>
+  </div>
+</dialog>
+
+<div id="print-root"></div>
+
+<script id="sample-data" type="application/json">{{SAMPLES_JSON}}</script>
+<script>
+/*{{CORE_JS}}*/
+</script>
+<script>
+(function () {
+"use strict";
+const VERSION = "{{VERSION}}";
+const REPO = "{{REPO}}";
+const HTML_ASSET = "SEL_Trip_Analyzer.html";
+const core = window.SELCore;
+const $ = (id) => document.getElementById(id);
+const out = $("out");
+const state = { files: [], empty: true, update: null };
+
+// ---------------------------------------------------------------- prefs
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("sel-trip:" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("sel-trip:" + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+};
+function setStatus(t) { $("status").textContent = t; }
+function flash(btn, text) {
+  const orig = btn.dataset.orig || btn.textContent;
+  btn.dataset.orig = orig; btn.textContent = text;
+  clearTimeout(btn._t); btn._t = setTimeout(() => { btn.textContent = orig; }, 1600);
+}
+
+// ---------------------------------------------------------------- theme
+const prefersDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+function applyTheme(dark) {
+  const root = document.documentElement;
+  root.classList.add("no-anim");               // switch colours instantly, no half-themed flash
+  root.setAttribute("data-theme", dark ? "dark" : "light");
+  $("dark").checked = dark;
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("no-anim")));
+}
+applyTheme(store.get("dark", prefersDark ? prefersDark.matches : false));
+$("dark").addEventListener("change", () => { applyTheme($("dark").checked); store.set("dark", $("dark").checked); });
+
+for (const [id, key] of [["optSeq", "seq"], ["optSet", "set"], ["optSer", "ser"]]) {
+  $(id).checked = store.get(key, true);
+  $(id).addEventListener("change", () => store.set(key, $(id).checked));
+}
+
+// ---------------------------------------------------------------- files
+const fmtSize = (n) => (n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
+const allowed = (name) => core.ALL_EXTS.includes(core.extOf(name)) && !name.toUpperCase().startsWith("README");
+
+function renderFiles() {
+  const ul = $("files");
+  ul.textContent = "";
+  if (!state.files.length) {
+    const li = document.createElement("li"); li.className = "empty"; li.textContent = "No files yet"; ul.appendChild(li);
+  }
+  state.files.forEach((f, i) => {
+    const li = document.createElement("li");
+    const n = document.createElement("span"); n.className = "fname"; n.textContent = f.name; n.title = f.path || f.name;
+    const s = document.createElement("span"); s.className = "fsize"; s.textContent = fmtSize(f.bytes.length);
+    const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Remove";
+    x.setAttribute("aria-label", "Remove " + f.name);
+    x.addEventListener("click", () => { state.files.splice(i, 1); renderFiles(); if (state.files.length) generate(); else showEmpty(); });
+    li.append(n, s, x); ul.appendChild(li);
+  });
+  $("count").textContent = state.files.length ? state.files.length + " loaded" : "none loaded";
+}
+
+async function addFiles(list) {
+  // list: [{file: File, path: string, fromFolder: bool}] already in order
+  let added = 0;
+  for (const { file, path, fromFolder } of list) {
+    if (fromFolder && !allowed(file.name)) continue;
+    const key = (path || file.name) + "|" + file.size + "|" + file.lastModified;
+    if (state.files.some((f) => f.key === key)) continue;
+    state.files.push({ key, name: file.name, path, bytes: new Uint8Array(await file.arrayBuffer()) });
+    added++;
+  }
+  renderFiles();
+  if (added) generate();
+  else if (list.length) setStatus("No new SEL files found in what was added.");
+}
+
+/** Order folder files like the desktop version: each folder's files (sorted) before its subfolders. */
+function folderOrder(a, b) {
+  const pa = a.path.split("/"), pb = b.path.split("/");
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    if (pa[i] === pb[i]) continue;
+    const aFile = i === pa.length - 1, bFile = i === pb.length - 1;
+    if (aFile !== bFile) return aFile ? -1 : 1;
+    return pa[i] < pb[i] ? -1 : 1;
+  }
+  return pa.length - pb.length;
+}
+
+function readAllEntries(reader) {
+  return new Promise((resolve) => {
+    const all = [];
+    const next = () => reader.readEntries((batch) => { if (!batch.length) resolve(all); else { all.push(...batch); next(); } }, () => resolve(all));
+    next();
+  });
+}
+async function walkEntry(entry, prefix, outList) {
+  if (entry.isFile) {
+    const file = await new Promise((res, rej) => entry.file(res, rej)).catch(() => null);
+    if (file) outList.push({ file, path: prefix + file.name, fromFolder: true });
+  } else if (entry.isDirectory) {
+    const kids = await readAllEntries(entry.createReader());
+    for (const k of kids) await walkEntry(k, prefix + entry.name + "/", outList);
+  }
+}
+
+const drop = $("drop");
+drop.addEventListener("click", () => $("pickFiles").click());
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("pickFiles").click(); } });
+let dragDepth = 0;
+document.addEventListener("dragenter", (e) => { e.preventDefault(); dragDepth++; drop.classList.add("over"); });
+document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove("over"); } });
+document.addEventListener("dragover", (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; });
+document.addEventListener("drop", async (e) => {
+  e.preventDefault(); dragDepth = 0; drop.classList.remove("over");
+  const dt = e.dataTransfer; if (!dt) return;
+  const items = dt.items ? [...dt.items].filter((i) => i.kind === "file") : [];
+  const entries = items.map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null));
+  const list = [];
+  if (entries.length && entries.every(Boolean)) {
+    for (const en of entries) {
+      const sub = [];
+      await walkEntry(en, "", sub);
+      if (en.isFile) sub.forEach((x) => { x.fromFolder = false; });  // a file dropped on its own is always read
+      else sub.sort(folderOrder);
+      list.push(...sub);
+    }
+  } else {
+    for (const f of dt.files) list.push({ file: f, path: f.name, fromFolder: false });
+  }
+  addFiles(list);
+});
+$("pickFiles").addEventListener("change", (e) => {
+  addFiles([...e.target.files].map((f) => ({ file: f, path: f.name, fromFolder: false }))); e.target.value = "";
+});
+$("pickFolder").addEventListener("change", (e) => {
+  const list = [...e.target.files].map((f) => ({ file: f, path: f.webkitRelativePath || f.name, fromFolder: true }));
+  list.sort(folderOrder); addFiles(list); e.target.value = "";
+});
+$("addFiles").addEventListener("click", () => $("pickFiles").click());
+$("addFolder").addEventListener("click", () => $("pickFolder").click());
+$("clear").addEventListener("click", () => { state.files = []; renderFiles(); showEmpty(); setStatus("Cleared"); });
+$("samples").addEventListener("click", () => {
+  const data = JSON.parse($("sample-data").textContent);
+  let added = 0;
+  for (const s of data) {
+    const key = "sample|" + s.name;
+    if (state.files.some((f) => f.key === key)) continue;
+    const bin = atob(s.b64), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    state.files.push({ key, name: s.name, path: "samples/" + s.name, bytes }); added++;
+  }
+  renderFiles();
+  if (added) generate().then(() => setStatus("Loaded the sample files - these are made-up events for trying the program"));
+});
+
+// ---------------------------------------------------------------- summary
+function showEmpty() { out.textContent = ""; state.empty = true; }
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function lineHtml(ln, i) {
+  const s = ln.trim(), n = ln.length;
+  const cls = Array.from({ length: n }, () => new Set());
+  const mark = (a, b, c) => { for (let k = Math.max(0, a); k < Math.min(n, b); k++) cls[k].add(c); };
+  if (i === 0 && s.startsWith("SEL TRIP")) mark(0, n, "h1");
+  else if (/^[=\-]{10,}$/.test(s)) mark(0, n, "rule");
+  else if (ln === s && /^[A-Z][A-Z /&()\-]{3,}$/.test(s)) mark(0, n, "h2");
+  else if (/^Event \d+ of \d+/.test(ln) || s.startsWith("Probable cause")) mark(0, n, "b");
+  else { const m = /^(\s{2}[A-Za-z][A-Za-z ./]{2,12}:)/.exec(ln); if (m) mark(0, m[1].length, "lbl"); }
+  let k = ln.indexOf("CHECK:");
+  if (k >= 0) { mark(k, n, "warn"); mark(k, k + 6, "warnb"); }
+  const m2 = /\[\d+ to check\]/.exec(ln);
+  if (m2) mark(m2.index, m2.index + m2[0].length, "warnb");
+  if ((s.startsWith("Needs review:") || s.startsWith("Confidence")) && s.includes("to check")) mark(0, n, "warn");
+  for (const [word, c] of [["TRIP - ", "trip"], ["Relay TRIPPED", "trip"], ["No trip - ", "ok"], ["No trip recorded", "ok"]]) {
+    k = ln.indexOf(word);
+    if (k >= 0) mark(k, k + word.replace(/ -\s*$/, "").length, c);
+  }
+  let html = "", cur = null, buf = "";
+  const flush = () => { if (buf) html += cur ? `<span class="${cur}">${esc(buf)}</span>` : esc(buf); buf = ""; };
+  for (let j = 0; j < n; j++) {
+    let c = [...cls[j]];
+    if (c.includes("warnb")) c = c.filter((x) => x !== "warn");
+    const key = c.sort().join(" ") || null;
+    if (key !== cur) { flush(); cur = key; }
+    buf += ln[j];
+  }
+  flush();
+  return html;
+}
+
+function showReport(text) {
+  out.innerHTML = text.split("\n").map(lineHtml).join("\n");
+  state.empty = false;
+}
+const summaryText = () => (state.empty ? "" : out.innerText.replace(/\n$/, ""));
+
+let busy = false;
+async function generate() {
+  if (!state.files.length) { setStatus("Add some files first"); return; }
+  if (busy) return;
+  busy = true; setStatus("Analyzing…");
+  try {
+    const { events, rdb, errors } = await core.loadFiles(state.files.map((f) => ({ name: f.name, bytes: f.bytes })));
+    const text = core.buildReport(events, rdb, errors, state.files.length, $("comments").value,
+      { sequence: $("optSeq").checked, settings: $("optSet").checked, ser: $("optSer").checked });
+    showReport(text);
+    const n = events.filter((e) => e.kind !== "ser").length, nf = state.files.length;
+    setStatus(`${n} event${n === 1 ? "" : "s"} from ${nf} file${nf === 1 ? "" : "s"}` + (errors.length ? `  -  ${errors.length} could not be read` : ""));
+  } catch (e) {
+    setStatus("Something went wrong: " + (e && e.message ? e.message : e));
+  } finally { busy = false; }
+}
+$("generate").addEventListener("click", generate);
+
+// typing into the summary: keep it plain text
+try { out.contentEditable = "plaintext-only"; } catch (e) { /* older browser */ }
+if (out.contentEditable !== "plaintext-only") {
+  out.contentEditable = "true";
+  out.addEventListener("paste", (e) => {
+    e.preventDefault();
+    document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain"));
+  });
+}
+out.addEventListener("input", () => { state.empty = out.textContent.length === 0; });
+
+// ---------------------------------------------------------------- copy / export
+async function copyAll() {
+  if (state.empty) { setStatus("Generate a summary first"); return; }
+  const text = summaryText();
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  flash($("copy"), "Copied ✓"); setStatus("Summary copied to clipboard");
+}
+$("copy").addEventListener("click", copyAll);
+
+const C = { ink: "#1B1B1B", muted: "#666666", accent: "#0B5CAD", rule: "#D6DCE4", head: "#EAF1FA", band: "#F7F9FC",
+            trip: "#C42B1C", ok: "#0F7B0F", warn: "#A15C00" };
+function runsHtml(t) {
+  return core.tripRuns(t).map(([txt, col]) => (col ? `<b style="color:${C[col]}">${esc(txt)}</b>` : esc(txt))).join("");
+}
+function reportHtml(text) {
+  const FONT = "font-family:Calibri,'Segoe UI',Arial,sans-serif;";
+  const cell = FONT + "padding:3px 8px;border-bottom:0.5pt solid " + C.rule + ";vertical-align:top;font-size:9pt;";
+  const keep = "page-break-after:avoid;break-after:avoid;";                       // headings stay with what follows
+  const whole = (n) => (n <= 18 ? "page-break-inside:avoid;break-inside:avoid;" : "");  // short tables stay on one page
+  const parts = [];
+  for (const blk of core.parseReportText(text)) {
+    const [kind] = blk;
+    if (kind === "title") parts.push(`<h1 style="font-size:20pt;margin:0 0 2pt;color:${C.ink}">${esc(blk[1])}</h1>`);
+    else if (kind === "meta") parts.push(`<p style="font-size:8.5pt;color:${C.muted};margin:0 0 10pt">${blk[1].map(esc).join("&nbsp;&nbsp;&nbsp; ")}</p>`);
+    else if (kind === "h1") parts.push(`<h2 style="${keep}font-size:13pt;color:${C.accent};margin:14pt 0 4pt">${esc(blk[1])}</h2>`);
+    else if (kind === "h2") parts.push(`<h3 style="${keep}font-size:11pt;color:${C.ink};margin:11pt 0 4pt">${esc(blk[1])}</h3>`);
+    else if (kind === "sub") parts.push(`<h4 style="${keep}font-size:9.5pt;color:${C.muted};margin:8pt 0 3pt">${esc(blk[1])}</h4>`);
+    else if (kind === "para") parts.push(`<p style="margin:0 0 5pt">${blk[1].split("\n").map(esc).join("<br>")}</p>`);
+    else if (kind === "note") parts.push(`<p style="font-size:8.5pt;font-style:italic;color:${C.muted};margin:3pt 0">${esc(blk[1])}</p>`);
+    else if (kind === "bullets") parts.push(`<ul style="margin:2pt 0 6pt;padding-left:18pt">${blk[1].map((b) => `<li style="margin:1pt 0">${runsHtml(b)}</li>`).join("")}</ul>`);
+    else if (kind === "mono") parts.push(`<pre style="font-family:Consolas,'Courier New',monospace;font-size:8pt;margin:2pt 0 6pt">${blk[1].map(esc).join("\n")}</pre>`);
+    else if (kind === "kv") {
+      parts.push(`<table style="${whole(blk[1].length)}border-collapse:collapse;width:100%;margin:2pt 0 6pt">` + blk[1].map(([k, v, mono]) => {
+        const ff = mono ? "font-family:Consolas,'Courier New',monospace;" : "";
+        return `<tr><td width="22%" style="${cell}width:22%;font-weight:bold;color:${C.muted};${ff}">${esc(k)}</td><td style="${cell}${ff}">${esc(v)}</td></tr>`;
+      }).join("") + `</table>`);
+    } else if (kind === "table") {
+      const [, headers, rows] = blk;
+      const widths = headers[0] === "#" ? [5, 21, 15, 8, 51] : headers[0] === "Cycle" ? [10, 16, 26, 48] : headers.map(() => 100 / headers.length);
+      parts.push(`<table style="${whole(rows.length)}border-collapse:collapse;width:100%;margin:2pt 0 8pt"><tr>` +
+        headers.map((h, j) => `<th width="${widths[j]}%" style="${cell}width:${widths[j]}%;text-align:left;background:${C.head};color:${C.accent}">${esc(h)}</th>`).join("") + "</tr>" +
+        rows.map((r, i) => `<tr>` + r.map((v, j) => `<td style="${cell}${i % 2 ? "background:" + C.band + ";" : ""}">${headers[j] === "Cause" ? runsHtml(v) : esc(v)}</td>`).join("") + "</tr>").join("") +
+        `</table>`);
+    }
+  }
+  return `<div style="font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:10.5pt;color:${C.ink};line-height:1.35">${parts.join("\n")}` +
+         `<p style="font-size:7.5pt;color:${C.muted};margin-top:14pt;border-top:0.5pt solid ${C.rule};padding-top:4pt">SEL Trip Event Analyzer v${VERSION}</p></div>`;
+}
+function download(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const stamp = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+function exportAs(kind) {
+  closeMenu();
+  if (state.empty) { setStatus("Generate a summary first"); return; }
+  const text = summaryText(), name = `Trip summary ${stamp()}`;
+  if (kind === "txt") download(name + ".txt", new Blob([text.replace(/\n/g, "\r\n")], { type: "text/plain;charset=utf-8" }));
+  else if (kind === "doc") {
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">` +
+      `<head><meta charset="utf-8"><title>${esc(name)}</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->` +
+      `<style>@page Section1{size:8.5in 11.0in;margin:0.7in 0.8in 0.7in 0.8in;} div.Section1{page:Section1;} table{mso-table-lspace:0;mso-table-rspace:0;width:100%;} ` +
+      `body,p,li,td,th,h1,h2,h3,h4{font-family:Calibri,'Segoe UI',Arial,sans-serif;} td,th{font-size:9pt;}</style></head>` +
+      `<body><div class="Section1">${reportHtml(text)}</div></body></html>`;
+    download(name + ".doc", new Blob(["\ufeff", doc], { type: "application/msword" }));
+  } else if (kind === "pdf") {
+    $("print-root").innerHTML = reportHtml(text);
+    const t = document.title; document.title = name;
+    setTimeout(() => { window.print(); document.title = t; }, 50);
+    setStatus('In the print window, choose "Save as PDF" as the printer');
+    return;
+  }
+  flash($("exportBtn"), "Exported ✓");
+  setStatus("Saved " + name + (kind === "doc" ? ".doc" : ".txt") + " to your downloads");
+}
+function closeMenu() { $("exportMenu").classList.remove("open"); $("exportBtn").setAttribute("aria-expanded", "false"); }
+$("exportBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const open = $("exportMenu").classList.toggle("open");
+  $("exportBtn").setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".menu-wrap")) closeMenu(); });
+$("exportMenu").addEventListener("click", (e) => { const b = e.target.closest("[data-exp]"); if (b) exportAs(b.dataset.exp); });
+
+// ---------------------------------------------------------------- feedback
+$("send").addEventListener("click", () => {
+  const text = $("feedback").value.trim();
+  if (!text) { setStatus("Type your feedback first"); $("feedback").focus(); return; }
+  const summary = summaryText();
+  const exts = [...new Set(state.files.map((f) => core.extOf(f.name)))].sort();
+  let body = `${text}\n\n---\nApp version: v${VERSION} (browser)  \nFiles loaded: ${state.files.length} (${exts.join(", ") || "none"})\n`;
+  if ($("attach").checked && summary) {
+    if (!confirm("Feedback is posted as a public GitHub issue, so anyone can read the attached summary (relay names, dates, locations).\n\nAttach it anyway?")) return;
+    const room = 6000 - encodeURIComponent(body).length;
+    let clip = summary;
+    while (clip && encodeURIComponent(clip).length > room) clip = clip.slice(0, Math.floor(clip.length * 0.8));
+    body += "\n<details><summary>Summary output</summary>\n\n```\n" + clip + (clip.length < summary.length ? "\n... (truncated)" : "") + "\n```\n</details>\n";
+  }
+  const title = "Feedback: " + text.replace(/\s+/g, " ").slice(0, 70);
+  window.open(`https://github.com/${REPO}/issues/new?` + new URLSearchParams({ title, body }), "_blank", "noopener");
+  $("feedback").value = "";
+  flash($("send"), "Opened ✓");
+  setStatus("Feedback opened on GitHub - click 'Create' there to submit");
+});
+
+// ---------------------------------------------------------------- updates
+const vt = (v) => (String(v).match(/\d+/g) || ["0"]).slice(0, 4).map(Number);
+const newer = (a, b) => { const x = vt(a), y = vt(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
+const hosted = /\.github\.io$/.test(location.hostname);
+async function checkUpdates(manual) {
+  if (hosted) { if (manual) setStatus("You're using the online version, which is always the latest."); return; }
+  $("updBtn").disabled = true;
+  if (manual) setStatus("Checking GitHub for updates…");
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
+    if (!r.ok) throw new Error("GitHub said " + r.status);
+    const rel = await r.json();
+    const asset = (rel.assets || []).find((a) => a.name === HTML_ASSET);
+    if (newer(rel.tag_name, VERSION) && asset) {
+      state.update = { version: rel.tag_name.replace(/^v/i, ""), url: asset.browser_download_url, notes: (rel.body || "").trim() };
+      $("updBtn").textContent = "Update to v" + state.update.version; $("updBtn").classList.add("accent");
+      $("bannerText").textContent = `Version ${state.update.version} is available (you have ${VERSION}). Download it and use it in place of this file.`;
+      $("banner").classList.add("show");
+      setStatus("Version " + state.update.version + " is available");
+    } else if (manual) setStatus(`You're on the latest version (v${VERSION})`);
+  } catch (e) {
+    if (manual) setStatus("Couldn't reach GitHub to check for updates (" + (e.message || e) + ")");
+  } finally { $("updBtn").disabled = false; }
+}
+function getUpdate() { if (state.update) window.open(state.update.url, "_blank", "noopener"); }
+$("updBtn").addEventListener("click", () => (state.update ? getUpdate() : checkUpdates(true)));
+$("bannerGet").addEventListener("click", getUpdate);
+$("bannerClose").addEventListener("click", () => $("banner").classList.remove("show"));
+if (hosted) { $("updBtn").style.display = "none"; }
+else if (navigator.onLine !== false) setTimeout(() => checkUpdates(false), 1200);
+
+// ---------------------------------------------------------------- help + keys
+$("helpBtn").addEventListener("click", () => $("help").showModal());
+$("helpClose").addEventListener("click", () => $("help").close());
+$("help").addEventListener("click", (e) => { if (e.target === $("help")) $("help").close(); });
+document.addEventListener("keydown", (e) => {
+  const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (e.key === "Escape") closeMenu();
+  else if (e.key === "F1") { e.preventDefault(); $("help").showModal(); }
+  else if (e.key === "F5" || (ctrl && e.key === "Enter")) { e.preventDefault(); generate(); }
+  else if (ctrl && e.shiftKey && k === "c") { e.preventDefault(); copyAll(); }
+  else if (ctrl && !e.shiftKey && k === "o") { e.preventDefault(); $("pickFiles").click(); }
+  else if (ctrl && !e.shiftKey && k === "s") { e.preventDefault(); exportAs("doc"); }
+  else if (ctrl && !e.shiftKey && k === "p") { e.preventDefault(); exportAs("pdf"); }
+  else if (ctrl && !e.shiftKey && k === "d") { e.preventDefault(); applyTheme(!$("dark").checked); store.set("dark", $("dark").checked); }
+});
+
+renderFiles();
+showEmpty();
+// test hook
+window.__selApp = { state, generate, summaryText, reportHtml, exportAs };
+})();
+</script>
+</body>
+</html>
