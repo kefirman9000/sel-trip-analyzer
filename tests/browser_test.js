@@ -135,8 +135,9 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await page.route("https://api.open-meteo.com/**", wxRoute);
   await page.route("https://archive-api.open-meteo.com/**", wxRoute);
   await page.click("#wxPanel summary");
-  const locs = page.locator("#wxRelays input");
-  for (let i = 0; i < await locs.count(); i++) { await locs.nth(i).fill("Ocala, FL"); await locs.nth(i).press("Enter"); }
+  await page.check("#wxAll");
+  await page.fill("#wxBulkText", "Ocala, FL");
+  await page.click("#wxBulkApply");
   await page.waitForFunction(() => [...document.querySelectorAll("#wxRelays .st")].every((x) => x.textContent.includes("Ocala")), null, { timeout: 5000 }).catch(() => {});
   await page.click("#wxGo");
   await page.waitForFunction(() => /Weather found for \d+/.test(document.getElementById("wxStatus").textContent), null, { timeout: 8000 }).catch(() => {});

@@ -170,7 +170,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 .dlg-body kbd { font-family: inherit; font-size: 12px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface-2); }
 
 /* page tabs */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; }
 .tabs button { border: 0; border-bottom: 2.5px solid transparent; border-radius: 6px 6px 0 0; background: transparent; padding: 7px 16px;
   font-weight: 600; color: var(--muted); margin-bottom: -1px; }
 .tabs button:hover { background: var(--surface-2); color: var(--text); }
@@ -265,7 +265,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 #wPins .x { border: 0; background: transparent; min-height: 24px; padding: 0 7px; color: var(--muted); font-size: 16px; }
 #wEventNote { height: 64px; }
 .wx-box { padding: 10px 14px; margin-top: 6px; }
-.wx-relays { display: grid; grid-template-columns: minmax(120px, auto) minmax(200px, 1fr) auto minmax(160px, 1.2fr); gap: 6px 10px; align-items: center; }
+.wx-relays { display: grid; grid-template-columns: auto minmax(120px, auto) minmax(200px, 1fr) auto minmax(160px, 1.2fr); gap: 6px 10px; align-items: center; }
+.wx-relays input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.wx-bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; margin-bottom: 10px; border-radius: 8px; background: var(--surface-2); }
+.wx-bulk input[type="text"] { flex: 1 1 220px; min-width: 0; }
 .wx-relays input { width: 100%; }
 .wx-relays .st { font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wx-relays .st.ok { color: var(--ok); } .wx-relays .st.bad { color: var(--warn); }
@@ -283,8 +286,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
   .wv-main, .wv-lower { grid-template-columns: 1fr; }
   .evlist li { grid-template-columns: 28px 1fr; }
   .evlist li > input, .evlist li > button { grid-column: 2; }
-  .wx-relays { grid-template-columns: 1fr auto; }
-  .wx-relays .st { grid-column: 1 / -1; }
+  .wx-relays { grid-template-columns: auto 1fr auto; }
+  .wx-relays > b { grid-column: 2 / -1; }
+  .wx-relays .st { grid-column: 2 / -1; }
+  .tabs button { padding: 7px 10px; }
+  .tabs .badge { display: none; }
+  .wx-bulk input { width: 100%; }
   .verdict { grid-template-columns: 1fr; }
 }
 @media (max-width: 1000px) and (min-width: 761px) {
@@ -387,6 +394,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
       <p class="hint" style="margin-top:0">Enter where each relay is (a town such as <i>Ocala, FL</i>, or <i>latitude, longitude</i>), then look up the weather.
         Thunderstorms, high wind, ice and heavy rain are added to the probable cause. Only the location and the event date and hour are sent to
         <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (a free weather service); your files stay on this computer.</p>
+      <div class="wx-bulk" role="group" aria-label="Set a location for several relays">
+        <label class="check"><input type="checkbox" id="wxAll"> Select all</label>
+        <input type="text" id="wxBulkText" placeholder="One location for the ticked relays, e.g. Ocala, FL" aria-label="Location for the ticked relays">
+        <button id="wxBulkApply">Apply to ticked</button>
+        <button id="wxBulkAll" title="Use this location for every relay">Apply to all</button>
+      </div>
       <div id="wxRelays" class="wx-relays"></div>
       <div class="row">
         <button class="accent" id="wxGo">Look up weather</button>
@@ -584,7 +597,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
     </table>
     <h3>Notes and weather</h3>
     <p><b>Event notes &amp; waveforms</b> (under the summary) lists every event: type a note and it's added to that event in the summary and exports.
-       <b>Station locations &amp; weather</b>: enter where each relay is (a town or latitude, longitude) and click <b>Look up weather</b>. The weather at the
+       <b>Station locations &amp; weather</b>: enter where each relay is (a town or latitude, longitude), or tick several relays (or <b>Select all</b>) and set one location for them all, then click <b>Look up weather</b>. The weather at the
        hour of each event is added, and thunderstorms, high wind, ice/snow, heavy rain or extreme heat are listed as possible causes. Only the location and
        the event date go to Open-Meteo (a free weather service). <b>Add weather to event notes</b> copies it into the notes.</p>
     <h3>Event types</h3>
@@ -1004,6 +1017,39 @@ const wxCache = {};
 $("wxUnits").value = store.get("wxUnits", "us");
 $("wxOn").checked = store.get("wxOn", true);
 function wxStatus(t) { $("wxStatus").textContent = t; }
+const wxSel = new Set();
+const relayKeys = () => (state.cache ? state.cache.choices.relays.map(([k]) => k.toUpperCase()) : []);
+function syncAll() {
+  const keys = relayKeys(), n = keys.filter((k) => wxSel.has(k)).length;
+  $("wxAll").checked = keys.length > 0 && n === keys.length;
+  $("wxAll").indeterminate = n > 0 && n < keys.length;
+  $("wxBulkApply").textContent = n ? `Apply to ${n} ticked` : "Apply to ticked";
+  $("wxBulkApply").disabled = !n;
+}
+$("wxAll").addEventListener("change", () => {
+  for (const k of relayKeys()) if ($("wxAll").checked) wxSel.add(k); else wxSel.delete(k);
+  renderRelays();
+});
+async function bulkSet(keys) {
+  const text = $("wxBulkText").value.trim();
+  if (!keys.length) { wxStatus("Tick the relays to change first (or use Apply to all)"); return; }
+  if (!text) { wxStatus("Type a town (e.g. Ocala, FL) or latitude, longitude first"); $("wxBulkText").focus(); return; }
+  wxStatus("Searching…");
+  try {
+    const res = await WX.geocode(text);
+    if (!res.length) { wxStatus("Not found: try 'Town, ST' or 'lat, lon'"); return; }
+    const all = store.get("locations", {});
+    for (const k of keys) all[k] = { label: res[0].label, lat: res[0].lat, lon: res[0].lon, typed: text };
+    store.set("locations", all);
+    wxStatus(`Set ${keys.length} relay${keys.length === 1 ? "" : "s"} to ${res[0].label}` +
+             (res.length > 1 ? ` (other matches: ${res.slice(1, 4).map((r) => r.label).join("; ")}; add the state or use lat, lon to pick another)` : "") +
+             ". Now click Look up weather.");
+    renderRelays();
+  } catch (e) { wxStatus("Couldn't reach the location service (" + (e.message || e) + ")"); }
+}
+$("wxBulkApply").addEventListener("click", () => bulkSet(relayKeys().filter((k) => wxSel.has(k))));
+$("wxBulkAll").addEventListener("click", () => bulkSet(relayKeys()));
+$("wxBulkText").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); bulkSet(relayKeys().filter((k) => wxSel.has(k))); } });
 function allItems() { return state.cache ? core.prepareView(state.cache.events, state.cache.rdb, {}).items : []; }
 function renderRelays() {
   const box = $("wxRelays");
@@ -1013,6 +1059,9 @@ function renderRelays() {
   if (!relays.length) { box.innerHTML = '<span class="hint">Load event files to list their relays here.</span>'; return; }
   for (const r of relays) {
     const key = r.toUpperCase();
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.dataset.relay = key; cb.setAttribute("aria-label", `Select ${r}`);
+    cb.checked = wxSel.has(key);
+    cb.addEventListener("change", () => { if (cb.checked) wxSel.add(key); else wxSel.delete(key); syncAll(); });
     const lab = document.createElement("b"); lab.textContent = r;
     const inp = document.createElement("input"); inp.type = "text"; inp.placeholder = "Town, ST  or  lat, lon";
     inp.value = locs[key] ? locs[key].typed || locs[key].label : ""; inp.setAttribute("aria-label", `Location of ${r}`);
@@ -1039,8 +1088,9 @@ function renderRelays() {
     btn.addEventListener("click", find);
     inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); find(); } });
     inp.addEventListener("change", find);
-    box.append(lab, inp, btn, st);
+    box.append(cb, lab, inp, btn, st);
   }
+  syncAll();
   const n = Object.keys(store.get("wxResults", {})).length;
   $("wxHint").textContent = n ? `weather found for ${n} event${n === 1 ? "" : "s"}` : "optional: weather at the time of each event";
 }

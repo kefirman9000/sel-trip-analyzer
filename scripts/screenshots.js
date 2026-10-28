@@ -29,8 +29,9 @@ fs.mkdirSync(OUT, { recursive: true });
 
   // weather
   await page.click("#wxPanel summary");
-  const locs = page.locator("#wxRelays input");
-  for (let i = 0; i < await locs.count(); i++) { await locs.nth(i).fill("Ocala, FL"); await locs.nth(i).press("Enter"); }
+  await page.check("#wxAll");
+  await page.fill("#wxBulkText", "Ocala, FL");
+  await page.click("#wxBulkApply");
   await page.waitForTimeout(400);
   await page.click("#wxGo");
   await page.waitForFunction(() => /Weather found/.test(document.getElementById("wxStatus").textContent));
