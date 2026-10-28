@@ -1,0 +1,53 @@
+name: Build and release
+
+# Push a tag like v1.0.1 (matching VERSION in sel_trip_analyzer.py) to publish
+# a release with SEL_Trip_Analyzer.exe attached. Installed copies of the app
+# pick it up through their "Check for updates" button.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: python
+        run: |
+          import re, os, sys
+          v = re.search(r'^VERSION = "([^"]+)"', open("sel_trip_analyzer.py", encoding="utf-8").read(), re.M).group(1)
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("vV")
+          if v != tag:
+              sys.exit(f"Tag {tag} does not match VERSION {v} in sel_trip_analyzer.py")
+
+      - name: Build exe
+        run: |
+          python -m pip install -r requirements.txt
+          python -m PyInstaller --noconfirm --onefile --windowed --name SEL_Trip_Analyzer --collect-all tkinterdnd2 --hidden-import olefile sel_trip_analyzer.py
+
+      - name: Smoke test parser
+        run: python sel_trip_analyzer.py --cli sample_files
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SEL_Trip_Analyzer.exe
+          generate_release_notes: true
+
+      - name: Keep build as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SEL_Trip_Analyzer
+          path: dist/SEL_Trip_Analyzer.exe
