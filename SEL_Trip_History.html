@@ -237,6 +237,28 @@ dialog .dlg-f { display: flex; gap: 8px; justify-content: flex-end; padding: 12p
 #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 8px; z-index: 300; box-shadow: var(--shadow); max-width: calc(100vw - 30px); }
 #busy { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); display: grid; place-items: center; z-index: 150; font-weight: 600; }
 
+.changes { border-left: 3px solid var(--accent); }
+.chg { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 4px; }
+.chg:hover { background: var(--surface-2); }
+.chg .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--muted); transform: translateY(-1px); }
+.chg.l3 .dot { background: var(--trip); } .chg.l2 .dot { background: var(--warn); } .chg.l0 .dot { background: var(--ok); }
+.chg .who { font-weight: 600; white-space: nowrap; }
+.watchbar { display: inline-flex; align-items: center; gap: 8px; padding: 2px 4px 2px 10px; border-radius: 14px; background: var(--drop); border: 1px solid var(--drop-line); font-size: 12.5px; }
+.watchbar .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: pulse 2s infinite; }
+.watchbar.paused .pulse { background: var(--warn); animation: none; }
+@keyframes pulse { 50% { opacity: .3; } }
+.wxtag { font-size: 11.5px; padding: 0 6px; border-radius: 9px; white-space: nowrap; }
+.wxtag.storm { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); font-weight: 600; }
+.wxtag.calm { background: var(--surface-2); color: var(--muted); }
+.locs td { vertical-align: middle; }
+.locs input[type="text"] { width: 100%; min-width: 180px; }
+.st-ok { color: var(--ok); font-size: 12px; } .st-bad { color: var(--trip); font-size: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; min-height: 26px; padding: 2px 10px; font-size: 12.5px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.bk-verdict { font-weight: 600; }
+.bk-verdict.bad { color: var(--trip); }
+
 #print-root { display: none; }
 @media print {
   body > *:not(#print-root) { display: none !important; }
@@ -277,6 +299,8 @@ dialog .dlg-f { display: flex; gap: 8px; justify-content: flex-end; padding: 12p
     <div class="head-actions">
       <button id="addFiles" title="Add event files (Ctrl+O)">Add files</button>
       <button id="addFolder" title="Add a folder (and its subfolders)">Add folder</button>
+      <button id="watchBtn" title="Keep a folder watched: new relay files are added as they arrive (Chrome / Edge)" hidden>Watch a folder</button>
+      <button id="analyzerBtn" title="Open the SEL Trip Analyzer (one event at a time, with waveforms)">Trip Analyzer ↗</button>
       <button id="exportBtn" class="accent" title="Export a historical report (Ctrl+S)" disabled>Export report</button>
       <button id="themeBtn" title="Dark / light (Ctrl+D)" aria-label="Dark or light mode"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></button>
     </div>
@@ -294,6 +318,7 @@ dialog .dlg-f { display: flex; gap: 8px; justify-content: flex-end; padding: 12p
     </div>
     <div class="row" style="display:flex;gap:8px;justify-content:center;margin-top:12px">
       <button id="samples">Try samples (2 years, 5 stations)</button>
+      <button id="watchBtn2" hidden>Watch a folder</button>
     </div>
     <div class="empty-grid">
       <div class="card"><h3>Builds up over time</h3><p>Add this month's downloads next month: events already in the history are recognized and counted once, even when they come from a .CEV, a .SUM and a .HIS.</p></div>
@@ -306,6 +331,7 @@ dialog .dlg-f { display: flex; gap: 8px; justify-content: flex-end; padding: 12p
   <section id="mainView" hidden>
     <div class="strip">
       <span id="stripText"></span>
+      <span class="watchbar" id="watchBar" hidden><span class="pulse"></span><span id="watchText"></span><button class="small" id="watchStop">Stop</button></span>
       <span class="grow"></span>
       <span class="field"><label for="fFrom" class="hint">From</label><input type="date" id="fFrom"></span>
       <span class="field"><label for="fTo" class="hint">To</label><input type="date" id="fTo"></span>
@@ -362,6 +388,8 @@ dialog .dlg-f { display: flex; gap: 8px; justify-content: flex-end; padding: 12p
         <label class="check"><input type="checkbox" data-s="recurring" checked> Recurring issues</label>
         <label class="check"><input type="checkbox" data-s="hotspots" checked> Fault hot spots</label>
         <label class="check"><input type="checkbox" data-s="trends" checked> Trends</label>
+        <label class="check"><input type="checkbox" data-s="breakers" checked> Breaker health</label>
+        <label class="check"><input type="checkbox" data-s="weather" checked> Weather</label>
         <label class="check"><input type="checkbox" data-s="matrix" checked> Issue counts by location</label>
         <label class="check"><input type="checkbox" data-s="details" checked> Details for each location</label>
         <label class="check"><input type="checkbox" data-s="events" checked> Event list in each location</label>
@@ -3247,6 +3275,151 @@ else root.SELDocx = api;
 
 </script>
 <script>
+/* SEL Trip Event Analyzer - weather at the time of an event.
+ *
+ * Uses Open-Meteo (free, no account): the geocoding API to turn a town name into
+ * coordinates, and the historical weather API (or the forecast API's recent past)
+ * for the hourly weather around each event. Only the station location and the
+ * event date are sent; the event files never leave the computer.
+ *
+ *   SELWeather.geocode("Ocala, FL") -> [{name, lat, lon, label}]
+ *   SELWeather.lookup({lat, lon}, "2026-10-21", 14, {units}) -> {text, hints, hours, ...}
+ *   SELWeather.assess(hours, eventHour, units) -> {text, hints}   (pure, testable)
+ */
+(function (root) {
+"use strict";
+
+const WMO = {
+  0: "clear", 1: "mainly clear", 2: "partly cloudy", 3: "overcast", 45: "fog", 48: "freezing fog",
+  51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 56: "freezing drizzle", 57: "heavy freezing drizzle",
+  61: "light rain", 63: "rain", 65: "heavy rain", 66: "freezing rain", 67: "heavy freezing rain",
+  71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains", 80: "rain showers", 81: "heavy rain showers",
+  82: "violent rain showers", 85: "snow showers", 86: "heavy snow showers", 95: "thunderstorm",
+  96: "thunderstorm with hail", 99: "thunderstorm with heavy hail",
+};
+const HOURLY = "temperature_2m,precipitation,snowfall,weather_code,wind_speed_10m,wind_gusts_10m";
+const pad = (n) => String(n).padStart(2, "0");
+
+/** "10/21/2026" or core datetime -> {date: "2026-10-21", hour} */
+function eventWhen(e, core) {
+  const dt = core.eventDatetime(e);
+  if (dt === null) return null;
+  const d = new Date(dt / 1000);
+  return { date: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`, hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+}
+
+/** Parse "lat, lon" typed by the user. */
+function parseLatLon(text) {
+  const m = /^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/.exec(text || "");
+  if (!m) return null;
+  const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+  return Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? { lat, lon, label: `${lat.toFixed(4)}, ${lon.toFixed(4)}` } : null;
+}
+
+async function getJson(url, fetchFn) {
+  const r = await (fetchFn || fetch)(url);
+  if (!r.ok) throw new Error(`weather service said ${r.status}`);
+  return r.json();
+}
+
+async function geocode(text, fetchFn) {
+  const ll = parseLatLon(text);
+  if (ll) return [{ name: ll.label, lat: ll.lat, lon: ll.lon, label: ll.label }];
+  // "Ocala, FL" -> search "Ocala", prefer results whose state/country matches what follows the comma
+  const [name, ...rest] = String(text).split(",").map((x) => x.trim()).filter(Boolean);
+  if (!name) return [];
+  const j = await getJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=10&language=en&format=json`, fetchFn);
+  let res = (j.results || []).map((r) => ({
+    name: r.name, lat: r.latitude, lon: r.longitude, admin1: r.admin1 || "", country: r.country_code || r.country || "",
+    label: [r.name, r.admin1, r.country_code || r.country].filter(Boolean).join(", "),
+  }));
+  const hint = rest.join(" ").toUpperCase();
+  if (hint) {
+    const STATES = { AL: "ALABAMA", AK: "ALASKA", AZ: "ARIZONA", AR: "ARKANSAS", CA: "CALIFORNIA", CO: "COLORADO", CT: "CONNECTICUT", DE: "DELAWARE",
+      FL: "FLORIDA", GA: "GEORGIA", HI: "HAWAII", ID: "IDAHO", IL: "ILLINOIS", IN: "INDIANA", IA: "IOWA", KS: "KANSAS", KY: "KENTUCKY", LA: "LOUISIANA",
+      ME: "MAINE", MD: "MARYLAND", MA: "MASSACHUSETTS", MI: "MICHIGAN", MN: "MINNESOTA", MS: "MISSISSIPPI", MO: "MISSOURI", MT: "MONTANA", NE: "NEBRASKA",
+      NV: "NEVADA", NH: "NEW HAMPSHIRE", NJ: "NEW JERSEY", NM: "NEW MEXICO", NY: "NEW YORK", NC: "NORTH CAROLINA", ND: "NORTH DAKOTA", OH: "OHIO",
+      OK: "OKLAHOMA", OR: "OREGON", PA: "PENNSYLVANIA", RI: "RHODE ISLAND", SC: "SOUTH CAROLINA", SD: "SOUTH DAKOTA", TN: "TENNESSEE", TX: "TEXAS",
+      UT: "UTAH", VT: "VERMONT", VA: "VIRGINIA", WA: "WASHINGTON", WV: "WEST VIRGINIA", WI: "WISCONSIN", WY: "WYOMING" };
+    const want = STATES[hint] || hint;
+    const score = (r) => (r.admin1.toUpperCase() === want ? 2 : 0) + (r.country.toUpperCase() === hint || r.country.toUpperCase() === want ? 1 : 0);
+    res = res.map((r, i) => [r, score(r), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map((x) => x[0]);
+  }
+  return res;
+}
+
+function urlFor(loc, date, units, today) {
+  const u = units === "metric" ? "" : "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch";
+  // the archive lags a few days; recent dates come from the forecast API's past data
+  const age = (Date.parse(today || new Date().toISOString().slice(0, 10)) - Date.parse(date)) / 86400000;
+  const host = age <= 60 ? "https://api.open-meteo.com/v1/forecast" : "https://archive-api.open-meteo.com/v1/archive";
+  return `${host}?latitude=${loc.lat}&longitude=${loc.lon}&start_date=${date}&end_date=${date}&hourly=${HOURLY}&timezone=auto${u}`;
+}
+
+/** Turn the hours around the event into a one-line summary and cause hints. */
+function assess(hours, hour, units) {
+  const metric = units === "metric";
+  const U = metric ? { t: "°C", w: "km/h", p: "mm" } : { t: "°F", w: "mph", p: "in" };
+  const at = hours.find((h) => h.hour === hour) || hours[Math.min(hours.length - 1, hour)] || null;
+  if (!at) return null;
+  const near = hours.filter((h) => h.hour >= hour - 2 && h.hour <= hour + 1);
+  const max = (k) => Math.max(...near.map((h) => (h[k] === null || h[k] === undefined ? -Infinity : h[k])));
+  const sum = (k) => near.reduce((t, h) => t + (h[k] || 0), 0);
+  const codes = near.map((h) => h.code).filter((c) => c !== null && c !== undefined);
+  const worst = codes.length ? Math.max(...codes) : at.code;
+  const gust = max("gust"), wind = max("wind"), precip = sum("precip"), snow = sum("snow");
+  const tC = metric ? at.temp : ((at.temp - 32) * 5) / 9;
+  const gustMph = metric ? gust / 1.609 : gust;
+  const rainHeavy = metric ? precip >= 7.5 : precip >= 0.3;
+  const parts = [WMO[worst] !== undefined ? WMO[worst] : "weather code " + worst];
+  if (isFinite(at.temp)) parts.push(`${Math.round(at.temp)}${U.t}`);
+  if (isFinite(wind)) parts.push(`wind ${Math.round(wind)} ${U.w}` + (isFinite(gust) && gust > wind + 3 ? `, gusts ${Math.round(gust)} ${U.w}` : ""));
+  if (precip > 0) parts.push(`${metric ? precip.toFixed(1) : precip.toFixed(2)} ${U.p} rain/precip. over ${near.length} h`);
+  if (snow > 0) parts.push(`${metric ? snow.toFixed(1) + " cm" : (snow / 2.54).toFixed(1) + " in"} snow`);
+  const hints = [];
+  if (worst >= 95) hints.push({ kind: "lightning", label: "thunderstorm", text: "Thunderstorm in the area at the time. Lightning is a likely cause; check the arresters and look for flashed insulators." });
+  if (gustMph >= 40) hints.push({ kind: "wind", label: "high wind", text: `Gusts to ${Math.round(gust)} ${U.w}. Consider wind: conductor slap or galloping (phase-to-phase), or trees and limbs contacting the line.` });
+  else if (gustMph >= 30) hints.push({ kind: "wind", label: "wind", text: `Gusty (${Math.round(gust)} ${U.w}). Tree or limb contact is possible.` });
+  if ([56, 57, 66, 67].includes(worst) || (snow > 0 && tC <= 1)) hints.push({ kind: "ice", label: "ice/snow", text: "Freezing precipitation or snow: ice or snow loading, sagging or galloping conductors, and tree limbs breaking under the weight." });
+  if (rainHeavy && worst < 95) hints.push({ kind: "rain", label: "heavy rain", text: "Heavy rain: possible flashover across dirty or cracked insulators, or wet trees contacting the line." });
+  if (isFinite(tC) && tC >= 35) hints.push({ kind: "heat", label: "heat", text: "Very hot: high load and conductor sag (tree contact), and equipment running hot." });
+  if (!hints.length) hints.push({ kind: "calm", label: "calm", text: "No severe weather at the time, so weather is an unlikely cause." });
+  return { text: `${parts.join(", ")} (hour of ${pad(hour)}:00 local)`, hints, at, near };
+}
+
+function hoursFrom(j) {
+  const h = j.hourly || {};
+  return (h.time || []).map((t, i) => ({
+    hour: parseInt(t.slice(11, 13), 10), temp: h.temperature_2m ? h.temperature_2m[i] : null, precip: h.precipitation ? h.precipitation[i] : null,
+    snow: h.snowfall ? h.snowfall[i] : null, code: h.weather_code ? h.weather_code[i] : null,
+    wind: h.wind_speed_10m ? h.wind_speed_10m[i] : null, gust: h.wind_gusts_10m ? h.wind_gusts_10m[i] : null,
+  }));
+}
+
+/** Weather for one location and date (cache: an object kept by the caller). */
+async function lookup(loc, date, hour, opts) {
+  opts = opts || {};
+  const units = opts.units || "us";
+  const key = `${loc.lat.toFixed(3)},${loc.lon.toFixed(3)},${date},${units}`;
+  let hours = opts.cache && opts.cache[key];
+  if (!hours) {
+    const j = await getJson(urlFor(loc, date, units, opts.today), opts.fetch);
+    hours = hoursFrom(j);
+    if (!hours.length) throw new Error("no weather data for that date");
+    if (opts.cache) opts.cache[key] = hours;
+  }
+  const a = assess(hours, hour, units);
+  if (!a) throw new Error("no weather data for that hour");
+  return Object.assign({ source: "Open-Meteo", location: loc.label || "" }, a);
+}
+
+const api = { geocode, lookup, assess, parseLatLon, eventWhen, urlFor, hoursFrom, WMO };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+else root.SELWeather = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
 /* SEL Trip History - the analysis behind the history page.
  *
  * Reads the same files as the trip analyzer (through core.js), keeps one record
@@ -3398,6 +3571,7 @@ function recordFrom(it, pathOf) {
     cause: a.cause.slice(), checks: a.checks.slice(), gaps: a.gaps.slice(),
     evidence: (a.evidence || []).map((x) => x.text), confidence: a.confidence, basis: a.basis,
     seq: e.sequence.filter((x) => x[2] === "asserted").slice(0, 24).map(([cy, el]) => [+cy.toFixed(2), el]),
+    waveId: e.waveRef ? e.waveRef.id : e.wave ? it.id : "",
     sources: [{ name: src.name, path: src.path, hash: src.hash || "" }],
     pair: it.pair ? core.relayKey(it.pair.other.e) : "", incident: it.incident ? it.incident.items.length : 0,
   };
@@ -3448,8 +3622,20 @@ async function analyzeFiles(files) {
     const src = pathOf(it.e.source);
     if (r && !r.sources.some((s) => s.path === src.path)) r.sources.push({ name: src.name, path: src.path, hash: src.hash });
   }
+  // which settings files describe which relay, so an event can be sent to the Trip Analyzer with its settings
+  const settingsFiles = {};
+  for (const [name, f] of byKey) {
+    const ext = core.extOf(f.name);
+    let rids = [];
+    try {
+      if (core.SETTINGS_EXTS.includes(ext)) rids = [...(await core.parseRdb(f.bytes, f.name))].map(([k, v]) => v.RID || k);
+      else if (core.SETTINGS_TEXT_EXTS.includes(ext)) { const st = core.settingsFromText(core.readText(f.bytes), f.name); if (st) rids = [st[1].RID || st[0]]; }
+    } catch (e) { /* not readable: already reported */ }
+    for (const rid of rids) (settingsFiles[upper(rid)] = settingsFiles[upper(rid)] || []).push({ name: f.name, path: f.path || f.name, hash: f.hash || "" });
+  }
+  for (const r of records) r.settingsFiles = settingsFiles[upper(r.relay)] || [];
   const settings = [...rdb].map(([label, s]) => [label, { RID: s.RID || "", TID: s.TID || "", SID: s.SID || "", LL: s.LL || "", file: s.__file__ || "" }]);
-  return { records, errors: errors.map((x) => x.replace(/#\d+:/, ":")), settings };
+  return { records, errors: errors.map((x) => x.replace(/#\d+:/, ":")), settings, settingsFiles };
 }
 
 // ---------------------------------------------------------------------------
@@ -3468,6 +3654,10 @@ const DEFAULTS = {
   halfLifeDays: 365,   // older events count for less in the score
   sequenceMinutes: 10, // reports on one relay this close together are one occasion (a reclose sequence)
   from: "", to: "",    // limit everything to this date range
+  stormWeight: 0.6,    // a trip in a storm counts this much in the score (weather, not the line)
+  slowCycles: 5,       // breaker clearing slower than this is "slow"
+  slowingPerYear: 0.5, // clearing time rising this many cycles a year (or more) is "slowing"
+  weather: {},         // record id -> {text, kinds: ["lightning", "wind", ...] or ["calm"], location}
   overrides: {},       // relay -> station
   worklog: {},         // relay -> [{date, text}]
 };
@@ -3574,6 +3764,10 @@ function buildModel(allRecords, cfgIn) {
     r.stationName = st.name; r.stationFrom2 = st.from;
   }
 
+  for (const r of records) {
+    const w = cfg.weather[r.id] || null;
+    r.wx = w; r.storm = w ? !w.kinds.includes("calm") : null;
+  }
   const dated = records.filter((r) => r.ms !== null);
   const latest = dated.length ? dated[dated.length - 1].ms : Date.now();
   const anchor = cfg.asOf ? Date.parse(cfg.asOf + "T23:59:59.999Z") : latest;
@@ -3600,6 +3794,8 @@ function buildModel(allRecords, cfgIn) {
     }
     occs.forEach((o, i) => {
       o.n = i + 1; o.id = o.recs[0].id; o.tripped = o.recs.some((r) => r.tripped);
+      const wx = o.recs.find((r) => r.wx);
+      o.storm = wx ? wx.storm : null;
       o.issues = new Map();
       for (const r of o.recs) { r.occ = `${L.key}#${o.n}`; r.occSize = o.recs.length; for (const x of r.issues) if (!o.issues.has(x.key)) o.issues.set(x.key, r); }
     });
@@ -3662,22 +3858,44 @@ function buildModel(allRecords, cfgIn) {
     hot.push(...L.hotspots);
     L.worklog = (cfg.worklog[L.relay] || cfg.worklog[L.key] || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
 
+    // ---- weather
+    const known = occs.filter((o) => o.tripped && o.storm !== null);
+    const kinds = {};
+    for (const o of known) { const w = o.recs.find((r) => r.wx).wx; for (const k of w.kinds) if (k !== "calm") kinds[k] = (kinds[k] || 0) + 1; }
+    L.wx = { known: known.length, storm: known.filter((o) => o.storm).length, calm: known.filter((o) => !o.storm).length, kinds, unknown: L.tripOccasions - known.length };
+    for (const x of L.recurring) {
+      if (ISSUE[x.key].group !== "faults" && x.key !== "lockout") continue;   // weather explains faults, not breaker or scheme problems
+      const os = occs.filter((o) => o.issues.has(x.key) && o.storm !== null);
+      if (os.length >= 3) {
+        const calm = os.filter((o) => !o.storm).length;
+        x.weather = { known: os.length, calm, storm: os.length - calm };
+        if (calm / os.length >= 0.7) x.weatherNote = `${calm} of ${os.length} happened in calm weather, so storms don't explain them: look for equipment, animals or vegetation growing into the line.`;
+        else if (calm / os.length <= 0.3) x.weatherNote = `${os.length - calm} of ${os.length} happened in storms: the line may be exposed (trees, lightning protection, conductor spacing).`;
+      }
+    }
+
+    // ---- breaker health: how fast it clears, and how much current it has interrupted
+    L.breaker = breakerHealth(L, occs, cfg, anchor);
+
     // ---- score
     const why = [];
     let base = 0, extra = 0;
     for (const o of occs) {
       if (o.ms === null) continue;
       const age = Math.max(0, (anchor - o.ms) / DAY);
-      const f = Math.pow(0.5, age / cfg.halfLifeDays);
+      const f = Math.pow(0.5, age / cfg.halfLifeDays) * (o.storm ? cfg.stormWeight : 1);
       base += (o.tripped ? 1 : 0.25) * f;
       for (const key of o.issues.keys()) extra += ISSUE[key].weight * f;
     }
-    if (base) why.push([`${plural(L.tripOccasions, "trip")}${L.trips > L.tripOccasions ? ` (${L.trips} operations counting recloses)` : ""}${L.occasions > L.tripOccasions ? `, ${L.occasions - L.tripOccasions} other events` : ""}; older ones count less`, base]);
+    const stormy = occs.filter((o) => o.storm).length;
+    if (base) why.push([`${plural(L.tripOccasions, "trip")}${L.trips > L.tripOccasions ? ` (${L.trips} operations counting recloses)` : ""}${L.occasions > L.tripOccasions ? `, ${L.occasions - L.tripOccasions} other events` : ""}; older ones count less${stormy ? `, ${stormy} in storms count ${Math.round(cfg.stormWeight * 100)}%` : ""}`, base]);
     if (extra) why.push(["Severity of the issues found", extra]);
     const rec = 2 * L.recurring.length, hs = 1.5 * L.hotspots.length;
     if (rec) why.push([`${plural(L.recurring.length, "recurring issue")}`, rec]);
     if (hs) why.push([`${plural(L.hotspots.length, "fault hot spot")}`, hs]);
-    let score = base + extra + rec + hs;
+    const bk = L.breaker && L.breaker.slowing ? 2 : 0;
+    if (bk) why.push([`Breaker clearing time rising (${L.breaker.slope.toFixed(1)} cycles a year)`, bk]);
+    let score = base + extra + rec + hs + bk;
     const mult = L.trend.dir === "up" ? 1.3 : L.trend.dir === "down" ? 0.85 : 1;
     if (mult !== 1) { why.push([`Trend ${L.trend.label.toLowerCase()} (${L.trend.text})`, score * (mult - 1)]); score *= mult; }
     L.score = +score.toFixed(1);
@@ -3727,9 +3945,13 @@ function buildModel(allRecords, cfgIn) {
   }
   recurring.sort((a, b) => b.inWindow - a.inWindow || (b.last || 0) - (a.last || 0));
   hot.sort((a, b) => b.n - a.n);
+  const breakers = ranked.filter((L) => L.breaker).map((L) => L.breaker)
+    .sort((a, b) => (b.slowing - a.slowing) || (b.latest - a.latest));
+  const wxAll = { known: 0, storm: 0, calm: 0, kinds: {} };
+  for (const L of ranked) { wxAll.known += L.wx.known; wxAll.storm += L.wx.storm; wxAll.calm += L.wx.calm; for (const [k, n] of Object.entries(L.wx.kinds)) wxAll.kinds[k] = (wxAll.kinds[k] || 0) + n; }
   return {
     cfg, anchor, first, latest, months, byMonth, records, relays: ranked, stations: stationList, issues: issueStats,
-    recurring, hotspots: hot, byId: new Map(records.map((r) => [r.id, r])),
+    recurring, hotspots: hot, breakers, wx: wxAll, byId: new Map(records.map((r) => [r.id, r])),
     totals: { events: records.length, trips: tripsAll.length, faults: records.filter((r) => r.fault).length,
               review: records.filter((r) => r.checks.length).length, relays: ranked.length, stations: stationList.length,
               undated: records.filter((r) => r.ms === null).length,
@@ -3739,12 +3961,92 @@ function buildModel(allRecords, cfgIn) {
 }
 
 // ---------------------------------------------------------------------------
+// Breaker health
+// ---------------------------------------------------------------------------
+/** Least-squares slope (per x unit) and intercept. */
+function fitLine(pts) {
+  const n = pts.length;
+  if (n < 2) return null;
+  const mx = pts.reduce((a, p) => a + p[0], 0) / n, my = pts.reduce((a, p) => a + p[1], 0) / n;
+  let sxx = 0, sxy = 0;
+  for (const [x, y] of pts) { sxx += (x - mx) ** 2; sxy += (x - mx) * (y - my); }
+  if (!sxx) return null;
+  const slope = sxy / sxx;
+  return { slope, at: (x) => my + slope * (x - mx) };
+}
+/** Clearing times (trip to breaker open, from element data) and fault current interrupted, for one relay's breaker. */
+function breakerHealth(L, occs, cfg, anchor) {
+  const ops = L.records.filter((r) => r.tripped && r.ms !== null);
+  const pts = L.records.filter((r) => r.clearCyc !== null && r.ms !== null).map((r) => ({ ms: r.ms, cyc: r.clearCyc, id: r.id }));
+  const amps = (r) => Math.max(0, ...["A", "B", "C"].map((p) => r.amps[p] || 0), r.amps.F || 0);
+  let kA = 0, kA2 = 0;
+  for (const r of ops) { const a = amps(r) / 1000; kA += a; kA2 += a * a; }
+  if (!pts.length && !ops.length) return null;
+  const out = { relayKey: L.key, relay: L.relay, station: L.station, ops: ops.length, kA: +kA.toFixed(1), kA2: +kA2.toFixed(1),
+                points: pts, n: pts.length, latest: pts.length ? pts[pts.length - 1].cyc : null, first: pts.length ? pts[0].cyc : null,
+                max: pts.length ? Math.max(...pts.map((p) => p.cyc)) : null, slow: pts.filter((p) => p.cyc > cfg.slowCycles).length,
+                slope: 0, slowing: false, reach: null, fit: null, limit: cfg.slowCycles };
+  if (pts.length >= 3) {
+    const t0 = pts[0].ms;
+    const f = fitLine(pts.map((p) => [(p.ms - t0) / (365.25 * DAY), p.cyc]));
+    if (f) {
+      out.slope = f.slope;
+      out.fit = { from: [pts[0].ms, f.at(0)], to: [pts[pts.length - 1].ms, f.at((pts[pts.length - 1].ms - t0) / (365.25 * DAY))] };
+      out.slowing = f.slope >= cfg.slowingPerYear && out.latest - out.first >= 1;
+      const nowY = (anchor - t0) / (365.25 * DAY), nowV = f.at(nowY);
+      if (out.slowing && nowV < cfg.slowCycles) out.reach = Math.round(anchor + ((cfg.slowCycles - nowV) / f.slope) * 365.25 * DAY);
+    }
+  }
+  out.verdict = !pts.length ? "No clearing times (needs .CEV or COMTRADE with the breaker status)"
+    : out.slowing ? (out.latest > cfg.slowCycles ? `Slow and getting slower: ${out.first} → ${out.latest} cycles` : `Getting slower: ${out.first} → ${out.latest} cycles; ${out.reach ? "reaches " + cfg.slowCycles + " cycles around " + isoDate(out.reach) : ""}`)
+    : out.slow ? `${plural(out.slow, "slow opening")} (over ${cfg.slowCycles} cycles), not a steady trend` : `Normal: latest ${out.latest} cycles`;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// What changed: the model now against the model built from the events seen before
+// ---------------------------------------------------------------------------
+/** before, after: models; newIds: ids of events added since. -> [{kind, relayKey, relay, station, text, ids, level}] */
+function changes(before, after, newIds) {
+  const out = [];
+  const B = new Map(before.relays.map((L) => [L.key, L])), fresh = new Set(newIds);
+  const add = (L, kind, text, ids, level) => out.push({ kind, relayKey: L.key, relay: L.relay, station: L.station, text, ids: ids || [], level: level || 1 });
+  for (const L of after.relays) {
+    const b = B.get(L.key);
+    const mine = L.records.filter((r) => fresh.has(r.id));
+    if (!b) { add(L, "new", `New location: ${plural(L.events, "event")}${L.recurring.length ? `, ${plural(L.recurring.length, "recurring issue")} already` : ""}`, mine.map((r) => r.id), 2); }
+    else if (mine.length) add(L, "events", `${plural(mine.length, "new event")}${mine.filter((r) => r.tripped).length ? ` (${mine.filter((r) => r.tripped).length} trips)` : ""}, latest ${isoDate(Math.max(...mine.map((r) => r.ms || 0)))}`, mine.map((r) => r.id), 0);
+    if (!b) continue;
+    for (const x of L.recurring) {
+      const was = b.recurring.find((y) => y.key === x.key);
+      if (!was) add(L, "recurring", `Now recurring: ${x.label.toLowerCase()} (${x.inWindow} in ${x.windowDays} days)`, x.allIds, 3);
+      else if (x.inWindow > was.inWindow) add(L, "recurring", `${x.label} more often: ${was.inWindow} → ${x.inWindow} in ${x.windowDays} days`, x.allIds, 2);
+    }
+    for (const y of b.recurring) if (!L.recurring.some((x) => x.key === y.key)) add(L, "eased", `No longer recurring: ${y.label.toLowerCase()}`, [], 0);
+    for (const h of L.hotspots) {
+      const was = b.hotspots.find((g) => Math.abs(g.at - h.at) <= Math.max(h.tol, g.tol));
+      if (!was) add(L, "hotspot", `New fault hot spot: ${h.n} faults at ${fx(h.from, 2)} to ${fx(h.to, 2)}`, h.ids, 3);
+      else if (h.n > was.n) add(L, "hotspot", `Hot spot at ~${fx(h.at, 2)} grew: ${was.n} → ${h.n} faults`, h.ids, 2);
+    }
+    if (L.trend.dir !== b.trend.dir && (L.trend.dir === "up" || L.trend.dir === "down"))
+      add(L, "trend", `Trips now ${L.trend.label.toLowerCase()} (${trendWords(L.trend)})`, [], L.trend.dir === "up" ? 2 : 0);
+    if (L.breaker && L.breaker.slowing && !(b.breaker && b.breaker.slowing)) add(L, "breaker", `Breaker getting slower: ${L.breaker.first} → ${L.breaker.latest} cycles`, L.breaker.points.map((p) => p.id), 3);
+    else if (L.breaker && b.breaker && L.breaker.latest !== null && b.breaker.latest !== null && L.breaker.latest > b.breaker.latest + 0.5 && L.breaker.latest > L.limit)
+      add(L, "breaker", `Breaker cleared slower: ${b.breaker.latest} → ${L.breaker.latest} cycles`, L.breaker.points.map((p) => p.id), 2);
+    if (b.rank - L.rank >= 2 || (L.rank <= 3 && b.rank > 3)) add(L, "rank", `Moved up to #${L.rank} (was #${b.rank})`, [], L.rank <= 3 ? 2 : 1);
+  }
+  const order = { new: 0, recurring: 1, hotspot: 2, breaker: 3, trend: 4, rank: 5, events: 6, eased: 7 };
+  return out.sort((a, b) => b.level - a.level || order[a.kind] - order[b.kind] || (a.relay < b.relay ? -1 : 1));
+}
+
+// ---------------------------------------------------------------------------
 // Report: Word blocks (docx.js), text and CSV
 // ---------------------------------------------------------------------------
 const fmtDate = (ms) => (ms === null || ms === undefined ? "-" : isoDate(ms));
 const fmtWhen = (r) => (r.ms === null ? `${r.rawDate} ${r.rawTime}`.trim() || "(no date)" : `${r.date} ${r.time.slice(0, 8)}`);
 const arrow = (t) => (t.dir === "up" ? "▲ " : t.dir === "down" ? "▼ " : "") + t.label;
 const issueList = (r) => r.issues.filter((x) => ISSUE[x.key].group !== "data").map((x) => ISSUE[x.key].label + (x.detail && !FAULT_KEYS[x.detail] ? ` (${x.detail})` : "")).join("; ");
+const WX_LABEL = { lightning: "thunderstorm", wind: "wind", ice: "ice/snow", rain: "heavy rain", heat: "heat" };
 const trendWords = (t) => (t.days >= 360 ? `${t.recent} in the last year vs ${t.prev} the year before` : `${t.recent} in the last ${t.days} days vs ${t.prev} before`);
 const whereText = (L) => `${L.relay}${L.station && L.station !== "Unassigned" ? ` (${L.station})` : ""}`;
 
@@ -3760,7 +4062,7 @@ function scoped(model, opts) {
 /** opts: {station, relay, sections: {overview, ranking, recurring, hotspots, trends, matrix, details, events, worklog}, top, notes} */
 function reportBlocks(model, opts) {
   opts = opts || {};
-  const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
+  const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, breakers: true, weather: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
   const S = scoped(model, opts);
   const recs = S.records;
   const dated = recs.filter((r) => r.ms !== null);
@@ -3781,7 +4083,8 @@ function reportBlocks(model, opts) {
       ["Recurring issues", S.recurring.length ? `${S.recurring.length} at ${plural(new Set(S.recurring.map((x) => x.relayKey)).size, "location")}` : "none"],
       ["Fault hot spots", S.hotspots.length ? `${S.hotspots.length}` : "none"],
       ["Needs review", `${recs.filter((r) => r.checks.length).length} events have items to check`],
-    ]]);
+    ].concat(S.relays.some((L) => L.breaker && L.breaker.slowing) ? [["Breakers", `getting slower at ${S.relays.filter((L) => L.breaker && L.breaker.slowing).map(whereText).join(", ")}`]] : [])
+     .concat(model.wx.known ? [["Weather", `${S.relays.reduce((a, L) => a + L.wx.storm, 0)} of ${S.relays.reduce((a, L) => a + L.wx.known, 0)} trips with weather were in storms`]] : [])]);
     const up = S.relays.filter((L) => L.trend.dir === "up"), down = S.relays.filter((L) => L.trend.dir === "down");
     if (up.length) blocks.push(["para", `Trips are increasing at ${up.map(whereText).join(", ")}.`]);
     if (down.length) blocks.push(["para", `Trips are decreasing at ${down.map(whereText).join(", ")}.`]);
@@ -3824,6 +4127,27 @@ function reportBlocks(model, opts) {
     else blocks.push(["para", "No location's trip count changed much."]);
     if (issueRows.length) { blocks.push(["h2", "By issue"]); blocks.push(["table", ["Location", "Issue", "Trend", "Compared"], issueRows, [24, 30, 16, 30]]); }
   }
+  if (sec.breakers !== false) {
+    const bks = S.relays.map((L) => L.breaker).filter((b) => b && b.n);
+    if (bks.length) {
+      blocks.push(["h1", "Breaker health"]);
+      blocks.push(["note", `Clearing time = trip to breaker open, from records with element data (.CEV or COMTRADE). Over ${model.cfg.slowCycles} cycles is slow; rising ${model.cfg.slowingPerYear}+ cycles a year is "getting slower".`]);
+      blocks.push(["table", ["Location", "Openings timed", "First", "Latest", "Change a year", "Operations", "kA interrupted", "Verdict"],
+        bks.sort((a, b) => b.slowing - a.slowing || b.latest - a.latest).map((b) => [whereText(b), String(b.n), `${b.first} cyc`, `${b.latest} cyc`, b.n >= 3 ? `${b.slope >= 0 ? "+" : ""}${b.slope.toFixed(2)} cyc` : "-",
+          String(b.ops), String(b.kA), b.verdict]), [16, 8, 8, 8, 10, 10, 10, 30]]);
+    }
+  }
+  if (sec.weather !== false && model.wx.known) {
+    const rows = S.relays.filter((L) => L.wx.known).map((L) => [whereText(L), String(L.wx.known), String(L.wx.storm), String(L.wx.calm),
+      L.wx.known ? `${Math.round(100 * L.wx.storm / L.wx.known)}%` : "-", topEntries(L.wx.kinds, 4).map(([k, n]) => `${WX_LABEL[k] || k} ${n}`).join(", ") || "-"]);
+    if (rows.length) {
+      blocks.push(["h1", "Weather"]);
+      blocks.push(["note", "Weather in the station's area at the hour of each trip (Open-Meteo). A storm makes weather a likely cause; repeat trips in calm weather point to the line itself."]);
+      blocks.push(["table", ["Location", "Trips with weather", "In storms", "Calm", "Storm share", "What kind"], rows, [26, 12, 10, 10, 10, 32]]);
+      const calmRec = S.recurring.filter((x) => x.weatherNote);
+      if (calmRec.length) blocks.push(["bullets", calmRec.map((x) => `${whereText(x)}, ${x.label.toLowerCase()}: ${x.weatherNote}`)]);
+    }
+  }
   if (sec.matrix && S.relays.length) {
     const keys = ISSUES.filter((I) => I.group !== "data" && S.relays.some((L) => L.counts[I.key])).map((I) => I.key);
     if (keys.length) {
@@ -3843,7 +4167,9 @@ function reportBlocks(model, opts) {
       const img = opts.chart ? opts.chart("relay", L) : null;
       if (img) blocks.push(img);
       const bl = [];
-      for (const x of L.recurring) bl.push(`Recurring: ${x.label}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.advice}`);
+      for (const x of L.recurring) bl.push(`Recurring: ${x.label}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.weatherNote ? x.weatherNote + " " : ""}${x.advice}`);
+      if (L.breaker && L.breaker.n) bl.push(`Breaker: ${L.breaker.verdict}. ${L.breaker.ops} operations, ${L.breaker.kA} kA interrupted.`);
+      if (L.wx.known) bl.push(`Weather: ${L.wx.storm} of ${L.wx.known} trips in storms${Object.keys(L.wx.kinds).length ? ` (${topEntries(L.wx.kinds, 4).map(([k, n]) => `${WX_LABEL[k] || k} ${n}`).join(", ")})` : ""}.`);
       for (const h of L.hotspots) bl.push(`Hot spot: ${h.n} faults at ${fx(h.from, 2)} to ${fx(h.to, 2)}${h.pct !== null ? ` (~${h.pct}% of the line)` : ""}, ${fmtDate(h.first)} to ${fmtDate(h.last)}.`);
       for (const [key, n] of topEntries(L.counts, 12)) if (!L.recurring.some((x) => x.key === key)) bl.push(`${ISSUE[key].label}: ${n}`);
       const ph = ["A", "B", "C"].filter((p) => L.phases[p]).map((p) => `phase ${p} ${L.phases[p]}`).concat(L.phases.G ? [`ground ${L.phases.G}`] : []);
@@ -3887,25 +4213,26 @@ function blocksToText(blocks) {
 const csvField = (v) => { v = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const csv = (rows) => rows.map((r) => r.map(csvField).join(",")).join("\r\n") + "\r\n";
 const EVENT_COLUMNS = ["Date", "Time", "Station", "Relay", "Event type", "Tripped", "Fault", "Phases", "Location", "% of line",
-  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Source files"];
+  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Source files"];
 function eventsCsv(model, opts) {
   const S = scoped(model, opts || {});
   const recurIds = new Set(S.recurring.flatMap((x) => x.allIds)), hotIds = new Set(S.hotspots.flatMap((h) => h.ids));
   return csv([EVENT_COLUMNS].concat(S.records.map((r) => [r.date || r.rawDate, r.time || r.rawTime, r.stationName, r.relay, r.et, r.tripped ? "Yes" : "No",
     r.fault ? "Yes" : "No", r.phases, r.loc, r.locPct ?? "", r.clearCyc ?? "", issueList(r), r.short, r.checks.join(" | "), r.confidence,
-    recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.sources.map((s) => s.path).join(" | ")])));
+    recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.wx ? r.wx.text : "", r.sources.map((s) => s.path).join(" | ")])));
 }
 const LOCATION_COLUMNS = ["Rank", "Station", "Relay", "Score", "Events", "Trips", "Faults", "First event", "Last trip", "Trend",
-  "Trips recent", "Trips before", "Recurring issues", "Hot spots", "Needs review", "Main issues"];
+  "Trips recent", "Trips before", "Recurring issues", "Hot spots", "Needs review", "Main issues", "Trips in storms", "Breaker latest (cycles)", "Breaker change a year", "kA interrupted"];
 function locationsCsv(model, opts) {
   const S = scoped(model, opts || {});
   return csv([LOCATION_COLUMNS].concat(S.relays.map((L) => [L.rank, L.station, L.relay, L.score, L.events, L.trips, L.faults, fmtDate(L.first), fmtDate(L.lastTrip),
     L.trend.label, L.trend.recent, L.trend.prev, L.recurring.map((x) => `${x.label} (${x.inWindow} in ${x.windowDays} d)`).join("; "),
-    L.hotspots.map((h) => `${h.n} at ${fx(h.from, 2)}-${fx(h.to, 2)}`).join("; "), L.review, L.top.map((t) => `${t.label} ${t.n}`).join("; ")])));
+    L.hotspots.map((h) => `${h.n} at ${fx(h.from, 2)}-${fx(h.to, 2)}`).join("; "), L.review, L.top.map((t) => `${t.label} ${t.n}`).join("; "),
+    L.wx.known ? `${L.wx.storm} of ${L.wx.known}` : "", L.breaker && L.breaker.latest !== null ? L.breaker.latest : "", L.breaker && L.breaker.n >= 3 ? L.breaker.slope.toFixed(2) : "", L.breaker ? L.breaker.kA : ""])));
 }
 
 const api = {
-  analyzeFiles, buildModel, mergeRecords, combineTrends, issuesFor, trendOf, bestWindow, hotSpots, monthRange,
+  analyzeFiles, buildModel, mergeRecords, combineTrends, changes, breakerHealth, fitLine, WX_LABEL, issuesFor, trendOf, bestWindow, hotSpots, monthRange,
   reportBlocks, blocksToText, eventsCsv, locationsCsv, EVENT_COLUMNS, LOCATION_COLUMNS,
   ISSUES, ISSUE, GROUPS, DEFAULTS, trendWords, isoDate, monthKey, fmtWhen, issueList, whereText, arrow,
 };
@@ -3918,7 +4245,8 @@ else root.SELHistory = api;
 (function () {
 "use strict";
 const VERSION = "2.0.0";
-const core = window.SELCore, H = window.SELHistory, Docx = window.SELDocx;
+const REPO = "kefirman9000/sel-trip-analyzer";
+const core = window.SELCore, H = window.SELHistory, Docx = window.SELDocx, WX = window.SELWeather;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -3932,6 +4260,7 @@ const state = {
   files: [], batches: [], records: [], model: null, cfg: Object.assign({}, H.DEFAULTS), notes: {}, worklog: {}, overrides: {},
   tab: "overview", relay: "", evFilter: { q: "", station: "", relay: "", issue: "", show: "all", month: "", sort: "newest" },
   drawer: { id: null, list: [] }, locGroup: "rank", errors: [],
+  weather: {}, locations: {}, baseline: null, changes: [], colorBy: "type", settingsFiles: {},
 };
 
 // ---------------------------------------------------------------- storage (IndexedDB)
@@ -4099,6 +4428,17 @@ function lineStrip(L) {
 }
 function chartSeries(m, recs) {
   const idx = new Map(m.months.map((k, i) => [k, i]));
+  if (state.colorBy === "weather") {
+    const st = m.months.map(() => 0), ca = m.months.map(() => 0), un = m.months.map(() => 0);
+    for (const r of recs) {
+      if (r.ms === null || !r.tripped) continue;
+      const i = idx.get(H.monthKey(r.ms)); if (i === undefined) continue;
+      if (r.storm === true) st[i]++; else if (r.storm === false) ca[i]++; else un[i]++;
+    }
+    const s = [{ label: "Trips in storms", color: "var(--c-nofault)", values: st }, { label: "Trips in calm weather", color: "var(--c-fault)", values: ca }];
+    if (un.some(Boolean)) s.push({ label: "Weather not looked up", color: "var(--c-other)", values: un });
+    return s;
+  }
   const f = m.months.map(() => 0), nf = m.months.map(() => 0), o = m.months.map(() => 0);
   for (const r of recs) {
     if (r.ms === null) continue;
@@ -4109,7 +4449,30 @@ function chartSeries(m, recs) {
   if (o.some(Boolean)) s.push({ label: "No trip", color: "var(--c-other)", values: o });
   return s;
 }
-const legendHtml = (series) => `<div class="legend">${series.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join("")}</div>`;
+const legendHtml = (series) => `<div class="legend" style="align-items:center">${series.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join("")}
+  <span class="seg" role="group" aria-label="Colour by"><button data-colorby="type" aria-pressed="${state.colorBy === "type"}">Type</button><button data-colorby="weather" aria-pressed="${state.colorBy === "weather"}" title="${Object.keys(state.weather).length ? "Storm or calm at the time of each trip" : "Look up the weather first (Files & settings)"}">Weather</button></span></div>`;
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-colorby]"); if (!b) return;
+  state.colorBy = b.dataset.colorby; prefs.set("colorBy", state.colorBy);
+  if (state.colorBy === "weather" && !Object.keys(state.weather).length) toast("No weather yet: set the station locations and click Look up weather on the Files & settings page.");
+  render();
+});
+const wxTag = (r) => (r.wx ? `<span class="wxtag ${r.storm ? "storm" : "calm"}" data-tip="${esc(r.wx.text + (r.wx.hints ? "\n" + r.wx.hints.join("\n") : ""))}">${r.storm ? esc(r.wx.kinds.map((k) => H.WX_LABEL[k] || k).join(", ")) : "calm"}</span>` : "");
+/** Clearing time of each breaker opening over time, with the slow limit and the trend line. */
+function breakerChart(b) {
+  const m = state.model;
+  const W = 1000, Hh = 200, padL = 40, padR = 14, padT = 14, padB = 26;
+  const x0 = Math.min(m.first, b.points[0].ms), x1 = Math.max(m.anchor, b.points[b.points.length - 1].ms);
+  const top = Math.ceil(Math.max(b.limit + 2, b.max + 1));
+  const X = (ms) => padL + (W - padL - padR) * (ms - x0) / (x1 - x0 || 1), Y = (v) => padT + (Hh - padT - padB) * (1 - v / top);
+  let g = "";
+  for (let v = 0; v <= top; v += top > 10 ? 2 : 1) g += `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${padL - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${v}</text>`;
+  g += `<line x1="${padL}" x2="${W - padR}" y1="${Y(b.limit).toFixed(1)}" y2="${Y(b.limit).toFixed(1)}" stroke="var(--trip)" stroke-width="1.5" stroke-dasharray="6 4"/><text x="${W - padR}" y="${(Y(b.limit) - 5).toFixed(1)}" text-anchor="end" style="fill:var(--trip)">slow: over ${b.limit} cycles</text>`;
+  for (const k of m.months) if (k.endsWith("-01") || k === m.months[0]) { const ms = Date.parse(k + "-01T00:00:00Z"); if (ms >= x0) g += `<text x="${X(ms).toFixed(1)}" y="${Hh - 6}" text-anchor="middle">${MONTHS[+k.slice(5) - 1]} ${k.slice(2, 4)}</text>`; }
+  if (b.fit) g += `<line x1="${X(b.fit.from[0]).toFixed(1)}" y1="${Y(b.fit.from[1]).toFixed(1)}" x2="${X(b.fit.to[0]).toFixed(1)}" y2="${Y(b.fit.to[1]).toFixed(1)}" stroke="${b.slowing ? "var(--trip)" : "var(--muted)"}" stroke-width="2" opacity=".7"/>`;
+  for (const p of b.points) g += `<circle class="bar" data-id="${esc(p.id)}" cx="${X(p.ms).toFixed(1)}" cy="${Y(p.cyc).toFixed(1)}" r="6" fill="${p.cyc > b.limit ? "var(--trip)" : "var(--c-fault)"}" data-tip="${esc(`${H.isoDate(p.ms)}: opened ${p.cyc} cycles after the trip\nClick for the event`)}"/>`;
+  return `<svg class="chart" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Breaker clearing time over time">${g}</svg>`;
+}
 
 // ---------------------------------------------------------------- analysis
 async function rebuild(reanalyze) {
@@ -4128,8 +4491,16 @@ async function rebuild(reanalyze) {
       console.info(`analyzed ${state.files.length} files in ${Math.round(performance.now() - t0)} ms`);
     }
   }
-  const cfg = Object.assign({}, state.cfg, { overrides: state.overrides, worklog: state.worklog });
+  const cfg = Object.assign({}, state.cfg, { overrides: state.overrides, worklog: state.worklog, weather: state.weather });
   state.model = H.buildModel(state.records, cfg);
+  // what changed since the user last marked the changes as seen (or since the first files were added)
+  if (!state.baseline && state.records.length) { state.baseline = { ids: state.records.map((r) => r.id), at: new Date().toISOString() }; kvSet("baseline", state.baseline); }
+  state.changes = [];
+  if (state.baseline) {
+    const seen = new Set(state.baseline.ids), newIds = state.records.filter((r) => !seen.has(r.id)).map((r) => r.id);
+    if (newIds.length) state.changes = H.changes(H.buildModel(state.records.filter((r) => seen.has(r.id)), cfg), state.model, newIds);
+    state.newIds = newIds;
+  }
   if (state.relay && !state.model.relays.some((L) => L.key === state.relay)) state.relay = "";
   render();
 }
@@ -4142,9 +4513,9 @@ function siteFromPath(path) {
   if (named) return named.replace(/[_]+/g, " ").trim().toUpperCase();
   return "";
 }
-async function addFiles(list, label) {
+async function addFiles(list, label, quiet) {
   list = list.filter((x) => ALLOWED.has(core.extOf(x.name)) && !x.name.toUpperCase().startsWith("README"));
-  if (!list.length) { toast("No relay files found in what was added."); return; }
+  if (!list.length) { if (!quiet) toast("No relay files found in what was added."); return 0; }
   busy(true, `Reading ${plural(list.length, "file")}…`);
   const known = new Set(state.files.map((f) => f.hash));
   const batch = { id: "b" + Date.now().toString(36), label: label || "", added: new Date().toISOString(), nFiles: 0, nDup: 0 };
@@ -4157,7 +4528,7 @@ async function addFiles(list, label) {
     fresh.push({ hash, name: x.name, path: x.path || x.name, site: siteFromPath(x.path), size: bytes.length, batch: batch.id, added: batch.added, bytes });
   }
   batch.nFiles = fresh.length;
-  if (!fresh.length) { busy(false); toast(`Nothing new: all ${plural(batch.nDup, "file")} are already in the history.`); return; }
+  if (!fresh.length) { busy(false); if (!quiet) toast(`Nothing new: all ${plural(batch.nDup, "file")} are already in the history.`); return 0; }
   const before = new Set(state.records.map((r) => r.id));
   try {
     await tx("files", "readwrite", (s) => { for (const f of fresh) s.put(f); });
@@ -4169,8 +4540,12 @@ async function addFiles(list, label) {
   const added = state.records.filter((r) => !before.has(r.id)).length;
   batch.nEvents = added;
   tx("batches", "readwrite", (s) => s.put(batch)).catch(() => {});
-  toast(`Added ${plural(fresh.length, "file")}${batch.nDup ? ` (${batch.nDup} already in the history)` : ""}: ${plural(added, "new event")}.` +
-        (state.errors.length ? ` ${plural(state.errors.length, "file")} couldn't be read: see Files & settings.` : ""), 6000);
+  const big = state.changes.filter((c) => c.level >= 2).length;
+  toast(`${label && label.startsWith("Watched") ? "Picked up" : "Added"} ${plural(fresh.length, "file")}${batch.nDup ? ` (${batch.nDup} already in the history)` : ""}: ${plural(added, "new event")}.` +
+        (big ? ` ${plural(big, "notable change")}: see What changed on the Overview.` : "") +
+        (state.errors.length ? ` ${plural(state.errors.length, "file")} couldn't be read: see Files & settings.` : ""), 7000);
+  if (added && Object.keys(state.locations).length && state.cfg.autoWeather !== false) lookupWeather(true);
+  return fresh.length;
 }
 function walkEntry(entry, prefix, out) {
   return new Promise((resolve) => {
@@ -4208,12 +4583,18 @@ async function loadSamples() {
   const data = JSON.parse($("sample-data").textContent || "[]");
   const list = data.map((s) => { const bin = atob(s.b64), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return { name: s.name, path: s.path, bytes }; });
   if (!state.worklog["FEEDER 8"]) { state.worklog["FEEDER 8"] = [{ date: "2025-12-10", text: "Tree trimming, whole feeder (sample)" }]; await kvSet("worklog", state.worklog); }
+  // made-up stations, put in real towns so the weather lookup has somewhere to look
+  const SAMPLE_LOCS = { "APEX SUB": ["Apex, North Carolina, US", 35.7327, -78.8503], "OAK HILL SUB": ["Holly Springs, North Carolina, US", 35.6513, -78.8336],
+    "RIVER SUB": ["Fuquay-Varina, North Carolina, US", 35.5843, -78.8000], "HILL SUB": ["Cary, North Carolina, US", 35.7915, -78.7811], "MILL ROAD SUB": ["Garner, North Carolina, US", 35.7113, -78.6142] };
+  for (const [st, [label, lat, lon]] of Object.entries(SAMPLE_LOCS)) if (!state.locations[st]) state.locations[st] = { label, lat, lon, typed: label + " (sample)" };
+  await kvSet("locations", state.locations);
   await addFiles(list, "Samples (made-up events)");
 }
 $("samples").onclick = loadSamples;
 
 // ---------------------------------------------------------------- top-level render
 function render() {
+  watchStatus();
   const m = state.model;
   const has = !!(m && m.records.length) || state.files.length;
   $("emptyView").hidden = !!has; $("mainView").hidden = !has; $("exportBtn").disabled = !(m && m.records.length);
@@ -4246,7 +4627,13 @@ function renderOverview() {
   const series = chartSeries(m, m.records);
   const maxScore = Math.max(1, ...m.relays.map((L) => L.score));
   const worse = m.relays.filter((L) => L.trend.dir === "up"), better = m.relays.filter((L) => L.trend.dir === "down");
+  const ch = state.changes || [];
+  const bks = m.breakers.filter((b) => b.n);
   el.innerHTML = `
+  ${ch.length ? `<div class="card changes" style="margin-bottom:16px">
+    <div class="card-head"><h2>What changed</h2><span class="hint">since ${esc((state.baseline.at || "").slice(0, 10))}: ${plural((state.newIds || []).length, "new event")}${ch.length > 8 ? ` · <button class="link" id="chgAll">all ${ch.length}</button>` : ""} · <button class="link" id="chgSeen">mark as seen</button></span></div>
+    ${ch.slice(0, state.chgAll ? ch.length : 8).map((c, i) => `<div class="chg l${c.level}" data-chg="${i}" tabindex="0"><span class="dot"></span><span class="who">${esc(c.relay)}</span><span>${esc(c.text)}</span></div>`).join("")}
+  </div>` : ""}
   <div class="kpis">
     <button class="kpi" data-go="events"><div class="v">${t.trips}</div><div class="l">trips of ${t.events} events</div></button>
     <button class="kpi" data-go="locations"><div class="v">${t.relays}</div><div class="l">relays at ${plural(t.stations, "station")}</div></button>
@@ -4281,6 +4668,15 @@ function renderOverview() {
         </div>`).join("") : `<p class="hint">Nothing happened ${state.cfg.recurMin} or more times within the recurrence window at one location.</p>`}
     </div>
   </div>
+  ${bks.length || m.wx.known ? `<div class="grid2 even">
+    <div class="card"><div class="card-head"><h2>Breakers</h2><span class="hint">trip to breaker open, from .CEV / COMTRADE</span></div>
+      ${bks.length ? `<table class="t"><thead><tr><th>Location</th><th class="r">Timed</th><th class="r">Latest</th><th>Verdict</th></tr></thead><tbody>${bks.map((b) => `<tr class="click" data-relay="${esc(b.relayKey)}"><td>${where(b)}</td><td class="r num">${b.n}</td><td class="r num">${b.latest} cyc</td><td class="bk-verdict${b.slowing || b.latest > b.limit ? " bad" : ""}">${esc(b.verdict)}</td></tr>`).join("")}</tbody></table>` : '<p class="hint">No clearing times yet: they come from .CEV or COMTRADE records that include the breaker status.</p>'}</div>
+    <div class="card"><div class="card-head"><h2>Weather</h2><span class="hint">${m.wx.known ? `${m.wx.known} trips with weather` : ""}</span></div>
+      ${m.wx.known ? `<p style="margin:0 0 8px"><b>${m.wx.storm}</b> of ${m.wx.known} trips (${Math.round(100 * m.wx.storm / m.wx.known)}%) happened in storms${Object.keys(m.wx.kinds).length ? `: ${Object.entries(m.wx.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(H.WX_LABEL[k] || k)} ${n}`).join(", ")}` : ""}.</p>
+        <table class="t"><tbody>${m.relays.filter((L) => L.wx.known).sort((a, b) => b.wx.known - a.wx.known).slice(0, 8).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="num">${L.wx.calm} calm · ${L.wx.storm} storm</td><td style="width:40%"><span class="scorebar" style="margin:0"><i style="width:${Math.round(100 * L.wx.storm / L.wx.known)}%;background:var(--c-nofault)"></i></span></td></tr>`).join("")}</tbody></table>
+        ${m.recurring.filter((x) => x.weatherNote).map((x) => `<p class="hint" style="margin:6px 0 0"><b>${esc(x.relay)}</b>, ${esc(x.label.toLowerCase())}: ${esc(x.weatherNote)}</p>`).join("")}`
+        : `<p class="hint">Set where each station is and look up the weather at each trip: storms explain some trips; repeat trips in calm weather point to the line itself.</p><button id="ovWx">Set up weather</button>`}</div>
+  </div>` : ""}
   <div class="grid2 even">
     <div class="card"><div class="card-head"><h2>Getting worse</h2></div>${changeList(worse, "No location's trips are increasing.")}</div>
     <div class="card"><div class="card-head"><h2>Getting better</h2></div>${changeList(better, "No location's trips are decreasing.")}</div>
@@ -4293,6 +4689,10 @@ function renderOverview() {
   el.querySelectorAll("[data-relay]").forEach((b) => { b.onclick = () => go("locations", { relay: b.dataset.relay }); b.onkeydown = (e) => { if (e.key === "Enter") b.click(); }; });
   el.querySelectorAll("[data-recur]").forEach((b) => { const x = m.recurring[+b.dataset.recur]; b.onclick = () => openDrawer(x.allIds[x.allIds.length - 1], x.allIds); b.onkeydown = (e) => { if (e.key === "Enter") b.click(); }; });
   el.querySelectorAll(".chart .bar[data-month]").forEach((b) => { b.onclick = () => go("events", { ev: { month: b.dataset.month } }); });
+  el.querySelectorAll("[data-chg]").forEach((b) => { const c = ch[+b.dataset.chg]; b.onclick = () => { if (c.ids.length) openDrawer(c.ids[c.ids.length - 1], c.ids); else go("locations", { relay: c.relayKey }); }; b.onkeydown = (e) => { if (e.key === "Enter") b.click(); }; });
+  if ($("chgSeen")) $("chgSeen").onclick = () => { state.baseline = { ids: state.records.map((r) => r.id), at: new Date().toISOString() }; kvSet("baseline", state.baseline); state.chgAll = false; rebuild(false); };
+  if ($("chgAll")) $("chgAll").onclick = () => { state.chgAll = true; renderOverview(); };
+  if ($("ovWx")) $("ovWx").onclick = () => { go("data"); setTimeout(() => { const el2 = $("wxCard"); if (el2) el2.scrollIntoView({ behavior: "smooth" }); }, 50); };
 }
 function changeList(list, none) {
   if (!list.length) return `<p class="hint">${none}</p>`;
@@ -4373,6 +4773,7 @@ function locationDetail(L) {
     <div class="recur" data-recur-ids="${esc(x.allIds.join("\n"))}" tabindex="0">
       <div class="top"><span class="what">${esc(x.label)}${x.clearing ? ` <span class="trip">${x.clearing.first} → ${x.clearing.last} cycles</span>` : ""}</span><span>${trendHtml(x.trend)}</span></div>
       <div class="where">${x.inWindow} times in ${x.windowDays} days (${fmtDate(x.from)} to ${fmtDate(x.to)}) · ${x.total} in all · last ${fmtDate(x.last)}${Object.keys(x.phases).length ? " · " + Object.entries(x.phases).map(([p, n]) => `${esc(p)} ${n}`).join(", ") : ""}</div>
+      ${x.weatherNote ? `<div class="advice"><b>Weather:</b> ${esc(x.weatherNote)}</div>` : ""}
       <div class="advice">${esc(x.advice)}</div>
     </div>`).join("")}</div>` : ""}
   <div class="card section">
@@ -4384,10 +4785,16 @@ function locationDetail(L) {
     ${lineStrip(L)}
     ${L.hotspots.map((h) => `<p style="margin:6px 0 0"><b class="warn">Hot spot:</b> ${h.n} faults between ${h.from.toFixed(2)} and ${h.to.toFixed(2)}${h.pct !== null ? ` (~${h.pct}% of the line)` : ""}, ${fmtDate(h.first)} to ${fmtDate(h.last)}. Patrol this section.</p>`).join("")}
   </div>
+  ${L.breaker && L.breaker.n ? `<div class="card section">
+    <div class="card-head"><h2>Breaker</h2><span class="bk-verdict${L.breaker.slowing || L.breaker.latest > L.breaker.limit ? " bad" : ""}">${esc(L.breaker.verdict)}</span></div>
+    ${breakerChart(L.breaker)}
+    <p class="hint" style="margin:6px 0 0">${plural(L.breaker.n, "opening")} timed${L.breaker.n >= 3 ? ` · trend ${L.breaker.slope >= 0 ? "+" : ""}${L.breaker.slope.toFixed(2)} cycles a year` : ""} · ${L.breaker.ops} trip operations · ${L.breaker.kA} kA interrupted in all (Σ kA² ${L.breaker.kA2}, for contact wear)${L.breaker.slowing ? " · Test the breaker timing and the trip circuit before it gets worse." : ""}</p>
+  </div>` : ""}
   <div class="grid2 even">
     <div class="card"><div class="card-head"><h2>Issues</h2><span class="hint">click to see the events</span></div>
       <table class="t"><thead><tr><th>Issue</th><th class="r">Times</th><th colspan="2">Trend</th></tr></thead><tbody>${issueRows || '<tr><td colspan="4" class="hint">None</td></tr>'}</tbody></table>
-      <p class="hint">Faulted phases: ${["A", "B", "C"].map((p) => `${p} ${L.phases[p]}`).join(" · ")} · ground ${L.phases.G}</p></div>
+      <p class="hint">Faulted phases: ${["A", "B", "C"].map((p) => `${p} ${L.phases[p]}`).join(" · ")} · ground ${L.phases.G}</p>
+      <p class="hint">Weather: ${L.wx.known ? `${L.wx.storm} of ${L.wx.known} trips in storms${Object.keys(L.wx.kinds).length ? ` (${Object.entries(L.wx.kinds).map(([k, n]) => `${esc(H.WX_LABEL[k] || k)} ${n}`).join(", ")})` : ""}, ${L.wx.calm} in calm weather` : "not looked up (Files & settings)"}</p></div>
     <div class="card"><div class="card-head"><h2>Work log</h2><span class="hint">Shown on the chart, so you can see if it helped</span></div>
       <ul class="wl-list">${L.worklog.map((w) => `<li><span>${esc(w.date)}</span><span class="grow">${esc(w.text)}</span><button class="small link danger" data-wl-del="${esc(w.date + "|" + w.text)}" aria-label="Delete">✕</button></li>`).join("") || '<li class="hint">Nothing yet: add tree trimming, breaker maintenance, settings changes…</li>'}</ul>
       <div class="wl"><input type="date" id="wlDate" aria-label="Date"><input type="text" id="wlText" placeholder="What was done (e.g. Breaker timing test, contacts replaced)"><button id="wlAdd">Add</button></div></div>
@@ -4399,7 +4806,7 @@ function locationDetail(L) {
   </div>`;
 }
 function evRow(r, withWhere) {
-  return `<tr class="click" data-id="${esc(r.id)}"><td class="num" style="white-space:nowrap">${esc(H.fmtWhen(r))}</td>${withWhere ? `<td>${esc(r.relay)}<div class="hint">${esc(r.stationName)}</div></td>` : ""}<td style="white-space:nowrap">${r.tripped ? `<span class="trip">${esc(r.et || "TRIP")}</span>` : esc(r.et || "–")}</td><td>${esc(r.short.replace(/^(TRIP|No trip) - /, "").replace(/\s+\[\d+ to check\]$/, ""))}${r.checks.length ? ` <span class="warn" data-tip="${esc(r.checks.join("\n"))}">· ${plural(r.checks.length, "item")} to check</span>` : ""}</td><td>${issueChips(r)}</td></tr>`;
+  return `<tr class="click" data-id="${esc(r.id)}"><td class="num" style="white-space:nowrap">${esc(H.fmtWhen(r))}</td>${withWhere ? `<td>${esc(r.relay)}<div class="hint">${esc(r.stationName)}</div></td>` : ""}<td style="white-space:nowrap">${r.tripped ? `<span class="trip">${esc(r.et || "TRIP")}</span>` : esc(r.et || "–")}</td><td>${esc(r.short.replace(/^(TRIP|No trip) - /, "").replace(/\s+\[\d+ to check\]$/, ""))}${r.checks.length ? ` <span class="warn" data-tip="${esc(r.checks.join("\n"))}">· ${plural(r.checks.length, "item")} to check</span>` : ""}</td><td>${issueChips(r)}${wxTag(r)}</td></tr>`;
 }
 function openStation(L) {
   $("stHint").textContent = `${L.relay} is at ${L.station}. Set it if the files don't say, or to group relays differently. Applies to every event from this relay.`;
@@ -4450,7 +4857,8 @@ function filteredEvents() {
     (!f.station || r.stationName === f.station) && (!f.relay || upper(r.relay) === f.relay) &&
     (!f.issue || r.issues.some((x) => x.key === f.issue)) && (!f.month || (r.ms !== null && H.monthKey(r.ms) === f.month)) &&
     (f.show === "all" || (f.show === "trips" && r.tripped) || (f.show === "review" && r.checks.length) || (f.show === "faults" && r.fault) ||
-     (f.show === "recurring" && m.recurring.some((x) => x.allIds.includes(r.id))) || (f.show === "hot" && m.hotspots.some((h) => h.ids.includes(r.id)))) &&
+     (f.show === "recurring" && m.recurring.some((x) => x.allIds.includes(r.id))) || (f.show === "hot" && m.hotspots.some((h) => h.ids.includes(r.id))) ||
+     (f.show === "storm" && r.tripped && r.storm === true) || (f.show === "calm" && r.tripped && r.storm === false) || (f.show === "breaker" && r.clearCyc !== null)) &&
     (!q || [r.relay, r.stationName, r.et, r.targets, r.short, r.date, r.loc, state.notes[r.id] || "", ...r.checks, ...r.cause, ...r.sources.map((s) => s.path), ...r.issues.map((x) => H.ISSUE[x.key].label)].join(" ").toUpperCase().includes(q)));
   if (f.sort === "newest") list = list.slice().reverse();
   else if (f.sort === "relay") list = list.slice().sort((a, b) => (a.stationName + a.relay < b.stationName + b.relay ? -1 : a.stationName + a.relay > b.stationName + b.relay ? 1 : (a.ms || 0) - (b.ms || 0)));
@@ -4477,7 +4885,7 @@ function renderEvents() {
   $("evStation").innerHTML = opt("", "All stations", f.station) + m.stations.map((S) => opt(S.name, S.name, f.station)).join("");
   $("evRelay").innerHTML = opt("", "All relays", f.relay) + m.relays.filter((L) => !f.station || L.station === f.station).map((L) => opt(L.key, L.relay, f.relay)).join("");
   $("evIssue").innerHTML = opt("", "Any issue", f.issue) + issueKeys.map((I) => opt(I.key, I.label, f.issue)).join("");
-  $("evShow").innerHTML = [["all", "All events"], ["trips", "Trips"], ["faults", "Faults"], ["review", "Needs review"], ["recurring", "Part of a recurring issue"], ["hot", "In a hot spot"]].map(([v, t]) => opt(v, t, f.show)).join("");
+  $("evShow").innerHTML = [["all", "All events"], ["trips", "Trips"], ["faults", "Faults"], ["review", "Needs review"], ["recurring", "Part of a recurring issue"], ["hot", "In a hot spot"], ["storm", "Trips in storms"], ["calm", "Trips in calm weather"], ["breaker", "Breaker timed"]].map(([v, t]) => opt(v, t, f.show)).join("");
   $("evMonth").innerHTML = opt("", "Any month", f.month) + [...m.months].reverse().map((k) => opt(k, monthLabel(k), f.month)).join("");
   $("evSort").value = f.sort;
   const list = filteredEvents();
@@ -4528,6 +4936,15 @@ function renderData() {
         ${num("cHotP", "hotTolPct", "…or within", 0.5, "% of the line length")}
         ${num("cHalf", "halfLifeDays", "Score half-life", 1, "days: older events count half as much")}
       </div>
+      <h3 style="margin-top:16px">Breakers and weather</h3>
+      <div class="settings-grid">
+        ${num("cSlow", "slowCycles", "Breaker is slow over", 0.5, "cycles, trip to open")}
+        ${num("cSlowing", "slowingPerYear", "Getting slower at", 0.1, "cycles a year or more")}
+        ${num("cStorm", "stormWeight", "A trip in a storm counts", 0.1, "× in the score (1 = the same as calm)")}
+      </div>
+      <h3 style="margin-top:16px">Trip Analyzer</h3>
+      <p class="hint" style="margin:4px 0">Where “Open in Trip Analyzer” goes. Leave blank for ${esc(defaultAnalyzerUrl())}.</p>
+      <input type="text" id="cAnalyzer" style="width:100%" placeholder="${esc(defaultAnalyzerUrl())}" value="${esc(state.cfg.analyzerUrl || "")}">
       <h3 style="margin-top:16px">Station overrides</h3>
       ${Object.keys(state.overrides).length ? `<ul class="hint">${Object.entries(state.overrides).map(([k, v]) => `<li>${esc(k)} → ${esc(v)}</li>`).join("")}</ul>` : '<p class="hint">None. Set one from a location\'s page (“change” next to its station).</p>'}
       <h3 style="margin-top:16px">How it works</h3>
@@ -4540,8 +4957,11 @@ function renderData() {
       </ul>
     </div>
   </div>`;
+  el.insertAdjacentHTML("afterbegin", wxCardHtml());
+  wireWxCard();
+  $("cAnalyzer").onchange = (e) => { state.cfg.analyzerUrl = e.target.value.trim(); kvSet("cfg", state.cfg); };
   el.querySelectorAll("input[data-key]").forEach((inp) => { inp.onchange = () => { const v = parseFloat(inp.value); if (Number.isFinite(v) && v >= 0) { state.cfg[inp.dataset.key] = v; kvSet("cfg", state.cfg); rebuild(false); } }; });
-  $("cfgReset").onclick = () => { for (const k of ["trendDays", "yearDays", "recurMin", "recurDays", "recurDaysOther", "sequenceMinutes", "hotMin", "hotTol", "hotTolPct", "halfLifeDays"]) state.cfg[k] = H.DEFAULTS[k]; kvSet("cfg", state.cfg); rebuild(false); };
+  $("cfgReset").onclick = () => { for (const k of ["trendDays", "yearDays", "recurMin", "recurDays", "recurDaysOther", "sequenceMinutes", "hotMin", "hotTol", "hotTolPct", "halfLifeDays", "slowCycles", "slowingPerYear", "stormWeight"]) state.cfg[k] = H.DEFAULTS[k]; kvSet("cfg", state.cfg); rebuild(false); };
   el.querySelectorAll("[data-del-batch]").forEach((b) => { b.onclick = () => removeBatch(b.dataset.delBatch); });
   $("backup").onclick = backup;
   $("restore").onclick = () => $("pickBackup").click();
@@ -4550,7 +4970,8 @@ function renderData() {
   $("clearAll").onclick = async () => {
     if (!confirm("Delete every file, event, note and setting kept by the Trip History in this browser? Back it up first if you might need it.")) return;
     await tx("files", "readwrite", (s) => s.clear()); await tx("batches", "readwrite", (s) => s.clear()); await tx("kv", "readwrite", (s) => s.clear());
-    Object.assign(state, { files: [], batches: [], records: [], notes: {}, worklog: {}, overrides: {}, cfg: Object.assign({}, H.DEFAULTS), relay: "" });
+    stopWatch(false);
+    Object.assign(state, { files: [], batches: [], records: [], notes: {}, worklog: {}, overrides: {}, cfg: Object.assign({}, H.DEFAULTS), relay: "", weather: {}, locations: {}, baseline: null, changes: [] });
     state.model = H.buildModel([], state.cfg); render(); toast("Cleared.");
   };
 }
@@ -4566,6 +4987,7 @@ async function removeBatch(id) {
 function b64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 async function backup() {
   const data = { app: "sel-trip-history", version: VERSION, exported: new Date().toISOString(), cfg: state.cfg, notes: state.notes, worklog: state.worklog, overrides: state.overrides,
+    locations: state.locations, weather: state.weather,
     batches: state.batches, files: state.files.map((f) => ({ hash: f.hash, name: f.name, path: f.path, site: f.site, size: f.size, batch: f.batch, added: f.added, b64: b64(f.bytes) })) };
   download(`Trip history backup ${new Date().toISOString().slice(0, 10)} (${state.files.length} files).json`, new Blob([JSON.stringify(data)], { type: "application/json" }));
 }
@@ -4580,6 +5002,8 @@ async function restore(file) {
   Object.assign(state.notes, data.notes || {});
   for (const [k, v] of Object.entries(data.worklog || {})) { const cur = state.worklog[k] || []; for (const w of v) if (!cur.some((x) => x.date === w.date && x.text === w.text)) cur.push(w); state.worklog[k] = cur; }
   state.overrides = Object.assign({}, data.overrides || {}, state.overrides);
+  state.locations = Object.assign({}, data.locations || {}, state.locations); state.weather = Object.assign({}, data.weather || {}, state.weather);
+  await kvSet("locations", state.locations); await kvSet("weather", state.weather);
   await tx("files", "readwrite", (s) => { for (const f of fresh) s.put(f); });
   await tx("batches", "readwrite", (s) => { for (const b of batches) s.put(b); });
   await kvSet("notes", state.notes); await kvSet("worklog", state.worklog); await kvSet("overrides", state.overrides);
@@ -4624,6 +5048,8 @@ function renderDrawer() {
     ${recs.length || hot.length ? `<h4>Part of a pattern</h4><ul>${recs.map((x) => `<li><b>Recurring ${esc(x.label.toLowerCase())}</b> at ${esc(x.relay)}: ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). <button class="link" data-list="${esc(x.allIds.join("\n"))}">step through them</button></li>`).join("")}
       ${hot.map((h) => `<li><b>Fault hot spot</b>: ${h.n} faults between ${h.from.toFixed(2)} and ${h.to.toFixed(2)}. <button class="link" data-list="${esc(h.ids.join("\n"))}">step through them</button></li>`).join("")}</ul>` : ""}
     ${seqMates.length ? `<h4>Same sequence</h4><ul>${seqMates.map((x) => `<li><button class="link" data-open="${esc(x.id)}">${esc(H.fmtWhen(x))} ${esc(x.et)}</button> <span class="muted">${esc(x.targets)}</span></li>`).join("")}</ul>` : ""}
+    <div style="margin:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="dAnalyzer" title="Open this event's files in the SEL Trip Analyzer${r.waveId ? ", on the Waveforms page" : ""}">${r.waveId ? "Open waveforms in Trip Analyzer ↗" : "Open in Trip Analyzer ↗"}</button></div>
+    ${r.wx ? `<h4>Weather</h4><p style="margin:0">${wxTag(r)} ${esc(r.wx.text)}${r.wx.location ? ` <span class="hint">at ${esc(r.wx.location)}</span>` : ""}</p>${r.wx.hints ? `<ul class="hint">${r.wx.hints.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}` : ""}
     <h4>Details</h4><table class="kv">${kv.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
     <h4>Probable cause</h4><ul>${r.cause.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
     ${r.checks.length ? `<h4>Check</h4><ul class="checkl">${r.checks.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
@@ -4632,15 +5058,251 @@ function renderDrawer() {
     ${r.seq.length ? `<h4>Elements that asserted (cycles)</h4><div class="seq mono">${r.seq.map(([c, e]) => `${c.toFixed(2).padStart(6, " ")}  ${esc(e)}`).join("<br>")}</div>` : ""}
     <h4>Note</h4><textarea id="dNote" rows="2" placeholder="e.g. Crew found a cracked insulator at pole 112">${esc(state.notes[r.id] || "")}</textarea>
     <h4>Source files</h4><ul>${r.sources.map((s) => `<li class="mono" style="font-size:12px">${esc(s.path)} ${state.files.some((f) => f.hash === s.hash) ? `<button class="link" data-dl="${esc(s.hash)}">download</button>` : ""}</li>`).join("")}</ul>
-    <p class="hint">Open the .CEV or COMTRADE file in the SEL Trip Analyzer to see its waveforms and check the elements against the settings.</p>`;
+    ${r.settingsFiles && r.settingsFiles.length ? `<h4>Settings for this relay</h4><ul>${r.settingsFiles.map((s) => `<li class="mono" style="font-size:12px">${esc(s.path)}</li>`).join("")}</ul>` : ""}`;
   $("dNote").oninput = (e) => { const v = e.target.value; if (v.trim()) state.notes[r.id] = v; else delete state.notes[r.id]; clearTimeout(renderDrawer.t); renderDrawer.t = setTimeout(() => kvSet("notes", state.notes), 400); };
   $("dBody").querySelectorAll("[data-list]").forEach((b) => { const ids = b.dataset.list.split("\n"); b.onclick = () => openDrawer(ids[0], ids); });
   $("dBody").querySelectorAll("[data-open]").forEach((b) => { b.onclick = () => openDrawer(b.dataset.open, state.drawer.list.includes(b.dataset.open) ? state.drawer.list : [b.dataset.open]); });
+  $("dAnalyzer").onclick = () => openInAnalyzer(r);
   $("dBody").querySelectorAll("[data-dl]").forEach((b) => { b.onclick = () => { const f = state.files.find((x) => x.hash === b.dataset.dl); if (f) download(f.name, new Blob([f.bytes])); }; });
 }
 $("dClose").onclick = closeDrawer;
 $("dPrev").onclick = () => stepDrawer(-1);
 $("dNext").onclick = () => stepDrawer(1);
+
+// ---------------------------------------------------------------- weather
+const HOURLY = "temperature_2m,precipitation,snowfall,weather_code,wind_speed_10m,wind_gusts_10m";
+function analyzerLocations() { try { return JSON.parse(localStorage.getItem("sel-trip:locations") || "{}"); } catch (e) { return {}; } }
+/** Where to look up the weather for a record: its station's location, else the location the Trip Analyzer has for the relay. */
+function locFor(r) {
+  const st = state.locations[r.stationName];
+  if (st) return st;
+  const a = analyzerLocations();
+  return a[r.relay] || a[upper(r.relay)] || null;
+}
+function wxCardHtml() {
+  const m = state.model;
+  const a = analyzerLocations();
+  const need = m.records.filter((r) => r.tripped && r.ms !== null);
+  const done = need.filter((r) => state.weather[r.id]).length;
+  return `<div class="card" id="wxCard" style="margin-bottom:16px">
+    <div class="card-head"><h2>Stations &amp; weather</h2><span class="hint">${done} of ${need.length} trips have weather · from Open-Meteo: only the location and dates are sent</span></div>
+    <div class="tablewrap"><table class="t locs"><thead><tr><th>Station</th><th>Relays</th><th style="width:44%">Where (a town like “Apex, NC”, or latitude, longitude)</th><th></th></tr></thead><tbody>
+    ${m.stations.map((S) => { const l = state.locations[S.name]; const fromA = !l && S.relays.some((L) => a[L.relay] || a[L.key]);
+      return `<tr><td><b>${esc(S.name)}</b></td><td class="hint">${S.relays.map((L) => esc(L.relay)).join(", ")}</td><td><input type="text" data-loc="${esc(S.name)}" value="${esc(l ? l.typed || l.label : "")}" placeholder="${fromA ? "using the Trip Analyzer's locations" : "not set"}"></td><td data-locst="${esc(S.name)}">${l ? `<span class="st-ok">✓ ${esc(l.label)}</span>` : fromA ? '<span class="st-ok">✓ from Trip Analyzer</span>' : ""}</td></tr>`; }).join("")}
+    </tbody></table></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+      <button class="accent" id="wxGo">Look up weather</button>
+      <select id="wxUnits" aria-label="Units"><option value="us">°F, mph</option><option value="metric">°C, km/h</option></select>
+      <label class="check"><input type="checkbox" id="wxAuto"${state.cfg.autoWeather !== false ? " checked" : ""}> Look up new trips automatically</label>
+      <button id="wxClear">Clear weather</button><span class="hint" id="wxStatus"></span>
+    </div></div>`;
+}
+function wireWxCard() {
+  $("wxUnits").value = state.cfg.wxUnits || "us";
+  $("wxUnits").onchange = (e) => { state.cfg.wxUnits = e.target.value; kvSet("cfg", state.cfg); };
+  $("wxAuto").onchange = (e) => { state.cfg.autoWeather = e.target.checked; kvSet("cfg", state.cfg); };
+  $("wxGo").onclick = () => lookupWeather(false);
+  $("wxClear").onclick = async () => { state.weather = {}; await kvSet("weather", state.weather); rebuild(false); };
+  document.querySelectorAll("[data-loc]").forEach((inp) => {
+    inp.onchange = async () => {
+      const st = inp.dataset.loc, text = inp.value.trim(), cell = document.querySelector(`[data-locst="${CSS.escape(st)}"]`);
+      if (!text) { delete state.locations[st]; await kvSet("locations", state.locations); cell.innerHTML = ""; return; }
+      cell.innerHTML = '<span class="hint">searching…</span>';
+      try {
+        const res = await WX.geocode(text);
+        if (!res.length) { cell.innerHTML = '<span class="st-bad">not found: try “Town, ST” or “lat, lon”</span>'; return; }
+        state.locations[st] = { label: res[0].label, lat: res[0].lat, lon: res[0].lon, typed: text };
+        await kvSet("locations", state.locations);
+        cell.innerHTML = `<span class="st-ok" title="${esc(res.slice(1, 4).map((x) => x.label).join("; "))}">✓ ${esc(res[0].label)}</span>`;
+      } catch (e) { cell.innerHTML = `<span class="st-bad">couldn't reach the location service</span>`; }
+    };
+  });
+}
+async function fetchHours(loc, from, to, units) {
+  const u = units === "metric" ? "" : "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch";
+  const today = new Date().toISOString().slice(0, 10);
+  const recent = (Date.parse(today) - Date.parse(from)) / 864e5 <= 60;
+  const host = recent ? "https://api.open-meteo.com/v1/forecast" : "https://archive-api.open-meteo.com/v1/archive";
+  const r = await fetch(`${host}?latitude=${loc.lat}&longitude=${loc.lon}&start_date=${from}&end_date=${to}&hourly=${HOURLY}&timezone=auto${u}`);
+  if (!r.ok) throw new Error(`weather service said ${r.status}`);
+  const j = await r.json(), h = j.hourly || {}, byDate = {};
+  (h.time || []).forEach((t, i) => {
+    (byDate[t.slice(0, 10)] = byDate[t.slice(0, 10)] || []).push({ hour: +t.slice(11, 13), temp: h.temperature_2m[i], precip: h.precipitation[i], snow: h.snowfall[i],
+      code: h.weather_code[i], wind: h.wind_speed_10m[i], gust: h.wind_gusts_10m[i] });
+  });
+  return byDate;
+}
+let wxBusy = false;
+/** Weather at the hour of every trip that doesn't have it yet: one request per station for the older dates and one for the last 60 days. */
+async function lookupWeather(quiet) {
+  if (wxBusy) return;
+  const status = (t) => { if ($("wxStatus")) $("wxStatus").textContent = t; };
+  const units = state.cfg.wxUnits || "us", today = new Date().toISOString().slice(0, 10);
+  const groups = new Map();
+  let noLoc = 0;
+  for (const r of state.model.records) {
+    if (!r.tripped || r.ms === null || state.weather[r.id] || r.date > today) continue;
+    const loc = locFor(r);
+    if (!loc) { noLoc++; continue; }
+    const k = `${loc.lat.toFixed(3)},${loc.lon.toFixed(3)}`;
+    if (!groups.has(k)) groups.set(k, { loc, recs: [] });
+    groups.get(k).recs.push(r);
+  }
+  if (!groups.size) { if (!quiet) { status(noLoc ? `Set where the stations are first (${plural(noLoc, "trip")} have no location).` : "Every trip already has its weather."); toast(noLoc ? "Set the station locations first." : "Every trip already has its weather."); } return; }
+  wxBusy = true;
+  let done = 0, failed = 0, n = 0;
+  for (const g of groups.values()) n += g.recs.length;
+  try {
+    for (const { loc, recs } of groups.values()) {
+      const recentCut = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
+      for (const part of [recs.filter((r) => r.date < recentCut), recs.filter((r) => r.date >= recentCut)]) {
+        if (!part.length) continue;
+        const dates = part.map((r) => r.date).sort();
+        status(`Looking up ${loc.label}…`);
+        let byDate;
+        try { byDate = await fetchHours(loc, dates[0], dates[dates.length - 1], units); } catch (e) { failed += part.length; status(`Couldn't reach the weather service (${e.message || e})`); continue; }
+        for (const r of part) {
+          const hours = byDate[r.date];
+          const a = hours && WX.assess(hours, new Date(r.ms).getUTCHours(), units);
+          if (!a) { failed++; continue; }
+          state.weather[r.id] = { text: a.text, kinds: a.hints.map((h) => h.kind), hints: a.hints.filter((h) => h.kind !== "calm").map((h) => h.text), location: loc.label };
+          done++;
+        }
+      }
+    }
+  } finally { wxBusy = false; }
+  await kvSet("weather", state.weather);
+  status(`Weather added to ${plural(done, "trip")}${failed ? `; ${failed} couldn't be looked up` : ""}${noLoc ? `; ${plural(noLoc, "trip")} at stations with no location` : ""}.`);
+  if (!quiet || done) toast(`Weather added to ${plural(done, "trip")}${failed ? ` (${failed} couldn't be looked up)` : ""}.`);
+  if (done) rebuild(false);
+}
+
+// ---------------------------------------------------------------- open in the Trip Analyzer
+function defaultAnalyzerUrl() {
+  if (/^https?:$/.test(location.protocol)) return new URL("SEL_Trip_Analyzer.html", location.href).href;
+  const [owner, repo] = REPO.split("/");
+  return `https://${owner}.github.io/${repo}/SEL_Trip_Analyzer.html`;
+}
+const analyzerUrl = () => state.cfg.analyzerUrl || defaultAnalyzerUrl();
+$("analyzerBtn").onclick = () => window.open(analyzerUrl(), "sel-analyzer");
+/** Send the event's files (with its COMTRADE pair and the relay's settings) to the Analyzer page, which opens it. */
+function openInAnalyzer(r) {
+  const want = new Map();
+  const byHash = new Map(state.files.map((f) => [f.hash, f]));
+  for (const s of r.sources.concat(r.settingsFiles || [])) {
+    const f = byHash.get(s.hash) || state.files.find((x) => x.path === s.path);
+    if (f) want.set(f.hash, f);
+    if (f && core.COMTRADE_EXTS.includes(core.extOf(f.name))) {       // the .cfg needs its .dat
+      const stem = f.path.replace(/\.[^./]+$/, "").toLowerCase();
+      for (const x of state.files) if (x.path.replace(/\.[^./]+$/, "").toLowerCase() === stem) want.set(x.hash, x);
+    }
+  }
+  if (!want.size) { toast("This event's files aren't kept here any more."); return; }
+  const files = [...want.values()].map((f) => ({ name: f.name, path: f.path, bytes: f.bytes }));
+  const w = window.open(analyzerUrl() + "#from-history", "sel-analyzer");
+  if (!w) { toast("The browser blocked the new window: allow pop-ups for this page and try again."); return; }
+  let sent = false, tries = 0;
+  const payload = { type: "sel-open", files, id: r.id, rec: r.waveId || "", label: `${r.relay} ${r.date} ${r.time.slice(0, 8)}` };
+  const onMsg = (e) => {
+    if (e.source !== w || !e.data) return;
+    if (e.data.type === "sel-ready" && !sent) { sent = true; w.postMessage(payload, "*"); }
+    if (e.data.type === "sel-opened") { cleanup(); toast(`Opened in the Trip Analyzer (${plural(files.length, "file")}).`); }
+  };
+  const ping = setInterval(() => {
+    if (++tries > 60) { cleanup(); toast("The Trip Analyzer didn't answer. It needs a version with the History link; check its address in Files & settings."); return; }
+    try { w.postMessage({ type: "sel-ping" }, "*"); } catch (e) { /* still loading */ }
+  }, 400);
+  function cleanup() { clearInterval(ping); window.removeEventListener("message", onMsg); }
+  window.addEventListener("message", onMsg);
+}
+
+// ---------------------------------------------------------------- watch a folder (Chrome / Edge: File System Access)
+const WATCH_MS = 15000;
+let watch = null;             // {handle, seen: {path: "size|modified"}, waiting: Map, timer, added, checked, busy, paused}
+function watchStatus() {
+  const bar = $("watchBar"); if (!bar) return;
+  bar.hidden = !watch; if (!watch) return;
+  bar.classList.toggle("paused", !!watch.paused);
+  const t = watch.checked ? watch.checked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  $("watchText").innerHTML = watch.paused ? `Paused: allow <b>${esc(watch.handle.name)}</b> again` :
+    `Watching <b>${esc(watch.handle.name)}</b>${t ? ` · checked ${t}` : ""}${watch.added ? ` · ${watch.added} new` : ""}`;
+  $("watchStop").textContent = watch.paused ? "Resume" : "Stop";
+}
+async function listDir(handle, prefix, out) {
+  for await (const [name, h] of handle.entries()) {
+    if (h.kind === "file") { if (ALLOWED.has(core.extOf(name)) && !name.toUpperCase().startsWith("README")) out.push({ path: prefix + name, h, name }); }
+    else if (h.kind === "directory" && !name.startsWith(".")) await listDir(h, prefix + name + "/", out);
+  }
+  return out;
+}
+/** New or changed files are taken once they haven't changed for one check (half-copied files wait). */
+async function pollWatch(first) {
+  if (!watch || watch.busy || watch.paused) return;
+  watch.busy = true;
+  try {
+    const list = await listDir(watch.handle, watch.handle.name + "/", []);
+    const fresh = [];
+    for (const { path, h, name } of list) {
+      let f; try { f = await h.getFile(); } catch (e) { continue; }
+      const sig = f.size + "|" + f.lastModified;
+      if (watch.seen[path] === sig) continue;
+      if (!first && watch.waiting.get(path) !== sig) { watch.waiting.set(path, sig); continue; }
+      watch.waiting.delete(path);
+      watch.seen[path] = sig;
+      fresh.push({ file: f, name, path });
+    }
+    watch.checked = new Date();
+    if (fresh.length) {
+      const n = await addFiles(fresh, `Watched folder ${watch.handle.name}`, true);
+      if (!first) { watch.added += n; if (n && document.hidden) { newSinceFocus += n; document.title = `(${newSinceFocus} new) ${baseTitle}`; } }
+      kvSet("watchSeen", watch.seen);
+    }
+  } catch (e) { watch.paused = true; }
+  finally { if (watch) watch.busy = false; watchStatus(); }
+}
+async function startWatch(handle) {
+  stopWatch(true);
+  const seen = (await kvGet("watchSeen")) || {};
+  watch = { handle, seen: (await kvGet("watchName")) === handle.name ? seen : {}, waiting: new Map(), timer: null, added: 0, checked: null, busy: false, paused: false };
+  await kvSet("watchDir", handle).catch(() => {}); kvSet("watchName", handle.name);
+  watchStatus();
+  await pollWatch(true);
+  watch.timer = setInterval(() => pollWatch(false), WATCH_MS);
+  toast(`Watching ${handle.name}: new relay files are added as they arrive, while this page is open.`);
+}
+function stopWatch(silent) {
+  if (watch && watch.timer) clearInterval(watch.timer);
+  watch = null;
+  if (!silent) { tx("kv", "readwrite", (s) => s.delete("watchDir")).catch(() => {}); }
+  watchStatus();
+}
+async function canUse(handle, ask) {
+  try {
+    if ((await handle.queryPermission({ mode: "read" })) === "granted") return true;
+    return ask && (await handle.requestPermission({ mode: "read" })) === "granted";
+  } catch (e) { return false; }
+}
+async function pickWatch() {
+  let h; try { h = await window.showDirectoryPicker({ id: "sel-history-watch", mode: "read" }); } catch (e) { return; }
+  startWatch(h);
+}
+async function resumeWatch() {
+  if (typeof window.showDirectoryPicker !== "function") return;
+  $("watchBtn").hidden = false; $("watchBtn2").hidden = false;
+  const h = await kvGet("watchDir");
+  if (!h || watch) return;
+  if (await canUse(h, false)) startWatch(h);
+  else { watch = { handle: h, seen: (await kvGet("watchSeen")) || {}, waiting: new Map(), added: 0, paused: true }; watchStatus(); }
+}
+$("watchBtn").onclick = pickWatch;
+$("watchBtn2").onclick = pickWatch;
+$("watchStop").onclick = async () => {
+  if (watch && watch.paused) { const h = watch.handle; if (await canUse(h, true)) startWatch(h); return; }
+  stopWatch(false); toast("Stopped watching the folder.");
+};
+let newSinceFocus = 0;
+const baseTitle = document.title;
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { newSinceFocus = 0; document.title = baseTitle; } });
 
 // ---------------------------------------------------------------- export
 const DESK = window.SEL_DESKTOP || null;
@@ -4798,14 +5460,17 @@ document.addEventListener("keydown", (e) => {
 // ---------------------------------------------------------------- start
 (async function start() {
   state.locGroup = prefs.get("locGroup", "rank");
+  state.colorBy = prefs.get("colorBy", "type");
   try {
-    const [files, batches, cfg, notes, worklog, overrides] = await Promise.all([allOf("files"), allOf("batches"), kvGet("cfg"), kvGet("notes"), kvGet("worklog"), kvGet("overrides")]);
+    const [files, batches, cfg, notes, worklog, overrides, weather, locations, baseline] = await Promise.all([allOf("files"), allOf("batches"), kvGet("cfg"), kvGet("notes"), kvGet("worklog"), kvGet("overrides"), kvGet("weather"), kvGet("locations"), kvGet("baseline")]);
+    state.weather = weather || {}; state.locations = locations || {}; state.baseline = baseline || null;
     state.files = files || []; state.batches = batches || [];
     state.cfg = Object.assign({}, H.DEFAULTS, cfg || {}); state.notes = notes || {}; state.worklog = worklog || {}; state.overrides = overrides || {};
   } catch (e) { toast("This browser won't keep the history (storage is blocked). Files you add are analyzed but forgotten when you close the page.", 8000); }
   if (state.files.length) await rebuild(true);
   else { state.model = H.buildModel([], state.cfg); render(); }
-  window.SELHistoryApp = { state, rebuild, addFiles, go, openDrawer };   // for tests
+  resumeWatch();
+  window.SELHistoryApp = { state, rebuild, addFiles, go, openDrawer, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h) };   // for tests
 })();
 })();
 </script>

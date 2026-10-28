@@ -417,6 +417,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
       <div class="sub">Trip-cause summaries from SEL relay event reports and QuickSet settings</div>
     </div>
     <div class="head-actions">
+      <button id="historyBtn" title="SEL Trip History: every event you've collected, by location, with recurring issues and trends">Trip History ↗</button>
       <button id="stationsBtn" title="Where each relay is, and the weather at each event">Stations &amp; weather</button>
       <button id="helpBtn" title="Help (F1)">Help</button>
       <label class="switch" title="Dark mode (Ctrl+D)"><input type="checkbox" id="dark"> Dark mode</label>
@@ -6094,6 +6095,32 @@ function showPage(which, recId, focus) {
   if (which === "wave") ensureWave().show(recId, focus);
   if (which === "events") renderEvents();
 }
+// ---------------------------------------------------------------- Trip History link and hand-off
+$("historyBtn").addEventListener("click", () => {
+  const local = /^https?:$/.test(location.protocol) && !/^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+  const [owner, repo] = REPO.split("/");
+  window.open(local ? new URL("SEL_Trip_History.html", location.href).href : `https://${owner}.github.io/${repo}/SEL_Trip_History.html`, "sel-history");
+});
+/** The Trip History page sends an event's files here (only the window that opened this one is listened to). */
+window.addEventListener("message", async (e) => {
+  const d = e.data;
+  if (!d || typeof d !== "object" || !window.opener || e.source !== window.opener) return;
+  if (d.type === "sel-ping") { e.source.postMessage({ type: "sel-ready" }, "*"); return; }
+  if (d.type !== "sel-open" || !Array.isArray(d.files)) return;
+  let added = 0;
+  for (const f of d.files) {
+    const bytes = f.bytes instanceof Uint8Array ? f.bytes : new Uint8Array(f.bytes || []);
+    const path = String(f.path || f.name || "file"), name = String(f.name || path.split("/").pop());
+    const key = "history|" + path + "|" + bytes.length;
+    if (!bytes.length || state.files.some((x) => x.key === key)) continue;
+    state.files.push({ key, name, path, bytes }); added++;
+  }
+  renderFiles();
+  if (added || !state.cache) await generate();
+  e.source.postMessage({ type: "sel-opened", added }, "*");
+  setStatus(`From Trip History: ${d.label || "an event"}` + (added ? ` (${added} file${added === 1 ? "" : "s"} added)` : ""));
+  if (d.rec) showPage("wave", d.rec); else if (d.id) jumpToEvent(d.id);
+});
 $("tabEvents").addEventListener("click", () => showPage("events"));
 $("tabSummary").addEventListener("click", () => showPage("summary"));
 $("tabWave").addEventListener("click", () => showPage("wave"));
