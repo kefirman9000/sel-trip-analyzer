@@ -25,6 +25,12 @@ built-in updater can replace it.
   summary. Press F5 or **Generate summary** to refresh.
 - The summary is editable and colour-coded (trips in red, no-trip events in
   green). **Copy all** puts plain text on the clipboard; **Save .txt** writes a file.
+- **Feedback on this output**: type what was wrong, missing, or should be
+  added, then **Send feedback**. It opens a pre-filled issue on this repo in
+  your browser (click *Create* to submit; needs a free GitHub account), and a
+  copy is always saved to `%APPDATA%\SEL Trip Analyzer\feedback.log`. Tick
+  *Attach summary* to include the output; issues are public, so you're asked
+  to confirm first.
 - **Dark mode** switch in the top corner. It follows your Windows setting on
   first launch and remembers your choice after that.
 - **Check for updates** looks at this repo's latest release. When a newer

@@ -1014,8 +1014,8 @@ def run_gui():
           "placeholder": True, "empty": True, "pal": None}
 
     root.title(APP_NAME)
-    root.geometry(cfg.get("geometry", "1180x860"))
-    root.minsize(920, 660)
+    root.geometry(cfg.get("geometry", "1180x920"))
+    root.minsize(920, 720)
 
     # ---- fonts: Segoe UI Variable on Windows 11, sensible fallbacks elsewhere
     fams = set(tkfont.families(root))
@@ -1115,9 +1115,27 @@ def run_gui():
     osb.grid(row=1, column=1, sticky="ns", padx=(4, 0))
     out.configure(yscrollcommand=osb.set)
 
+    # ---- feedback on the output
+    fbk = ttk.Frame(root, padding=(22, 14, 22, 0))
+    fbk.grid(row=5, column=0, sticky="ew")
+    fbk.columnconfigure(0, weight=1)
+    fh = ttk.Frame(fbk)
+    fh.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+    ttk.Label(fh, text="FEEDBACK ON THIS OUTPUT", style="Cap.TLabel").pack(side="left")
+    ttk.Label(fh, text="  what was wrong, missing, or should be added?", style="Hint.TLabel").pack(side="left")
+    feedback = tk.Text(fbk, height=3, wrap="word", relief="flat", bd=0, highlightthickness=1,
+                       padx=10, pady=8, font=F["body"], undo=True)
+    feedback.grid(row=1, column=0, sticky="ew")
+    fside = ttk.Frame(fbk)
+    fside.grid(row=1, column=1, sticky="ns", padx=(12, 0))
+    v_attach = tk.BooleanVar(value=False)
+    ttk.Checkbutton(fside, text="Attach summary", variable=v_attach).pack(anchor="w")
+    send_btn = ttk.Button(fside, text="Send feedback")
+    send_btn.pack(fill="x", pady=(8, 0))
+
     # ---- status bar
     sbar = ttk.Frame(root, padding=(22, 8, 22, 12))
-    sbar.grid(row=5, column=0, sticky="ew")
+    sbar.grid(row=6, column=0, sticky="ew")
     status = ttk.Label(sbar, text="Ready" + ("" if dnd_ok else "  -  drag-and-drop unavailable, use Add files"),
                        style="Hint.TLabel")
     status.pack(side="left")
@@ -1193,6 +1211,9 @@ def run_gui():
         lb.configure(font=F["body"], highlightthickness=1, relief="flat", bd=0)
         style_text(comments, pal)
         style_text(out, pal)
+        style_text(feedback, pal)
+        feedback.configure(font=F["body"])
+        feedback.tag_configure("ph", foreground=pal["muted"])
         lb.configure(bg=pal["surface"], fg=pal["text"], selectbackground=pal["sel"],
                      selectforeground=pal["text"], highlightbackground=pal["border"],
                      highlightcolor=pal["accent"])
@@ -1427,6 +1448,65 @@ def run_gui():
         else:
             check_updates(silent=False)
 
+    FEEDBACK_PH = ("e.g. Event 3 was a DTT from the remote end, not a local fault. "
+                   "Would be nice to show the breaker number in the quick summary.")
+    st["fb_ph"] = False
+
+    def fb_placeholder(show):
+        if show and not feedback.get("1.0", "end-1c").strip():
+            feedback.delete("1.0", "end")
+            feedback.insert("1.0", FEEDBACK_PH, "ph")
+            st["fb_ph"] = True
+        elif not show and st["fb_ph"]:
+            feedback.delete("1.0", "end")
+            st["fb_ph"] = False
+
+    def send_feedback():
+        import urllib.parse
+        import webbrowser
+        text = "" if st["fb_ph"] else feedback.get("1.0", "end-1c").strip()
+        if not text:
+            set_status("Type your feedback first")
+            feedback.focus_set()
+            return
+        summary = "" if st["empty"] else out.get("1.0", "end-1c")
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        # always keep a local copy
+        log = os.path.join(os.path.dirname(settings_path()), "feedback.log")
+        try:
+            os.makedirs(os.path.dirname(log), exist_ok=True)
+            with open(log, "a", encoding="utf-8") as f:
+                f.write(f"===== {stamp}  v{VERSION}\n{text}\n\n")
+        except Exception:
+            pass
+        exts = sorted({os.path.splitext(p)[1].lower() for p in files})
+        body = (f"{text}\n\n---\nApp version: v{VERSION}  \n"
+                f"Files loaded: {len(files)} ({', '.join(exts) or 'none'})\n")
+        if v_attach.get() and summary:
+            room = 6000 - len(urllib.parse.quote(body))
+            clip = summary
+            while clip and len(urllib.parse.quote(clip)) > room:
+                clip = clip[: int(len(clip) * 0.8)]
+            body += ("\n<details><summary>Summary output</summary>\n\n```\n" + clip
+                     + ("\n... (truncated)" if len(clip) < len(summary) else "") + "\n```\n</details>\n")
+        title = "Feedback: " + re.sub(r"\s+", " ", text)[:70]
+        if "OWNER/" in GITHUB_REPO:
+            messagebox.showinfo("Feedback", f"Saved to {log}")
+            return
+        if v_attach.get() and summary and not messagebox.askyesno(
+                "Attach summary?",
+                "Feedback is posted as a public GitHub issue, so anyone can read the attached "
+                "summary (relay names, dates, locations).\n\nAttach it anyway?"):
+            return
+        url = (f"https://github.com/{GITHUB_REPO}/issues/new?"
+               + urllib.parse.urlencode({"title": title, "body": body}))
+        webbrowser.open(url)
+        feedback.delete("1.0", "end")
+        st["fb_ph"] = False
+        fb_placeholder(True)
+        flash(send_btn, "Opened ✓", "Send feedback")
+        set_status("Feedback opened on GitHub - click 'Create' there to submit (a copy was saved locally)")
+
     def on_close(save_only=False):
         save_settings({"dark": st["dark"], "geometry": root.geometry(),
                        "seq": v_seq.get(), "set": v_set.get(), "ser": v_ser.get()})
@@ -1439,6 +1519,10 @@ def run_gui():
     gen_btn.config(command=generate)
     copy_btn.config(command=copy_all)
     save_btn.config(command=save_txt)
+    send_btn.config(command=send_feedback)
+    feedback.bind("<FocusIn>", lambda e: fb_placeholder(False))
+    feedback.bind("<FocusOut>", lambda e: fb_placeholder(True))
+    feedback.bind("<Control-a>", lambda e: (e.widget.tag_add("sel", "1.0", "end"), "break")[1])
     for txt, cmd in (("Add files", browse), ("Add folder", browse_folder),
                      ("Remove", remove_sel), ("Clear", clear_all)):
         ttk.Button(fb, text=txt, command=cmd).pack(side="left", padx=(0, 6))
@@ -1488,12 +1572,14 @@ def run_gui():
     root.protocol("WM_DELETE_WINDOW", on_close)
 
     apply_theme()
+    fb_placeholder(True)
     show_placeholder()
     show_empty()
     refresh_list()
 
     # hooks used by scripts/screenshots.py
     root.app = SimpleNamespace(add_paths=add_paths, comments=comments, hide_placeholder=hide_placeholder,
+                               feedback=feedback, fb_placeholder=fb_placeholder,
                                generate=generate, toggle_dark=toggle_dark, v_dark=v_dark,
                                show_update_available=show_update_available)
 
