@@ -61,8 +61,10 @@ Waveform analysis page (reference stepping, COMTRADE, pinned notes, zoom, Word
 export), feedback, dark mode, help and the phone layout.
 
 The expected answers come from the sample files. To lock in behaviour on
-**real** relay files, add a scrubbed case under `tests/fixtures/` (see the
-README there). This repo is public, so replace relay and station names first.
+**real** relay files, run `node scripts/add_fixture.js <case-name> <files>`: it
+replaces relay and station names, renames the files, refuses to write if a name
+is left, and drafts `tests/fixtures/<case-name>/expected.json` for you to finish
+(see `tests/fixtures/README.md`). This repo is public, so read the result once.
 
 ## Sample files
 
