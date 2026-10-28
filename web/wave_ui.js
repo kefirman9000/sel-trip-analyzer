@@ -534,7 +534,7 @@ function create(ctx) {
   let lay = null;
   function redraw() {
     if (!st.rec) return;
-    const W = Math.max(320, canvas.parentElement.clientWidth);
+    const W = Math.max(240, canvas.parentElement.clientWidth);
     const m = model();
     const l = layout(m, W);
     const dpr = window.devicePixelRatio || 1;

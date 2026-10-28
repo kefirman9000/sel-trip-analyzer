@@ -10,8 +10,9 @@ overcurrent elements against the relay's own settings.
 
 | | |
 |---|---|
-| **[⬇ Windows program](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.exe)** | `SEL_Trip_Analyzer.exe`: download and double-click, no install |
-| **[▶ Browser version](https://kefirman9000.github.io/sel-trip-analyzer/)** | Opens in your browser on any computer, nothing to install. [Download it](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html) to use offline |
+| **[▶ Open it online](https://kefirman9000.github.io/sel-trip-analyzer/)** | Runs in your browser on any computer, nothing to install |
+| **[⬇ Download SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)** | The whole program in one file: double-click it to use it offline (Chrome, Edge, Firefox, Safari) |
+| [Windows program (optional)](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.exe) | The same page in its own window, with Windows Save dialogs and automatic updates |
 
 Latest version: see [Releases](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest) · [Report a problem or suggest something](https://github.com/kefirman9000/sel-trip-analyzer/issues/new)
 
@@ -36,23 +37,29 @@ Latest version: see [Releases](https://github.com/kefirman9000/sel-trip-analyzer
   grouped, and **repeat trips** on the same relay flagged.
 - **Real Word (.docx) export** in both versions, with a waveform picture for
   every event that has one.
-- **One program.** The Windows program and the browser version are now the
-  same page, so they always give the same answers.
+- **One program.** Everything is now one web page you can use online or
+  download. The optional Windows program shows that same page in its own window.
 
 ## Get started
 
-1. **Download** `SEL_Trip_Analyzer.exe` and put it in a folder you own, such as
-   Desktop or Documents. Avoid Program Files, because the program updates
-   itself in place.
-2. **Open it.** The first time, Windows may say *"Windows protected your PC"*.
-   Click **More info → Run anyway**. This appears because the program isn't
-   code-signed. It opens in its own window (it uses Microsoft Edge, which comes
-   with Windows, to draw the window; nothing is sent anywhere).
-3. **Drag your event files** (or a whole folder) onto the window, or onto the
-   program's icon. The summary appears straight away.
+1. **[Open it online](https://kefirman9000.github.io/sel-trip-analyzer/)**, or
+   **download [SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)**
+   and double-click it. It works offline, on Windows, Mac or Linux, and your
+   files are read on your computer and never uploaded.
+2. **Drag your event files** (or a whole folder) onto the page. The summary
+   appears straight away.
 
 Want to see it work first? Click **Try samples**, or download the
 [sample files](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_sample_files.zip).
+
+### Optional: the Windows program
+
+`SEL_Trip_Analyzer.exe` is the same page in its own window. It adds Windows
+**Save As** dialogs, opening files dropped on its icon, and **automatic
+updates**. Put it in a folder you own (Desktop or Documents, not Program
+Files). The first time, Windows may say *"Windows protected your PC"*: click
+**More info → Run anyway** (the program isn't code-signed). It uses Microsoft
+Edge, which comes with Windows, to draw its window.
 
 ## Which files to use
 
@@ -134,8 +141,10 @@ your computer, appear in the event's details, and are searchable. The
 
 ### Weather at the time of the event
 
-Open **Station locations & weather**, type where each relay is (a town such as
-*Ocala, FL*, or *latitude, longitude*) and click **Look up weather**. Each event
+Open **Station locations & weather** and type where each relay is (a town such
+as *Ocala, FL*, or *latitude, longitude*). To set several at once, tick them (or
+**Select all**), type one location and click **Apply to ticked** (or **Apply to
+all**). Then click **Look up weather**. Each event
 gets a *Weather* line (conditions, temperature, wind and gusts, rain or snow
 for that hour), and when the weather could explain the trip it's added to the
 probable cause:
@@ -188,21 +197,22 @@ or one of the **reference waveforms**, and step through them with ◀ ▶
 
 ![Reference waveforms](docs/screenshots/reference.png)
 
-## Browser version
+## Web page or Windows program?
 
-Can't run `.exe` files, or not on Windows? **[Open the browser version](https://kefirman9000.github.io/sel-trip-analyzer/)**,
-or [download SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)
-and double-click it to use it offline. It works in Chrome, Edge, Firefox and
-Safari, on Windows, Mac or Linux. It is the same program as the Windows
-version; your files are read inside the browser tab and never uploaded.
+They are the same program and give the same results. The differences:
 
-The only differences: the browser version saves exports to your Downloads
-folder (the Windows program asks where), and to update it you download the new
-file (the online copy is always current).
+| | Web page (`.html` or online) | Windows program (`.exe`) |
+|---|---|---|
+| Runs on | Any computer with a browser | Windows |
+| Saving exports | To your Downloads folder | Asks where, with a Save As dialog |
+| Opening files | Drag onto the page, or Add files | Also drag onto the program's icon |
+| Updates | The online copy is always current; a downloaded copy shows a banner with a link to the new file | Installs the update itself when you say yes |
 
 ## Updates
 
-The Windows program checks for a new version when it starts. When one is
+The online version is always the latest. A downloaded `.html` checks GitHub
+when it opens and shows a banner when there's a newer file to download. The
+Windows program checks for a new version when it starts. When one is
 available, a banner appears and **Check for updates** turns into **Update to
 vX.Y.Z**. Click **Install and restart**: it downloads the new version, checks
 it hasn't been tampered with, and reopens. Your notes and settings are kept.
