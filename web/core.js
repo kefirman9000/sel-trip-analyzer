@@ -154,7 +154,8 @@ function decodeBlob(data) {
 // ---------------------------------------------------------------------------
 // Settings text
 // ---------------------------------------------------------------------------
-const SETTING_RE = '\\b([A-Z][A-Z0-9_]{0,11})\\s*:?=\\s*(.*?)(?=\\s{2,}[A-Z][A-Z0-9_]{0,11}\\s*:?=|\\"|$)';
+// setting names can start with a digit (50P1P, 51GTD) but must contain a letter
+const SETTING_RE = '\\b((?=[0-9]*[A-Z])[A-Z0-9][A-Z0-9_]{0,11})\\s*:?=\\s*(.*?)(?=\\s{2,}(?=[0-9]*[A-Z])[A-Z0-9][A-Z0-9_]{0,11}\\s*:?=|\\"|$)';
 const USEFUL_SETTINGS = new Set(["RID", "TID", "SID", "LL", "CTR", "CTRN", "PTR", "PTRS", "Z1MAG", "Z1ANG", "Z0MAG",
   "TR", "TRCOMM", "TRSOTF", "DTT", "ULTR", "ER", "79RI", "52A", "52AA1", "BFI",
   "Z1P", "Z2P", "Z3P", "Z1MG", "Z2MG", "Z1G", "Z2D", "Z2PD", "Z2GD", "Z3D",
@@ -297,7 +298,7 @@ function newRec(source, kind) {
     source, kind: kind || "event", relay_id: "", terminal_id: "", fid: "", date: "", time: "",
     event_type: "", location: "", shot: "", freq: "", targets: "",
     currents: new Map(), voltages: new Map(), sequence: [], trip_cycle: null, open_cycle: null,
-    settings: {}, ser_lines: [], extra: [], dup_of: null, trigger_cycle: null, prefault_short: false, notes: [],
+    settings: {}, ser_lines: [], extra: [], dup_of: null, trigger_cycle: null, prefault_short: false, notes: [], wave: null,
   };
 }
 
@@ -395,10 +396,10 @@ function analyzeTable(rec, hdr, table, sam) {
     let preWin = mags.slice(Math.max(0, preEnd - sam), preEnd);
     if (!preWin.length) preWin = mags.slice(0, sam);
     const pre = preWin.reduce((a, b) => a + b, 0) / preWin.length;
-    analog.push([name, n, pre, mags]);
+    analog.push([name, n, pre, mags, vals]);
   });
 
-  const firstOn = new Map(), preOn = new Set();
+  const firstOn = new Map(), preOn = new Set(), digital = new Map();
   hdr.forEach((name, c) => {
     if (!strip(name).includes(" ")) return;
     const names = splitWS(name);
@@ -408,6 +409,10 @@ function analyzeTable(rec, hdr, table, sam) {
       const bits = hexBits(h);
       for (let b = 0; b < Math.min(bits.length, names.length); b++) {
         const el = names[b];
+        if (el !== "*") {
+          if (!digital.has(el)) digital.set(el, new Uint8Array(table.length));
+          digital.get(el)[k] = bits[b] === "1" ? 1 : 0;
+        }
         if (el === "*" || bits[b] !== "1") continue;
         if (k === 0) preOn.add(el);
         else if (!firstOn.has(el) && !preOn.has(el)) firstOn.set(el, k);
@@ -424,11 +429,17 @@ function analyzeTable(rec, hdr, table, sam) {
   });
 
   const end = rec.open_cycle !== null ? Math.trunc(rec.open_cycle * sam) : table.length;
-  for (const [name, n, pre, mags] of analog) {
+  const waveChannels = [];
+  for (const [name, n, pre, mags, vals] of analog) {
     let win = mags.slice(Math.max(0, startFault - lag), Math.max(startFault - lag + 1, end - lag));
     if (!win.length) win = mags;
-    if (pmatch("^(I[ABCNGRSPQ]|IA|IB|IC|IN|IG|3I0|3I2|I1|I2|IP)\\w*$", n)) rec.currents.set(name, [pre, Math.max(...win)]);
-    else if (pmatch("^V(A|B|C|AB|BC|CA|S|P|1|2)\\w*$", n)) rec.voltages.set(name, [pre, Math.min(...win)]);
+    if (pmatch("^(I[ABCNGRSPQ]|IA|IB|IC|IN|IG|3I0|3I2|I1|I2|IP)\\w*$", n)) {
+      rec.currents.set(name, [pre, Math.max(...win)]);
+      waveChannels.push({ name, kind: "I", values: vals });
+    } else if (pmatch("^V(A|B|C|AB|BC|CA|S|P|1|2)\\w*$", n)) {
+      rec.voltages.set(name, [pre, Math.min(...win)]);
+      waveChannels.push({ name, kind: "V", values: vals });
+    }
   }
 
   const ordered = [...firstOn.entries()].map((e, idx) => [e[0], e[1], idx])
@@ -439,6 +450,12 @@ function analyzeTable(rec, hdr, table, sam) {
       rec.sequence.push([0.0, el, "pre"]);
   const trips = [...firstOn.entries()].filter(([el]) => TRIP_NAMES.has(el.toUpperCase())).map(([, k]) => k);
   if (trips.length) rec.trip_cycle = Math.min(...trips) / sam;
+  // raw samples for the waveform chart
+  rec.wave = waveChannels.length ? {
+    sam, trigger: trig, trip: trips.length ? Math.min(...trips) : null,
+    open: rec.open_cycle !== null ? Math.round(rec.open_cycle * sam) : null, channels: waveChannels,
+    digitals: [...digital].map(([name, values]) => ({ name, values })),
+  } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -684,23 +701,25 @@ async function parseRdb(bytes, fileName) {
 // ---------------------------------------------------------------------------
 const EVENT_EXTS = [".cev", ".eve", ".txt", ".sum", ".his", ".ser", ".hdr", ".log", ".chi"];
 const SETTINGS_EXTS = [".rdb"];
-const ALL_EXTS = EVENT_EXTS.concat(SETTINGS_EXTS);
+const COMTRADE_EXTS = [".cfg", ".dat", ".cff"];   // waveform records, read by analysis.js
+const ALL_EXTS = EVENT_EXTS.concat(SETTINGS_EXTS, COMTRADE_EXTS);
 const extOf = (name) => { const m = /(\.[^.\\/]*)$/.exec(name); return m ? m[1].toLowerCase() : ""; };
 
 /** files: [{name, bytes: Uint8Array}] in load order. */
 async function loadFiles(files) {
-  const events = [], rdb = new Map(), errors = [];
+  const events = [], rdb = new Map(), errors = [], comtrade = [];
   for (const f of files) {
     const ext = extOf(f.name);
     try {
-      if (SETTINGS_EXTS.includes(ext)) for (const [k, v] of await parseRdb(f.bytes, f.name)) rdb.set(k, v);
+      if (COMTRADE_EXTS.includes(ext)) comtrade.push(f);
+      else if (SETTINGS_EXTS.includes(ext)) for (const [k, v] of await parseRdb(f.bytes, f.name)) rdb.set(k, v);
       else if (ext === ".cev") events.push(...parseCev(readText(f.bytes), f.name));
       else events.push(...parseText(readText(f.bytes), f.name));
     } catch (e) {
       errors.push(`${f.name}: ${e && e.message ? e.message : e}`);
     }
   }
-  return { events, rdb, errors };
+  return { events, rdb, errors, comtrade };
 }
 
 // ---------------------------------------------------------------------------
@@ -1022,10 +1041,118 @@ function showMatches(e, a, show) {
   if (show === "notrip") return !a.tripped;
   return true;
 }
-function searchText(e, a) {
-  return [e.relay_id, e.terminal_id, e.source, e.event_type, e.targets, e.date, e.time, e.location, a.desc]
+function searchText(e, a, note) {
+  return [e.relay_id, e.terminal_id, e.source, e.event_type, e.targets, e.date, e.time, e.location, a.desc, note]
     .concat(a.cause, a.checks, a.gaps, a.primary).filter(Boolean).join(" ").toUpperCase();
 }
+
+/** Stable id for an event (a history row that repeats a detailed report shares its id). */
+function eventId(e) {
+  const t = e.dup_of || e;
+  const dt = eventDatetime(t);
+  return [relayKey(t).toUpperCase(), dt !== null ? String(dt) : `${t.date} ${t.time}`, eventCore(t.event_type)].join("|");
+}
+
+const COMM_CLASS = "communications / transfer trip";
+function usesComms(it) {
+  if (splitWS((it.e.targets || "").toUpperCase()).includes("COMM")) return true;
+  return it.e.sequence.some(([, el, st]) => st === "asserted" && elementClass(el) === COMM_CLASS);
+}
+const abc = (et) => { const p = eventPhases(et); return p ? [...p].filter((x) => x !== "G").sort().join("") : ""; };
+const PAIR_WINDOW_US = 1e6;             // both ends within 1 second
+const INCIDENT_GAP_US = 300e6;          // events within 5 minutes of each other
+const REPEAT_WINDOW_US = 30 * 86400e6;  // 3+ trips on a relay within 30 days
+const REPEAT_MIN = 3;
+
+/** Same fault seen by the relays at both ends of a line. */
+function findPairs(items) {
+  const cand = items.filter((it) => it.e.dup_of === null && it.dt !== null && has(FAULT_TYPES, eventCore(it.e.event_type)));
+  const options = [];
+  for (let i = 0; i < cand.length; i++) {
+    for (let j = i + 1; j < cand.length; j++) {
+      const a = cand[i], b = cand[j];
+      if (relayKey(a.e).toUpperCase() === relayKey(b.e).toUpperCase()) continue;
+      const diff = Math.abs(a.dt - b.dt);
+      if (diff > PAIR_WINDOW_US || abc(a.e.event_type) !== abc(b.e.event_type)) continue;
+      const la = fnum(strip(a.e.location || "")), lb = fnum(strip(b.e.location || ""));
+      const ll = fnum(a.s.LL !== undefined ? a.s.LL : "") || fnum(b.s.LL !== undefined ? b.s.LL : "");
+      const adds = la !== null && lb !== null && la >= 0 && lb >= 0 && ll ? Math.abs(la + lb - ll) <= 0.15 * ll : false;
+      const comms = usesComms(a) || usesComms(b);
+      if (!adds && !comms) continue;
+      const llText = a.s.LL !== undefined && fnum(a.s.LL) ? a.s.LL : b.s.LL;
+      options.push({ a, b, adds, comms, diff, la, lb, ll, llText });
+    }
+  }
+  options.sort((x, y) => (y.adds - x.adds) || (y.comms - x.comms) || (x.diff - y.diff) || (x.a.order - y.a.order));
+  const used = new Set(), pairs = [];
+  for (const o of options) {
+    if (used.has(o.a) || used.has(o.b)) continue;
+    used.add(o.a); used.add(o.b);
+    const [first, second] = o.a.order <= o.b.order ? [o.a, o.b] : [o.b, o.a];
+    const p = { first, second, likely: o.adds, comms: o.comms, diffMs: o.diff / 1000, ll: o.ll, llText: o.llText,
+                locs: [strip(first.e.location || ""), strip(second.e.location || "")], sum: o.la + o.lb };
+    first.pair = { other: second, info: p }; second.pair = { other: first, info: p };
+    pairs.push(p);
+  }
+  return pairs.sort((x, y) => x.first.order - y.first.order);
+}
+
+/** Groups of events close together in time (e.g. a storm). */
+function findIncidents(items) {
+  const dated = items.filter((it) => it.e.dup_of === null && it.dt !== null).sort((a, b) => a.dt - b.dt || a.order - b.order);
+  const chains = [];
+  for (const it of dated) {
+    const last = chains.length ? chains[chains.length - 1] : null;
+    if (last && it.dt - last[last.length - 1].dt <= INCIDENT_GAP_US) last.push(it);
+    else chains.push([it]);
+  }
+  const incidents = chains.filter((c) => c.length >= 2 && !(c.length === 2 && c[0].pair && c[0].pair.other === c[1]));
+  incidents.forEach((c, i) => {
+    const info = { n: i + 1, items: c, relays: [...new Set(c.map((it) => relayKey(it.e)))], spanUs: c[c.length - 1].dt - c[0].dt };
+    for (const it of c) it.incident = info;
+  });
+  return incidents.map((c) => c[0].incident);
+}
+
+/** Relays that tripped REPEAT_MIN or more times within REPEAT_WINDOW_US. */
+function findRepeats(items) {
+  const byRelay = new Map();
+  for (const it of items) {
+    if (!it.a.tripped || it.e.dup_of !== null || it.dt === null) continue;
+    const k = relayKey(it.e);
+    if (!byRelay.has(k)) byRelay.set(k, []);
+    byRelay.get(k).push(it);
+  }
+  const out = [];
+  for (const [relay, list] of byRelay) {
+    list.sort((a, b) => a.dt - b.dt || a.order - b.order);
+    let best = null;
+    for (let i = 0, j = 0; j < list.length; j++) {
+      while (list[j].dt - list[i].dt > REPEAT_WINDOW_US) i++;
+      if (!best || j - i + 1 > best.length) best = list.slice(i, j + 1);
+    }
+    if (best && best.length >= REPEAT_MIN) {
+      const phases = { A: 0, B: 0, C: 0, G: 0 };
+      for (const it of best) for (const p of eventPhases(it.e.event_type) || []) phases[p]++;
+      out.push({ relay, items: best, spanUs: best[best.length - 1].dt - best[0].dt, phases });
+    }
+  }
+  return out.sort((a, b) => b.items.length - a.items.length || cmp(a.relay.toUpperCase(), b.relay.toUpperCase()));
+}
+
+function fmtSpan(us) {
+  const sec = us / 1e6;
+  if (sec < 90) return `${fx(sec, sec < 10 ? 1 : 0)} seconds`;
+  if (sec < 5400) return `${fx(sec / 60, 1)} minutes`;
+  if (sec < 172800) return `${fx(sec / 3600, 1)} hours`;
+  return `${pyRound(sec / 86400)} days`;
+}
+const daysText = (us) => { const d = pyRound(us / 86400e6); return d < 1 ? "within one day" : `in ${d} day${d === 1 ? "" : "s"}`; };
+const phaseText = (ph) => ["A", "B", "C"].filter((p) => ph[p]).map((p) => `phase ${p} ${ph[p]}x`).concat(ph.G ? [`ground ${ph.G}x`] : []).join(", ");
+const elementsText = (it) => (it.a.primary.length ? it.a.primary.join(", ") : interpretTargets(it.e.targets).slice(0, 2).join("/") || "element not identified");
+const clearText = (e) => (e.trip_cycle !== null && e.open_cycle !== null && e.open_cycle > e.trip_cycle
+  ? `breaker opened ${fx(e.open_cycle - e.trip_cycle, 2)} cycles after trip` : "");
+const station = (e) => (e.terminal_id && e.terminal_id !== relayKey(e) ? ` (${e.terminal_id})` : "");
 
 function prepareView(events, rdb, opts) {
   opts = opts || {};
@@ -1038,8 +1165,13 @@ function prepareView(events, rdb, opts) {
   const items = ev.map((e, i) => {
     const [sRdb, lbl, how] = matchSettings(e, rdb);
     const s = Object.assign({}, e.settings, sRdb);
-    return { e, s, label: lbl, how, a: analyzeEvent(e, s, how, lbl), order: i };
+    return { e, s, label: lbl, how, a: analyzeEvent(e, s, how, lbl), order: i, dt: eventDatetime(e),
+             pair: null, incident: null };
   });
+  const notes = opts.notes || {};
+  const weather = opts.weather || {};
+  for (const it of items) { it.id = eventId(it.e); it.note = notes[it.id] || ""; it.weather = weather[it.id] || null; }
+  const pairs = findPairs(items), incidents = findIncidents(items), repeats = findRepeats(items);
   const show = opts.show || "all";
   const relay = strip(opts.relay || "").toUpperCase();
   const search = strip(opts.search || "").toUpperCase();
@@ -1048,7 +1180,7 @@ function prepareView(events, rdb, opts) {
   for (const it of items) {
     if (!showMatches(it.e, it.a, show)) continue;
     if (relay && strip(relayKey(it.e)).toUpperCase() !== relay) continue;
-    if (search && !searchText(it.e, it.a).includes(search)) continue;
+    if (search && !searchText(it.e, it.a, [it.note, it.weather ? it.weather.text : ""].join(" ")).includes(search)) continue;
     if (hideDups && it.e.dup_of !== null) { nDups++; continue; }
     shown.push(it);
   }
@@ -1062,7 +1194,7 @@ function prepareView(events, rdb, opts) {
     const n = (it) => it.a.checks.length + it.a.gaps.length;
     shown.sort((x, y) => n(y) - n(x) || x.order - y.order);
   }
-  return { items, shown, nDups };
+  return { items, shown, nDups, pairs, incidents, repeats };
 }
 
 /** Counts for the Show options and the relays present, for labelling the view controls. */
@@ -1088,7 +1220,7 @@ function describeView(opts, nDups) {
   return parts.join("; ");
 }
 
-function overviewLines(shown) {
+function overviewLines(shown, extra) {
   const trips = shown.filter((it) => it.a.tripped).length;
   const lines = [`  Events      : ${shown.length} - ${trips} trip${trips !== 1 ? "s" : ""}, ${shown.length - trips} no trip`];
   const cats = [], known = new Set();
@@ -1104,6 +1236,22 @@ function overviewLines(shown) {
   for (const it of shown) { const k = relayKey(it.e); relays.set(k, (relays.get(k) || 0) + 1); }
   const ordered = [...relays].sort((a, b) => (b[1] - a[1]) || cmp(a[0].toUpperCase(), b[0].toUpperCase()));
   lines.push("  Relays      : " + ordered.map(([k, n]) => `${k} (${n})`).join(", "));
+  if (extra) {
+    const shownSet = new Set(shown);
+    const pairs = extra.pairs.filter((p) => shownSet.has(p.first) || shownSet.has(p.second));
+    const inc = extra.incidents.filter((x) => x.items.some((it) => shownSet.has(it)));
+    const rep = extra.repeats.filter((r) => r.items.some((it) => shownSet.has(it)));
+    if (pairs.length) lines.push(`  Two-ended   : ${pairs.length} fault${pairs.length === 1 ? "" : "s"} seen from both ends of a line`);
+    if (inc.length) lines.push(`  Incidents   : ${inc.length} group${inc.length === 1 ? "" : "s"} of events close together in time`);
+    if (rep.length) lines.push("  Repeat trips: " + rep.map((r) => `${r.relay} (${r.items.length} ${daysText(r.spanUs)})`).join(", "));
+    const wx = shown.filter((it) => it.weather);
+    if (wx.length) {
+      const kinds = new Map();
+      for (const it of wx) for (const h of it.weather.hints || []) if (h.kind !== "calm") kinds.set(h.label, (kinds.get(h.label) || 0) + 1);
+      lines.push(`  Weather     : looked up for ${wx.length} event${wx.length === 1 ? "" : "s"}` +
+                 (kinds.size ? "; " + [...kinds].map(([k, n]) => `${k} ${n}`).join(", ") : "; no severe weather found"));
+    }
+  }
   lines.push("  Confidence  : " + ["High", "Medium", "Low"]
     .map((c) => [c, shown.filter((it) => it.a.confidence === c).length]).filter(([, n]) => n).map(([c, n]) => `${n} ${c}`).join(", "));
   return lines;
@@ -1117,7 +1265,8 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
   const showSettings = detail === "full" && opts.settings !== false;
   const showSer = detail === "full" && opts.ser !== false;
   const now = opts.now || nowStamp();
-  const { items, shown, nDups } = prepareView(events, rdb, opts);
+  const view = prepareView(events, rdb, opts);
+  const { items, shown, nDups } = view;
   const ser = events.filter((e) => e.kind === "ser");
   const nItems = shown.reduce((t, it) => t + it.a.checks.length + it.a.gaps.length, 0);
   const nEv = shown.filter((it) => it.a.checks.length || it.a.gaps.length).length;
@@ -1132,9 +1281,9 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
   const out = [];
   out.push("SEL TRIP EVENT SUMMARY", "=".repeat(60), `Generated: ${now}`,
            `Files analyzed: ${nFiles}   Events found: ${items.length}   Settings databases: ${rdb.size}`);
-  const view = describeView(opts, nDups);
-  if (items.length && (view || shown.length !== items.length))
-    out.push(`Showing: ${shown.length} of ${items.length} events` + (view ? ` (${view})` : ""));
+  const viewText = describeView(opts, nDups);
+  if (items.length && (viewText || shown.length !== items.length))
+    out.push(`Showing: ${shown.length} of ${items.length} events` + (viewText ? ` (${viewText})` : ""));
   if (shown.length)
     out.push(`Needs review: ${nItems} item(s) to check across ${nEv} of ${shown.length} event(s)` + (nItems ? " - see the CHECK lines" : ""));
   out.push("");
@@ -1142,7 +1291,7 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
 
   if (!items.length && !ser.length) out.push("No event data recognized in the loaded files.");
   else {
-    if (shown.length >= 2) out.push("OVERVIEW", "-".repeat(60), ...overviewLines(shown), "");
+    if (shown.length >= 2) out.push("OVERVIEW", "-".repeat(60), ...overviewLines(shown, view), "");
     out.push("QUICK SUMMARY", "-".repeat(60));
     if (items.length && !shown.length) out.push("No events match the current Show / Relay / Search options.");
     shown.forEach((it, idx) => {
@@ -1151,6 +1300,7 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
       out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${e.event_type || "?"} | ${shortCause(e, it.s, it.a)}`);
     });
     out.push("");
+    out.push(...relationSections(view, number));
     if (detail !== "summary" && !(items.length && !shown.length)) {
       out.push("EVENT DETAILS", "-".repeat(60));
       const shownSettings = new Map();
@@ -1179,8 +1329,10 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
         }
         const nChk = a.checks.length + a.gaps.length;
         out.push(`  Confidence  : ${a.confidence} (${a.basis})` + (nChk ? ` - ${nChk} item(s) to check` : ""));
+        if (it.note) out.push(`  Notes       : ${splitlines(strip(it.note)).map((x) => strip(x)).filter(Boolean).join(" / ")}`);
+        if (it.weather) out.push(`  Weather     : ${it.weather.text}`);
         out.push("  Probable cause:");
-        for (const c of a.cause.concat(dupNote(e))) out.push(`    - ${c}`);
+        for (const c of a.cause.concat(dupNote(e), relationNotes(it, number), weatherNotes(it))) out.push(`    - ${c}`);
         if (nChk) { out.push("  Check before relying on this:"); for (const c of a.checks.concat(a.gaps)) out.push(`    - CHECK: ${c}`); }
         if (showSeq && e.sequence.length) {
           out.push("  Element sequence (cycles from start of record):");
@@ -1229,15 +1381,83 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
   return out.join("\n");
 }
 
+const ref = (number, it) => (number.has(it.e) ? `#${number.get(it.e)}` : "an event not shown in this view");
+
+function pairVerdict(p) {
+  if (p.likely) return `locations ${p.locs[0]} + ${p.locs[1]} = ${fx(p.sum, 2)}, line length ${p.llText}: likely the same fault seen from both ends`;
+  return "communications-assisted trip within " + fx(p.diffMs, 0) + " ms: possibly the same fault seen from both ends";
+}
+
+/** Cause hints from the weather at the time of the event (only when it looks relevant). */
+function weatherNotes(it) {
+  if (!it.weather || !it.weather.hints) return [];
+  return it.weather.hints.filter((h) => h.kind !== "calm" || it.a.tripped).map((h) => `Weather: ${h.text}`);
+}
+
+function relationNotes(it, number) {
+  const out = [];
+  if (it.pair) {
+    const o = it.pair.other;
+    out.push(`Other end of the line: ${ref(number, o)} ${relayKey(o.e)}${station(o.e)} tripped by ${elementsText(o)}` +
+             (o.e.location ? ` at ${o.e.location}` : "") + ` - ${pairVerdict(it.pair.info)}.`);
+  }
+  if (it.incident) {
+    const x = it.incident;
+    out.push(`Part of incident ${x.n}: ${x.items.length} events on ${x.relays.length} relay${x.relays.length === 1 ? "" : "s"} within ${fmtSpan(x.spanUs)}.`);
+  }
+  return out;
+}
+
+function relationSections(view, number) {
+  const out = [];
+  const isShown = (it) => number.has(it.e);
+  const line = (it) => `${ref(number, it)} ${relayKey(it.e)} ${it.e.event_type || "?"}: ${shortCause(it.e, it.s, it.a)}`;
+  const pairs = view.pairs.filter((p) => isShown(p.first) || isShown(p.second));
+  if (pairs.length) {
+    out.push("TWO-ENDED EVENTS", "-".repeat(60));
+    for (const p of pairs) {
+      out.push(`  ${relayKey(p.first.e)} and ${relayKey(p.second.e)} at ${strip(`${p.first.e.date} ${p.first.e.time}`)}:`);
+      out.push(`    - ${p.first.a.desc}; ${pairVerdict(p)}.`);
+      for (const it of [p.first, p.second]) {
+        const c = clearText(it.e);
+        out.push(`    - ${ref(number, it)} ${relayKey(it.e)}${station(it.e)}: ${elementsText(it)}` + (it.e.location ? ` at ${it.e.location}` : "") + (c ? `, ${c}` : "") + ".");
+      }
+    }
+    out.push("");
+  }
+  const inc = view.incidents.filter((x) => x.items.some(isShown));
+  if (inc.length) {
+    out.push("INCIDENTS", "-".repeat(60));
+    for (const x of inc) {
+      const f = x.items[0].e, l = x.items[x.items.length - 1].e;
+      out.push(`  Incident ${x.n}, ${strip(`${f.date} ${f.time}`)} to ${l.time || l.date} (${x.items.length} events on ${x.relays.length} relay${x.relays.length === 1 ? "" : "s"} within ${fmtSpan(x.spanUs)}):`);
+      for (const it of x.items) out.push(`    - ${line(it)}`);
+    }
+    out.push("");
+  }
+  const rep = view.repeats.filter((r) => r.items.some(isShown));
+  if (rep.length) {
+    out.push("REPEAT TRIPS", "-".repeat(60));
+    for (const r of rep) {
+      const f = r.items[0].e, l = r.items[r.items.length - 1].e;
+      out.push(`    - ${r.relay}: ${r.items.length} trips ${daysText(r.spanUs)} (${f.date} to ${l.date}) - ${phaseText(r.phases)}. ` +
+               `Repeated trips often point to one cause (equipment, vegetation, animals); worth a patrol. Events ${r.items.map((it) => ref(number, it)).join(", ")}.`);
+    }
+    out.push("");
+  }
+  return out;
+}
+
 const CSV_COLUMNS = ["#", "Date", "Time", "Relay", "Station", "Event type", "Description", "Tripped",
   "Tripping elements", "Fault location", "% of line", "Targets", "Max phase current (A)",
   "Ground current (A)", "Breaker clearing (cycles)", "Confidence", "Items to check",
-  "Check details", "Source file"];
+  "Check details", "Other end", "Incident", "Notes", "Weather", "Source file"];
 const csvField = (v) => (/[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
 
 /** One row per event (same filter and order as the summary) for Excel. */
 function reportCsv(events, rdb, opts) {
   const { shown } = prepareView(events, rdb, opts);
+  const number = new Map(shown.map((it, i) => [it.e, i + 1]));
   const rows = [CSV_COLUMNS];
   shown.forEach((it, idx) => {
     const e = it.e, s = it.s, a = it.a;
@@ -1250,7 +1470,9 @@ function reportCsv(events, rdb, opts) {
     rows.push([String(idx + 1), e.date, e.time, e.relay_id, e.terminal_id, e.event_type, a.desc,
       a.tripped ? "Yes" : "No", a.primary.join(", "), loc, v !== null && ll ? fx(100 * v / ll, 0) : "", e.targets,
       peaks.length ? fx(Math.max(...peaks), 0) : "", gnd !== null ? fx(gnd[1], 0) : "",
-      clearing, a.confidence, String(a.checks.length + a.gaps.length), a.checks.concat(a.gaps).join(" | "), e.source]);
+      clearing, a.confidence, String(a.checks.length + a.gaps.length), a.checks.concat(a.gaps).join(" | "),
+      it.pair ? `${number.has(it.pair.other.e) ? "#" + number.get(it.pair.other.e) + " " : ""}${relayKey(it.pair.other.e)}` : "",
+      it.incident ? String(it.incident.n) : "", strip(it.note || ""), it.weather ? it.weather.text : "", e.source]);
   });
   return rows.map((r) => r.map((f) => csvField(String(f))).join(",")).join("\r\n") + "\r\n";
 }
@@ -1258,7 +1480,7 @@ function reportCsv(events, rdb, opts) {
 // ---------------------------------------------------------------------------
 // Report text -> blocks (for the formatted Word / print view)
 // ---------------------------------------------------------------------------
-const KV_RE = "^ {2}([A-Za-z][A-Za-z ./]{1,14}?)\\s*:\\s?(.*)$";
+const KV_RE = "^ {2}([A-Za-z][A-Za-z ./\\-]{1,14}?)\\s*:\\s?(.*)$";
 const SUB_RE = "^ {2}(\\S.*?):\\s*$";
 const SEQ_RE = "^\\s{3,}([\\d.]+)\\s+(\\S+)\\s+(already asserted at start|asserted)\\s+\\((.*)\\)\\s*$";
 const QS_RE = "^\\s*(\\d+)\\.\\s+(.*)$";
@@ -1334,8 +1556,9 @@ function tripRuns(text) {
 }
 
 const api = {
-  loadFiles, buildReport, reportCsv, viewChoices, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
-  parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, nowStamp, fx, fc, pyTitle, elementClass,
+  loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
+  parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, nowStamp, eventDatetime, eventCore,
+  interpretEventType, interpretTargets, extractSettings, splitWS, strip, splitlines, csvLine, latin1, FAULT_TYPES, fx, fc, pyTitle, elementClass,
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.SELCore = api;

@@ -4,12 +4,18 @@ REM Needs Python 3.9+ from python.org (tick "Add python.exe to PATH" when instal
 cd /d "%~dp0"
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python scripts\build_html.py || goto :error
 python -m PyInstaller --noconfirm --onefile --windowed ^
   --name SEL_Trip_Analyzer ^
-  --collect-all tkinterdnd2 ^
-  --collect-data sv_ttk --collect-data docx --collect-all reportlab --hidden-import olefile ^
-  --icon assets\icon.ico --add-data "assets\icon.ico;assets" --add-data "assets\icon.png;assets" --add-data "sample_files;sample_files" ^
-  sel_trip_analyzer.py
+  --icon assets\icon.ico ^
+  --add-data "dist\SEL_Trip_Analyzer.html;app" --add-data "sample_files;sample_files" ^
+  sel_trip_analyzer.py || goto :error
+dist\SEL_Trip_Analyzer.exe --selftest
 echo.
 echo Done. Your program is at: %~dp0dist\SEL_Trip_Analyzer.exe
 pause
+exit /b 0
+:error
+echo Build failed.
+pause
+exit /b 1

@@ -3,7 +3,10 @@
 # SEL Trip Event Analyzer
 
 Drop in SEL relay event files and get a plain-English summary of **what tripped
-and why**, ready to paste into an outage report or export to Word or PDF.
+and why**, ready to paste into an outage report or export to Word. Open any
+`.CEV` or COMTRADE record on the **Waveform analysis** page to see the
+waveforms, phasors, harmonics and every relay element, and to check the
+overcurrent elements against the relay's own settings.
 
 | | |
 |---|---|
@@ -14,20 +17,27 @@ Latest version: see [Releases](https://github.com/kefirman9000/sel-trip-analyzer
 
 ![Trip summary](docs/screenshots/main.png)
 
-## What it does
+## What's new in 2.0
 
-- Reads SEL event reports (`.CEV`, `.EVE`, `.TXT`, `.SUM`, `.HIS`, `.SER`, COMTRADE `.HDR`)
-  and QuickSet settings files (`.RDB`), as many as you like at once.
-- Works out the fault type, faulted phases, fault location, the element that
-  tripped, how fast the breaker opened, and the likely cause.
-- **Flags anything it isn't sure about** with a `CHECK:` line and rates each
-  event's confidence High, Medium or Low, so you know what to verify.
-- Lets you **filter, sort and search** the results (trips only, needs review,
-  one relay, newest first…) and choose how much detail to show.
-- Gives you an editable summary you can copy, or export as a formatted Word or
-  PDF report, or as a spreadsheet for Excel.
-- Runs entirely on your computer. No install, no account, nothing uploaded.
-  Use the Windows program or the [browser version](#browser-version).
+- **Waveform analysis page.** Synchronized current, voltage and relay-element
+  graphs with zoom, scroll and a cursor; phasor diagram; sequence components;
+  harmonic spectrum; fault type from the waveforms (compared with what the relay
+  reported); a check of each 50/51 element against the relay's settings and
+  curve; and every relay element with a plain-English meaning.
+- **Reference waveforms.** Step through nine built-in examples: normal load,
+  each fault type, a high-impedance fault, transformer inrush, CT saturation and
+  an evolving fault, each with "what to look for".
+- **COMTRADE** records (`.CFG` + `.DAT`, or `.CFF`), 1991 to 2013, ASCII or binary.
+- **Notes on the graph**, pinned to a point in time, included in exports.
+- **Notes per event**, added to the summary, Word and spreadsheet exports.
+- **Weather at the time of each event** (optional): thunderstorms, high wind,
+  ice and heavy rain are added to the probable cause.
+- **Two ends of a line** paired up, **incidents** (events close together)
+  grouped, and **repeat trips** on the same relay flagged.
+- **Real Word (.docx) export** in both versions, with a waveform picture for
+  every event that has one.
+- **One program.** The Windows program and the browser version are now the
+  same page, so they always give the same answers.
 
 ## Get started
 
@@ -36,43 +46,21 @@ Latest version: see [Releases](https://github.com/kefirman9000/sel-trip-analyzer
    itself in place.
 2. **Open it.** The first time, Windows may say *"Windows protected your PC"*.
    Click **More info → Run anyway**. This appears because the program isn't
-   code-signed.
-3. **Drag your event files** (or a whole folder) onto the drop zone. The summary
-   appears straight away.
+   code-signed. It opens in its own window (it uses Microsoft Edge, which comes
+   with Windows, to draw the window; nothing is sent anywhere).
+3. **Drag your event files** (or a whole folder) onto the window, or onto the
+   program's icon. The summary appears straight away.
 
-Want to see it work first? Click **Try samples** in the program, or download the
+Want to see it work first? Click **Try samples**, or download the
 [sample files](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_sample_files.zip).
-
-## Browser version
-
-Can't run `.exe` files, or not on Windows? Use **`SEL_Trip_Analyzer.html`**, a
-single file that does the same analysis inside your web browser.
-
-1. [Open it online](https://kefirman9000.github.io/sel-trip-analyzer/), or [download SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)
-   to keep a copy that works offline.
-2. Double-click it. It opens in Chrome, Edge, Firefox or Safari, on Windows, Mac
-   or Linux. It also works offline.
-3. Drag your event files or a folder onto the page, exactly like the Windows program.
-
-Your files are read inside the browser tab and **never uploaded**. The summary,
-the CHECK flags and the confidence ratings are identical to the Windows program
-(automated tests compare the two on every change).
-
-A few things differ from the Windows program:
-
-| | Windows program | Browser version |
-|---|---|---|
-| Word export | `.docx` | `.doc` (opens in Word) |
-| PDF export | Saves a PDF file | Opens the print window: choose **Save as PDF** |
-| Updates | Installs itself after you say yes | Shows a banner with a download link; save the new file over the old one (the online copy is always current) |
-| Feedback log | Also saved on your PC | Opened on GitHub only |
 
 ## Which files to use
 
 | File | What it is | How much it helps |
 |---|---|---|
-| `.CEV` | Compressed event report | **Best.** Element timeline, currents, voltages, and usually the settings |
-| `.RDB` | QuickSet settings database | Adds the trip equation (TR) and line length (LL) |
+| `.CEV` | Compressed event report | **Best.** Element timeline, currents, voltages, waveforms, and usually the settings |
+| `.CFG` + `.DAT` (or `.CFF`) | COMTRADE record | Waveforms and elements for the Waveform analysis page |
+| `.RDB` | QuickSet settings database | Adds the trip equation (TR), line length (LL), CT ratio and 50/51 settings |
 | `.EVE` `.TXT` | Text event report or saved terminal capture | Good: event type, targets, location |
 | `.SUM` `.HDR` | Event summary / COMTRADE header | Good: same as above |
 | `.HIS` | Event history list | Basic: one line per event |
@@ -86,129 +74,175 @@ To get a CEV file, download the event from the relay with AcSELerator QuickSet
 and choose the compressed (CEV) format, or save the output of the `CEV` command
 from a terminal session.
 
-## Reading the summary
+## The trip summary
 
-The summary starts with a **Quick summary** (one line per event, oldest first),
-then the **Event details**:
+The summary starts with a **Quick summary** (one line per event, oldest first)
+and an **Overview**, then the **Event details**:
 
 - **Event type, targets, location, currents, voltages**, as recorded by the relay.
 - **Probable cause**: which element tripped and why. With a CEV and settings,
   this comes from the trip equation and the element timeline. Otherwise it's
   read from the front-panel targets.
-- **Confidence**:
-  - **High**: element data and settings, and nothing looked wrong.
-  - **Medium**: some data is missing, or one item needs checking.
-  - **Low**: only a history row, or several items need checking.
+- **Confidence**: **High** (element data and settings, nothing looked wrong),
+  **Medium** (some data missing, or one item to check), **Low** (history row
+  only, or several items to check).
 - **`CHECK:` lines** say exactly what to confirm. They're shown in amber, and
   the quick summary shows `[n to check]` for each event.
+
+It also connects events to each other:
+
+- **Two-ended events**: the same fault seen by the relays at both ends of a
+  line (within a second, same phases). When the two fault locations add up to
+  the line length it says so.
+- **Incidents**: events within a few minutes of each other, such as a storm
+  hitting several feeders, or a reclose sequence.
+- **Repeat trips**: three or more trips on the same relay within 30 days.
 
 | You'll see a CHECK like... | What to do |
 |---|---|
 | *No settings for this relay* | Add the relay's `.RDB` so the trip equation and line length can be checked |
 | *No relay element data / History row only* | Load the `.CEV` for that event |
-| *Targets show phase B but the event type says A* | The record disagrees with itself. Look at the oscillography |
+| *Targets show phase B but the event type says A* | The record disagrees with itself. Open it on the Waveform analysis page |
 | *Highest fault current is on phase …* | Fault type may be misclassified. Check the waveforms |
 | *Location beyond the end of the line* / *Negative location* | Fault was likely past the remote bus or behind the relay. Check directionality and adjacent sections |
-| *Zone 1 operated … beyond typical reach* | Possible overreach or a location error |
 | *Breaker took … cycles to open* | Check the breaker and trip circuit |
 | *Tripped without identifying a fault type* | Confirm transfer trip, manual/SCADA open, or external trip input |
 | *Settings assumed / none match relay* | Make sure the right `.RDB` is loaded |
 
-### Event types
-
-| Code | Meaning |
-|---|---|
-| `AG` `BG` `CG` | Single phase-to-ground fault |
-| `AB` `BC` `CA` | Phase-to-phase fault |
-| `ABG` `BCG` `CAG` | Two phases to ground |
-| `ABC` | Three-phase fault |
-| `TRIP` | Tripped, but no fault type found (transfer trip, manual/SCADA, external input) |
-| `ER` | Event recorded by the ER trigger; no trip |
-| `TRIG` | Manually triggered event |
-| `… T` | A trailing **T** (for example `AG T`) means the relay tripped |
-
-### Common targets
-
-`INST` instantaneous · `TIME` time-delayed · `COMM` communications-assisted ·
-`ZONE1/2/3` distance zones · `50` instantaneous overcurrent · `51` time-overcurrent ·
-`81` frequency · `SOTF` switch-onto-fault · `A B C G N` faulted phases / ground ·
-`RS` recloser reset (ready) · `CY` recloser cycling · `LO` recloser locked out
-
-**Fault location** is in the relay's line-length units (miles or km, as set by
-LL). With settings loaded it's also shown as a percentage of the line. `$$$$$`
-means the relay couldn't calculate it.
-
-## Organizing the summary
-
-The row of controls above the summary changes what it shows and in what order.
-The summary always says which view it is showing (for example *Showing: 7 of
-11 events (needs review; newest first)*).
+### Organizing the summary
 
 | Control | Choices |
 |---|---|
-| **Show** | All events · Trips only · Needs review · Faults only · No-trip events. Each shows how many events it includes |
-| **Relay** | All relays, or one relay (with its event count) |
+| **Show** | All events · Trips only · Needs review · Faults only · No-trip events |
+| **Relay** | All relays, or one relay |
 | **Sort** | Oldest first · Newest first · By relay · Needs review first |
-| **Detail** | **Summary only**: overview + one line per event · **Standard**: adds each event's details and CHECKs · **Full**: adds the element timeline, settings and SER |
-| **Hide duplicates** | Skips history rows that repeat an event you also loaded as a detailed report (on by default) |
-| **Search** | Only events whose details contain the text, e.g. a relay, `zone 2`, `81` or `breaker` (`Ctrl+F`) |
+| **Detail** | **Summary only** · **Standard** (adds details and CHECKs) · **Full** (adds element timeline, settings and SER) |
+| **Hide duplicates** | Skips history rows that repeat an event you also loaded as a detailed report |
+| **Search** | Only events whose details or notes contain the text (`Ctrl+F`) |
 
-When two or more events are shown, the summary starts with an **Overview**:
-counts of trips, fault types, events per relay and confidence levels.
+The summary box is **fully editable**: whatever you change is what gets copied
+or exported. **Export** gives Word (`.docx`, with a waveform picture for each
+event that has one), PDF (through the print window), a spreadsheet for Excel
+(`.csv`, one row per event) or plain text.
 
-For heavy sorting and filtering, use **Export → Spreadsheet for Excel (.csv)**.
-It gives one row per event (date, relay, event type, cause, tripping elements,
-location and % of line, currents, breaker clearing time, confidence and every
-CHECK), using the same filter and order as the summary.
+### Event notes
 
-Changing the view rebuilds the summary. If you've edited the text, the program
-asks first, so copy or export your edits before switching views.
+Open **Event notes & waveforms** under the summary to add a note to any event
+(for example *"Crew found a burned crossarm at pole 112"*). Notes are saved on
+your computer, appear in the event's details, and are searchable. The
+**Waveforms ›** button opens that event on the Waveform analysis page.
 
-## Comments, export and feedback
+### Weather at the time of the event
 
-- **Comments & suggestions** box: anything you type is added to the top of the
-  summary.
-- The summary box is **fully editable**. Whatever you change is what gets
-  copied or exported.
-- **Export** → Word (`.docx`), PDF, spreadsheet (`.csv`), or plain text. Word
-  and PDF open automatically once saved. Shortcuts: `Ctrl+S` Word, `Ctrl+P` PDF.
-- **Feedback on this output**: tell us what was wrong or missing. **Send
-  feedback** opens a pre-filled issue on this page (you'll need a free GitHub
-  account to submit it), and a copy is always saved on your PC.
-  *Issues are public*, so only tick **Attach summary** if the content can be
-  shared.
+Open **Station locations & weather**, type where each relay is (a town such as
+*Ocala, FL*, or *latitude, longitude*) and click **Look up weather**. Each event
+gets a *Weather* line (conditions, temperature, wind and gusts, rain or snow
+for that hour), and when the weather could explain the trip it's added to the
+probable cause:
+
+| Weather | Added to the cause |
+|---|---|
+| Thunderstorm | Lightning is a likely cause; check arresters and look for flashed insulators |
+| Gusts of 30 to 40+ mph | Wind: conductor slap, galloping, or trees and limbs contacting the line |
+| Freezing rain or snow below freezing | Ice or snow loading, sagging conductors, limbs breaking |
+| Heavy rain | Flashover across dirty or cracked insulators, wet trees |
+| Very hot | High load and conductor sag |
+
+**Add weather to event notes** copies it into each event's notes. The weather
+comes from [Open-Meteo](https://open-meteo.com/), a free service; only the
+station location and the event date are sent. It reports conditions in the
+area, not individual lightning strikes.
+
+## Waveform analysis
+
+Click the **Waveform analysis** tab (`Ctrl+G`). Pick a record from your files,
+or one of the **reference waveforms**, and step through them with ◀ ▶
+(`Page Up` / `Page Down`).
+
+![Waveform analysis](docs/screenshots/wave.png)
+
+- **Fault type** found from the currents and voltages, with the evidence
+  (which currents rose, ground current, which voltages sagged), and whether it
+  agrees with what the relay reported. Warnings for DC offset, CT saturation,
+  inrush, evolving and high-impedance faults.
+- **Graphs** of currents, voltages and relay elements on one time line.
+  Click to set the cursor, drag to zoom in, `Shift`+drag to pan, `Ctrl`+wheel
+  to zoom, double-click to go back to the fault. Click a channel to hide it.
+  **Show** switches between the raw samples, the fundamental only (filters out
+  DC offset and harmonics) and an RMS trend.
+- **Phasors** and **sequence components** at the cursor, with what each one
+  means (negative sequence = unbalance, zero sequence = ground involved).
+- **Harmonics**: 2nd (inrush), 3rd (arcing, saturation), 5th, THD and DC offset.
+- **Overcurrent elements vs. the relay's settings**: each 50 element's pickup
+  against the measured current, and each 51 element's expected curve time
+  (from its curve and time dial) against when it actually timed out.
+- **Relay elements**: every element in the record with a plain-English
+  meaning and its on/off times. Search, filter by group, and tick to add it to
+  the graph.
+- **Notes on the graph**: **✎ Add note**, then click where it goes. Notes are
+  drawn on the graph and included in the picture and Word exports.
+- **Simple / Advanced**: Advanced adds angles, secondary amps, multiples of
+  pickup, all harmonics, every element and a samples export.
+- **Export**: Word report, picture of the graph, or every sample as a
+  spreadsheet.
+
+![Reference waveforms](docs/screenshots/reference.png)
+
+## Browser version
+
+Can't run `.exe` files, or not on Windows? **[Open the browser version](https://kefirman9000.github.io/sel-trip-analyzer/)**,
+or [download SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)
+and double-click it to use it offline. It works in Chrome, Edge, Firefox and
+Safari, on Windows, Mac or Linux. It is the same program as the Windows
+version; your files are read inside the browser tab and never uploaded.
+
+The only differences: the browser version saves exports to your Downloads
+folder (the Windows program asks where), and to update it you download the new
+file (the online copy is always current).
 
 ## Updates
 
-The program checks for a new version when it starts. When one is available, the
-**Check for updates** button turns blue and reads **Update to vX.Y.Z**. Click
-it, read what's new, and choose **Yes**. It downloads the new version, checks
-it hasn't been tampered with, and restarts.
+The Windows program checks for a new version when it starts. When one is
+available, a banner appears and **Check for updates** turns into **Update to
+vX.Y.Z**. Click **Install and restart**: it downloads the new version, checks
+it hasn't been tampered with, and reopens. Your notes and settings are kept.
 
 ## Help and shortcuts
 
 Press **F1** (or click **Help**) for the built-in guide.
 
 `Ctrl+O` add files · `F5` generate · `Ctrl+F` search · `Ctrl+Shift+C` copy ·
-`Ctrl+S` Word · `Ctrl+P` PDF · `Ctrl+D` dark mode · `Delete` remove the selected files
+`Ctrl+S` Word · `Ctrl+P` PDF · `Ctrl+G` waveform page · `Ctrl+D` dark mode
+
+On the graph: `←` `→` move the cursor (`Shift` = one cycle) · `+` `−` zoom ·
+`F` back to the fault · `0` whole record · `N` add a note
 
 ## Troubleshooting
 
-**Dragging files onto the window does nothing.**
-Windows blocks drag-and-drop into programs running *as administrator*. Open the
-program normally (not "Run as administrator"), or use **Add files**.
+**The program opens in a browser tab instead of its own window.**
+It uses Microsoft Edge to draw its window. If Edge isn't installed it falls
+back to your default browser; everything still works.
 
 **"No event data recognized."**
 The file isn't in a format the program knows, or it's empty. Try the `.CEV`
 version of the event. If a real SEL file isn't recognized, please send feedback
 so support can be added.
 
+**A COMTRADE record doesn't appear on the Waveform analysis page.**
+Load both the `.CFG` and the `.DAT` (same name), or the single `.CFF` file.
+
+**The overcurrent check says "No settings".**
+Load the relay's `.RDB`. Settings are matched by relay ID; for COMTRADE the
+relay ID is the device name in the `.CFG`. You can also pick the settings in
+the list above the table.
+
+**Weather says it couldn't be looked up.**
+It needs an internet connection. Events dated in the future (a relay clock set
+wrong) have no weather.
+
 **The update fails with a permission error.**
 The program is in a protected folder such as Program Files. Move
 `SEL_Trip_Analyzer.exe` to your Desktop or Documents and try again.
-
-**Export fails.**
-The file is probably open in Word or a PDF viewer. Close it and export again.
 
 **My antivirus removed or quarantined the program.**
 Single-file Python programs are sometimes flagged by mistake. Restore it, or
@@ -216,16 +250,21 @@ ask IT to allow it. You can check the file came from this page's Releases.
 
 ## Privacy
 
-Your files are only read on your own PC; nothing is uploaded. The program
-contacts the internet only to check GitHub for updates, and when you choose to
-send feedback.
+Your files are only read on your own computer; nothing is uploaded. The program
+contacts the internet only to check GitHub for updates, to look up weather when
+you ask it to (location and date only), and when you choose to send feedback.
+Feedback is posted as a public GitHub issue, so only attach the summary if it
+can be shared.
 
 ## Limitations
 
 The analysis is automated and is meant to speed up your review, not replace it.
-Always confirm against the oscillography and settings. SEL file formats vary
-between relay models and firmware, and the `.RDB` reader is best-effort. If
-something looks wrong for your relays, use **Send feedback**.
+Always confirm against the relay's own event report and settings. SEL file
+formats vary between relay models and firmware, and the `.RDB` reader is
+best-effort. The waveform classification uses the fundamental currents and
+voltages and can be fooled by unusual systems (for example ungrounded or
+resonant-grounded). If something looks wrong for your relays, use **Send
+feedback**.
 
 ---
 

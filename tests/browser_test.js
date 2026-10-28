@@ -5,7 +5,7 @@ const { chromium } = require("playwright");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const REPO = path.resolve(__dirname, ".."), OUT = process.argv[2] || null;
 const url = "file://" + path.join(REPO, "dist/SEL_Trip_Analyzer.html");
-// reference output: the same core run from the command line (Python parity is checked by tests/test_web_parity.py)
+// reference output: the same core run from the command line
 const pyOut = (args) => {
   const ci = args.indexOf("--comments");
   const extra = ci >= 0 ? ["--comments", args[ci + 1]] : [];
@@ -67,11 +67,11 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
 
   // 4b) view options: filters, search, relay, sort, detail, CSV
   await page.selectOption("#vShow", "review");
-  await page.waitForFunction(() => /Showing: \d+ of 11 events \(needs review/.test(window.__selApp.summaryText()));
+  await page.waitForFunction(() => /Showing: \d+ of \d+ events \(needs review/.test(window.__selApp.summaryText()));
   const samples = path.join(REPO, "sample_files");
   ok("Show = Needs review matches command-line", norm(await page.evaluate(() => window.__selApp.summaryText())) ===
      norm(cliRaw([...UI_DEFAULTS, "--show", "review", samples])));
-  ok("Show menu lists counts", (await page.textContent("#vShow")).includes("Needs review (7)"));
+  ok("Show menu lists counts", /Needs review \(\d+\)/.test(await page.textContent("#vShow")));
   await page.selectOption("#vRelay", "FEEDER 12");
   await page.selectOption("#vSort", "newest");
   await page.selectOption("#vDetail", "full");
@@ -91,7 +91,7 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await page.evaluate(() => { window.confirm = () => true; });
   await page.fill("#vSearch", ""); await page.selectOption("#vShow", "all"); await page.selectOption("#vRelay", "");
   await page.selectOption("#vSort", "time"); await page.selectOption("#vDetail", "standard");
-  await page.waitForFunction(() => !/^Showing: \d+ of 11 events \((needs|relay)/m.test(window.__selApp.summaryText()));
+  await page.waitForFunction(() => !/^Showing: \d+ of \d+ events \((needs|relay)/m.test(window.__selApp.summaryText()));
 
   // 5) edit the summary, then export txt + doc include the edit
   await page.click("#out");
@@ -101,9 +101,10 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   const txt = fs.readFileSync(await dTxt.path(), "utf8");
   ok("txt export includes hand edit", txt.includes("EDITED BY HAND") && txt.includes("\r\n"), dTxt.suggestedFilename());
   const [dDoc] = await Promise.all([page.waitForEvent("download"), page.keyboard.press("Control+s")]);
-  const doc = fs.readFileSync(await dDoc.path(), "utf8");
-  if (OUT) fs.writeFileSync(path.join(OUT, "web_export.doc.html"), doc);
-  ok("Word export via Ctrl+S, formatted + edit", doc.includes("urn:schemas-microsoft-com:office:word") && doc.includes("EDITED BY HAND") && doc.includes("<table"), dDoc.suggestedFilename());
+  const doc = fs.readFileSync(await dDoc.path()).toString("latin1");
+  if (OUT) fs.writeFileSync(path.join(OUT, "web_export.docx"), fs.readFileSync(await dDoc.path()));
+  ok("Word export via Ctrl+S: real .docx with tables, pictures and the edit", doc.startsWith("PK") && doc.includes("EDITED BY HAND") &&
+     doc.includes("<w:tbl>") && doc.includes("word/media/image1.png") && dDoc.suggestedFilename().endsWith(".docx"), dDoc.suggestedFilename());
 
   // 6) PDF/print view
   await page.evaluate(() => { window.print = () => { window.__printed = true; }; });
@@ -113,6 +114,67 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await page.emulateMedia({ media: "print" });
   if (OUT) await page.pdf({ path: path.join(OUT, "web_print.pdf"), format: "Letter", printBackground: true });
   await page.emulateMedia({ media: "screen" });
+
+  // 6b) event notes: typed in the list, shown in the summary
+  await page.evaluate(() => { window.confirm = () => true; });
+  await page.click("#generate");
+  await page.waitForFunction(() => !window.__selApp.state.edited);
+  await page.click("#notesPanel summary");
+  const noteInput = page.locator("#evList input").first();
+  await noteInput.fill("Crew found a burned crossarm"); await noteInput.press("Enter"); await noteInput.blur();
+  await page.waitForFunction(() => window.__selApp.summaryText().includes("Notes       : Crew found a burned crossarm"), null, { timeout: 5000 }).catch(() => {});
+  ok("event note appears in the summary", (await page.evaluate(() => window.__selApp.summaryText())).includes("Notes       : Crew found a burned crossarm"));
+
+  // 6c) weather (Open-Meteo mocked): location per relay, lookup, hints in the summary
+  await page.route("https://geocoding-api.open-meteo.com/**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" },
+    body: JSON.stringify({ results: [{ name: "Ocala", latitude: 29.19, longitude: -82.14, admin1: "Florida", country_code: "US" }] }) }));
+  const wxRoute = (r) => { const d = /start_date=([\d-]+)/.exec(r.request().url())[1]; const time = [...Array(24).keys()].map((h) => `${d}T${String(h).padStart(2, "0")}:00`);
+    r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ hourly: { time,
+      temperature_2m: time.map(() => 75), precipitation: time.map(() => 0), snowfall: time.map(() => 0), weather_code: time.map((t, i) => (d === "2026-10-21" && i === 14 ? 95 : 1)),
+      wind_speed_10m: time.map(() => 9), wind_gusts_10m: time.map(() => 14) } }) }); };
+  await page.route("https://api.open-meteo.com/**", wxRoute);
+  await page.route("https://archive-api.open-meteo.com/**", wxRoute);
+  await page.click("#wxPanel summary");
+  const locs = page.locator("#wxRelays input");
+  for (let i = 0; i < await locs.count(); i++) { await locs.nth(i).fill("Ocala, FL"); await locs.nth(i).press("Enter"); }
+  await page.waitForFunction(() => [...document.querySelectorAll("#wxRelays .st")].every((x) => x.textContent.includes("Ocala")), null, { timeout: 5000 }).catch(() => {});
+  await page.click("#wxGo");
+  await page.waitForFunction(() => /Weather found for \d+/.test(document.getElementById("wxStatus").textContent), null, { timeout: 8000 }).catch(() => {});
+  const wxText = await page.evaluate(() => window.__selApp.summaryText());
+  ok("weather lookup adds Weather lines and a thunderstorm hint", /Weather {5}: thunderstorm/.test(wxText) && wxText.includes("Weather: Thunderstorm in the area"),
+     await page.textContent("#wxStatus"));
+  await shot(page, "web_weather_light.png", { fullPage: true });
+
+  // 6d) waveform analysis page
+  await page.click("#tabWave");
+  await page.waitForSelector("#pageWave:not([hidden])");
+  const recs = await page.$$eval("#wRec option", (o) => o.map((x) => x.textContent));
+  ok("waveform page lists CEV + COMTRADE records and 9 references", recs.filter((x) => /CEV|\.cev|COMTRADE/i.test(x)).length >= 5 && recs.length >= 14, recs.length + " records");
+  await page.selectOption("#wRec", { label: "Normal load (no fault)" });
+  const codes = [];
+  for (let i = 0; i < 9; i++) { codes.push((await page.textContent("#wCode")).trim()); if (i < 8) await page.click("#wNext"); }
+  ok("stepping through the reference library classifies each one", codes.join(" ") === "— AG BC BCG ABC AG INRUSH AG ABG", codes.join(" "));
+  const ct = recs.find((x) => x.includes("COMTRADE"));
+  await page.selectOption("#wRec", { label: ct });
+  ok("COMTRADE record: fault type and 51G check", (await page.textContent("#wCode")).trim() === "CG" && /51G[\s\S]*Agrees/.test(await page.textContent("#wOC")));
+  await page.click("#wNoteMode");
+  const bb = await page.locator("#wOverlay").boundingBox();
+  await page.mouse.click(bb.x + bb.width * 0.5, bb.y + 80);
+  await page.fill("#wNoteText", "Arc restrikes here"); await page.click("#wNoteSave");
+  ok("note pinned on the graph", (await page.locator("#wPins li input").count()) === 1);
+  const spanMs = async () => parseInt(/\((\d+) ms of/.exec(await page.textContent("#wSpan"))[1], 10);
+  const before = await spanMs();
+  await page.mouse.move(bb.x + bb.width * 0.3, bb.y + 120); await page.mouse.down(); await page.mouse.move(bb.x + bb.width * 0.6, bb.y + 120, { steps: 4 }); await page.mouse.up();
+  const after = await spanMs();
+  ok("drag zooms in", after < before * 0.6, `${before} ms -> ${after} ms`);
+  await page.click("#wAdv");
+  ok("advanced view shows angles", (await page.textContent("#wPhTable")).includes("Angle"));
+  const [dW] = await Promise.all([page.waitForEvent("download"), page.click("#wExportBtn").then(() => page.click('[data-wexp="docx"]'))]);
+  const wdoc = fs.readFileSync(await dW.path()).toString("latin1");
+  ok("waveform Word report has the graph, phasors and the note", wdoc.startsWith("PK") && wdoc.includes("Arc restrikes here") && wdoc.includes("word/media/image2.png"), dW.suggestedFilename());
+  await shot(page, "web_wave_light.png", { fullPage: true });
+  await page.click("#wSimple");
+  await page.click("#tabSummary");
 
   // 7) feedback opens a prefilled GitHub issue
   await page.evaluate(() => { window.open = (u) => { window.__opened = u; }; window.confirm = () => true; });
@@ -147,6 +209,11 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   const overflow = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   ok("phone width has no horizontal scroll", overflow <= 0, "overflow " + overflow + "px");
   await shot(phone, "web_phone.png");
+  await phone.click("#tabWave");
+  await phone.waitForSelector("#pageWave:not([hidden])");
+  const overflowW = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok("waveform page fits a phone", overflowW <= 0, "overflow " + overflowW + "px");
+  await shot(phone, "web_phone_wave.png", { fullPage: true });
 
   ok("no page errors", errors.length === 0, errors.join(" | "));
   console.log(results.join("\n"));

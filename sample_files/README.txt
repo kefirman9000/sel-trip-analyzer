@@ -15,6 +15,10 @@ Line5_ABC_Zone1.hdr            HDR      Three-phase fault, Zone 1          COMTR
 Feeder3_CG_51G.eve             EVE      C-to-ground, time-overcurrent      Text event report; flags missing settings
 Feeder7_transfer_trip.sum      SUM      Trip with no fault, COMM target    Recognized as a likely transfer trip
 Feeder14_underfrequency.txt    TXT      Underfrequency (81) trip           Off-nominal frequency flagged
+Line5_Hill_BC_Zone1.cev        CEV      Other end of LINE 5, same fault    Paired with Line5_BC as a two-ended event
+Feeder8_storm.sum              SUM      Two trips a minute after Feeder 3  Grouped with Feeder 3 as one incident (storm)
+Feeder3_CG_51G.cfg / .dat      COMTRADE Feeder 3 fault, 32 samples/cycle   Waveform analysis: 51G U3 timing vs settings
+Feeder3_settings.rdb           RDB      Feeder 3 relay settings            Used for the 51G evaluation (TD 2.00, U3)
 Feeder9_AG_needs_review.cev    CEV      Deliberately inconsistent record   Several CHECK flags: wrong phase, beyond line,
                                                                            slow breaker
 

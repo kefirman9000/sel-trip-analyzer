@@ -39,10 +39,25 @@ def q(x):
     return f'"{x}"'
 
 
-def cev(name, *, fid, when, event, location, shot, targets, freq, sam=4, ncyc=15, trig=16,
+def wave(z, th, t_fault, faulted, dc=True, tau=2.5, h5=0.0):
+    """Instantaneous value of phasor z at angle th; adds a decaying DC offset from fault inception."""
+    v = abs(z) * math.sqrt(2) * math.cos(th + math.atan2(z.imag, z.real))
+    if h5:
+        v += h5 * abs(z) * math.sqrt(2) * math.cos(5 * th)
+    if faulted and dc and t_fault is not None:
+        v -= abs(z) * math.sqrt(2) * math.cos(math.atan2(z.imag, z.real) + t_fault[1]) * math.exp(-t_fault[0] / tau) * 0.6
+    return v
+
+
+def cev(name, *, fid, when, event, location, shot, targets, freq, sam=16, ncyc=15, trig=16,
         currents, open_row=None, vfault=(67.0, 67.0, 67.0), vpre=67.0, names, timeline, settings):
     """currents: {"IA": (prefault_phasor, fault_phasor), ...} in primary amps rms.
+    trig / open_row / timeline rows are given in quarter cycles (4 per cycle) and scaled to `sam`.
     timeline: {element: (on_row, off_row_or_None)}; on_row 0 = already asserted."""
+    sc = sam // 4
+    trig *= sc
+    open_row = open_row * sc if open_row is not None else None
+    timeline = {k: (a * sc, b * sc if b is not None else None) for k, (a, b) in timeline.items()}
     lines = [checksum_line([q("FID"), q("FID=" + fid)]),
              checksum_line([q(x) for x in ("MONTH", "DAY", "YEAR", "HOUR", "MIN", "SEC", "MSEC")]),
              checksum_line([str(v) for v in (when.month, when.day, when.year, when.hour, when.minute,
@@ -60,10 +75,11 @@ def cev(name, *, fid, when, event, location, shot, targets, freq, sam=4, ncyc=15
         th = 2 * math.pi * k / sam
         faulted = k >= trig and (open_row is None or k < open_row)
         opened = open_row is not None and k >= open_row
+        tf = ((k - trig) / sam, 2 * math.pi * trig / sam) if faulted else None
         inst = {}
         for ph, (pre, flt) in currents.items():
             z = flt if faulted else 0j if opened else pre
-            inst[ph] = abs(z) * math.sqrt(2) * math.cos(th + math.atan2(z.imag, z.real))
+            inst[ph] = wave(z, th, tf, faulted and abs(flt - pre) > 1, h5=0.03 if not faulted else 0.0)
         ig = inst["IA"] + inst["IB"] + inst["IC"]
         volts = []
         for i, base in enumerate((0, -120, 120)):
@@ -131,6 +147,27 @@ def ole_file(path, storage, streams):
         f.write(body)
 
 
+def comtrade(base, *, station, device, start, trigger_offset_cyc, sam, ncyc, freq, analogs, digitals):
+    """IEEE C37.111-1999 ASCII COMTRADE (.cfg + .dat).
+    analogs: [(name, phase, unit, a_scale, primary, secondary, fn(k) -> value)] ; digitals: [(name, fn(k) -> 0/1)]."""
+    n = ncyc * sam
+    rate = freq * sam
+    trig_time = start + dt.timedelta(seconds=trigger_offset_cyc / freq)
+    fmt = lambda t: t.strftime("%d/%m/%Y,%H:%M:%S.%f")  # noqa: E731
+    cfg = [f"{station},{device},1999", f"{len(analogs) + len(digitals)},{len(analogs)}A,{len(digitals)}D"]
+    for i, (name, ph, unit, a, pri, sec, _) in enumerate(analogs, 1):
+        cfg.append(f"{i},{name},{ph},,{unit},{a:g},0,0,-32767,32767,{pri:g},{sec:g},P")
+    for i, (name, fn) in enumerate(digitals, 1):
+        cfg.append(f"{i},{name},,,{fn(0)}")
+    cfg += [f"{freq:g}", "1", f"{rate:g},{n}", fmt(start), fmt(trig_time), "ASCII", "1"]
+    dat = []
+    for k in range(n):
+        vals = [str(int(round(fn(k) / a))) for (_, _, _, a, _, _, fn) in analogs]
+        dat.append(",".join([str(k + 1), str(int(round(k * 1e6 / rate)))] + vals + [str(fn(k)) for _, fn in digitals]))
+    write(base + ".cfg", "\n".join(cfg) + "\n")
+    write(base + ".dat", "\n".join(dat) + "\n")
+
+
 def write(name, text):
     with open(os.path.join(OUT, name), "w", newline="\r\n") as f:
         f.write(text)
@@ -143,6 +180,7 @@ F12_SETTINGS = ["RID     =FEEDER 12                      TID     =APEX SUB",
                 "CTR     =240       PTR     =600.00    LL      =10.00",
                 "Z1MAG   =4.62      Z1ANG   =78.40     Z1P     =3.70      Z1MG    =3.70",
                 "50P1P   =12.00     50G1P   =6.00      51GP    =1.20      51GC    =U3",
+                "51GTD   =3.00      51PP    =2.50      51PC    =U3        51PTD   =2.00",
                 "TR      =M1P + Z1G + M2PT + Z2GT + 51GT + 50P1",
                 "ER      =/51G + /51P + /M2P + /Z2G"]
 
@@ -187,6 +225,19 @@ def main():
         settings=["RID     =FEEDER 9                       TID     =MILL ROAD SUB",
                   "CTR     =240       PTR     =600.00    LL      =10.00",
                   "TR      =M1P + Z1G + 51GT + 50P1"])
+
+    # 2b) The other end of LINE 5 (HILL SUB) for the same fault: close-in, Zone 1
+    cev("Line5_Hill_BC_Zone1.cev", fid=FID_421, when=dt.datetime(2026, 10, 22, 9, 41, 17, 506000),
+        event="BC T", location="0.70", shot=0, targets="INST ZONE1 B C", freq=59.98,
+        currents={"IA": (2 * LOAD["IA"], 2 * LOAD["IA"]), "IB": (2 * LOAD["IB"], 2 * LOAD["IB"] + P(6200, -168)),
+                  "IC": (2 * LOAD["IC"], 2 * LOAD["IC"] - P(6200, -168))},
+        vfault=(66.8, 14.0, 13.6), open_row=27,
+        names="M1P M2P Z1G Z2G M2PT KEY PTRX TRIP OUT101 52AA1 IN201".split(),
+        timeline={"M1P": (16, 28), "M2P": (16, 28), "KEY": (16, 29), "TRIP": (17, 30), "OUT101": (17, 30),
+                  "52AA1": (0, 27), "IN201": (0, 27)},
+        settings=["RID      := LINE 5 HILL", "TID      := HILL SUB", "LL       := 10.50",
+                  "CTR      := 400", "PTR      := 1200", "TR       := M1P OR Z1G OR M2PT OR Z2GT",
+                  "TRCOMM   := M2P OR Z2G", "ECOMM    := POTT"])
 
     # 4) Text event report (EVE) - time-overcurrent ground fault
     write("Feeder3_CG_51G.eve", """\
@@ -279,6 +330,70 @@ FID=SEL-351-5-R514-V0-Z105104-D20111020
 1   10/27/26   14:03:22.900     79CY             Asserted
 """)
 
+    # 9b) Storm: Feeder 8 trips twice a minute after Feeder 3 (reclose, then lockout)
+    write("Feeder8_storm.sum", """\
+FEEDER 8                                 Date: 10/21/26    Time: 14:23:10.240
+OAK HILL SUB
+
+Event: BG T      Location: 3.40    Shot:  0  Frequency: 60.00
+Targets: TIME 51 B G
+Currents (A Pri), ABCNGQ:   230  1410  225  4  1180  790
+
+FEEDER 8                                 Date: 10/21/26    Time: 14:23:16.880
+OAK HILL SUB
+
+Event: BG T      Location: 3.38    Shot:  1  Frequency: 60.00
+Targets: TIME 51 B G LO
+Currents (A Pri), ABCNGQ:   228  1395  221  4  1172  781
+""")
+
+    # 9c) COMTRADE record of the Feeder 3 fault (32 samples/cycle), cleared by 51G after its U3 delay
+    sam, f0, inception, n_cyc = 32, 60.0, 6.5, 32
+    trip_cyc = inception + 19.45            # 51G U3, TD 2.00, M = 7.75 -> 0.324 s
+    open_cyc = trip_cyc + 3.0
+    pre = {"A": P(212, -25), "B": P(219, -145), "C": P(214, 95)}
+    flt = {"A": pre["A"], "B": pre["B"], "C": P(1872, 22)}
+    def cyc(k): return k / sam
+    def state(k):
+        c = cyc(k)
+        return "pre" if c < inception else "fault" if c < open_cyc else "open"
+    tf0 = 2 * math.pi * inception
+    def cur(ph):
+        def fn(k):
+            st, th = state(k), 2 * math.pi * cyc(k)
+            if st == "open":
+                return 0.0
+            z = flt[ph] if st == "fault" else pre[ph]
+            return wave(z, th, (cyc(k) - inception, tf0) if st == "fault" else None,
+                        st == "fault" and ph == "C", h5=0.03 if st == "pre" else 0.0)
+        return fn
+    def ig(k): return cur("A")(k) + cur("B")(k) + cur("C")(k)
+    def volt(ph, base, sag):
+        def fn(k):
+            st, th = state(k), 2 * math.pi * cyc(k)
+            mag = sag if st == "fault" else 0.0 if st == "open" else 67.0
+            return mag * math.sqrt(2) * math.cos(th + math.radians(base))
+        return fn
+    on = lambda a, b=None: (lambda k: 1 if a <= cyc(k) and (b is None or cyc(k) < b) else 0)  # noqa: E731
+    comtrade("Feeder3_CG_51G", station="OAK HILL SUB", device="FEEDER 3",
+             start=dt.datetime(2026, 10, 21, 14, 22, 5, 118000) - dt.timedelta(seconds=inception / f0),
+             trigger_offset_cyc=inception, sam=sam, ncyc=n_cyc, freq=f0,
+             analogs=[("IA", "A", "A", 0.2, 240, 1, cur("A")), ("IB", "B", "A", 0.2, 240, 1, cur("B")),
+                      ("IC", "C", "A", 0.2, 240, 1, cur("C")), ("IG", "N", "A", 0.2, 240, 1, ig),
+                      ("VA", "A", "kV", 0.005, 600, 1, volt("A", 0, 66.4)), ("VB", "B", "kV", 0.005, 600, 1, volt("B", -120, 66.1)),
+                      ("VC", "C", "kV", 0.005, 600, 1, volt("C", 120, 25.0))],
+             digitals=[("51G", on(inception, open_cyc + 0.5)), ("51GT", on(trip_cyc, open_cyc + 0.5)),
+                       ("TRIP", on(trip_cyc, open_cyc + 1.5)), ("OUT101", on(trip_cyc, open_cyc + 1.5)),
+                       ("52A", on(0, open_cyc)), ("IN101", on(0, open_cyc))])
+    ole_file(os.path.join(OUT, "Feeder3_settings.rdb"), "FEEDER 3", [
+        ("Global", "SID     =OAK HILL SUB\r\nRID     =FEEDER 3\r\nTID     =OAK HILL SUB\r\n"),
+        ("Group 1", "RID     =FEEDER 3                       TID     =OAK HILL SUB\r\n"
+                    "CTR     =240       PTR     =600.00    LL      =8.00\r\n"
+                    "50P1P   =20.00     50G1P   =15.00     51GP    =1.00      51GC    =U3\r\n"
+                    "51GTD   =2.00      51PP    =3.00      51PC    =U3        51PTD   =2.00\r\n"
+                    "TR      =51GT + 51PT + 50P1\r\n"),
+    ])
+
     # 10) QuickSet settings database for Feeder 12
     ole_file(os.path.join(OUT, "Feeder12_settings.rdb"), "FEEDER 12", [
         ("Global", "SID     =APEX SUB\r\nRID     =FEEDER 12\r\nTID     =APEX SUB\r\n"),
@@ -311,6 +426,10 @@ Line5_ABC_Zone1.hdr            HDR      Three-phase fault, Zone 1          COMTR
 Feeder3_CG_51G.eve             EVE      C-to-ground, time-overcurrent      Text event report; flags missing settings
 Feeder7_transfer_trip.sum      SUM      Trip with no fault, COMM target    Recognized as a likely transfer trip
 Feeder14_underfrequency.txt    TXT      Underfrequency (81) trip           Off-nominal frequency flagged
+Line5_Hill_BC_Zone1.cev        CEV      Other end of LINE 5, same fault    Paired with Line5_BC as a two-ended event
+Feeder8_storm.sum              SUM      Two trips a minute after Feeder 3  Grouped with Feeder 3 as one incident (storm)
+Feeder3_CG_51G.cfg / .dat      COMTRADE Feeder 3 fault, 32 samples/cycle   Waveform analysis: 51G U3 timing vs settings
+Feeder3_settings.rdb           RDB      Feeder 3 relay settings            Used for the 51G evaluation (TD 2.00, U3)
 Feeder9_AG_needs_review.cev    CEV      Deliberately inconsistent record   Several CHECK flags: wrong phase, beyond line,
                                                                            slow breaker
 
