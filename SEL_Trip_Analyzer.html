@@ -285,6 +285,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0;
 .exp-formats input { accent-color: var(--accent); margin: 0; }
 .exp-formats label:has(input:checked) { border-color: var(--accent); background: var(--drop-hover); font-weight: 600; }
 .exp-group { border: 0; padding: 0; margin: 14px 0 0; }
+.exp-name { display: flex; width: 100%; margin-top: 10px; }
+.exp-name input { flex: 1; min-width: 0; }
 .exp-group legend { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); font-weight: 700; padding: 0; margin-bottom: 6px; }
 .exp-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
 .exp-items .field { grid-column: 1 / -1; }
@@ -4429,9 +4431,23 @@ function create(ctx) {
 
   function exportPng(v) {
     const fig = currentFigure(v);
-    fig.canvas.toBlob((b) => { ctx.download(`Waveform ${fileSafe(titleText())}.png`, b); ctx.setStatus("Saved the graph picture (with your notes)"); }, "image/png");
+    fig.canvas.toBlob((b) => { ctx.download(`${(v && v.fileName) || fileNameFor("png")}.png`, b); ctx.setStatus("Saved the graph picture (with your notes)"); }, "image/png");
   }
   const fileSafe = (s) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80);
+  /** e.g. "FEEDER 3 2026-10-21 14-22-05 CG" or "Reference - CT saturation during a ground fault" */
+  function baseName() {
+    const rec = st.rec;
+    if (st.item.refInfo) return fileSafe(`Reference - ${st.item.refInfo.title}`);
+    const dt = core.eventDatetime({ date: rec.date || "", time: rec.time || "" });
+    let when = "";
+    if (dt !== null) {
+      const d = new Date(dt / 1000), p2 = (x) => String(x).padStart(2, "0");
+      when = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}-${p2(d.getUTCMinutes())}-${p2(d.getUTCSeconds())}`;
+    }
+    const code = st.an.cls.code === "NONE" ? "no fault" : st.an.cls.code;
+    return fileSafe(`${rec.relay || rec.station || rec.source} ${when} ${code}`);
+  }
+  const fileNameFor = (f) => `${baseName()} ${f === "docx" ? "waveform analysis" : f === "png" ? "graph" : "samples"}`;
   function exportCsv(v) {
     const rec = st.rec;
     const vw = v && v.csvRange === "view" ? st.view : null;
@@ -4444,7 +4460,7 @@ function create(ctx) {
       if (!v || v.csvDigitals !== false) for (const d of rec.digitals) row.push(d.values[k]);
       lines.push(row.join(","));
     }
-    ctx.download(`Samples ${fileSafe(titleText())}.csv`, new Blob([lines.join("\r\n")], { type: "text/csv" }));
+    ctx.download(`${(v && v.fileName) || fileNameFor("csv")}.csv`, new Blob([lines.join("\r\n")], { type: "text/csv" }));
     ctx.setStatus("Saved the samples as a spreadsheet (primary units)");
   }
   function exportDocx(v) {
@@ -4511,7 +4527,7 @@ function create(ctx) {
     }
     blocks.push(["note", "Automated analysis from the recorded waveforms. Confirm against the relay's own event report and settings."]);
     const bytes = DOCX.build(blocks, { title: "Waveform analysis", footer: `SEL Trip Event Analyzer v${ctx.version}`, runs: core.tripRuns, paper: v.paper });
-    ctx.download(`Waveform analysis ${fileSafe(titleText())}.docx`, new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    ctx.download(`${v.fileName || fileNameFor("docx")}.docx`, new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
     ctx.setStatus("Saved the waveform analysis as a Word document");
   }
   const WAVE_EXPORT = {
@@ -4535,6 +4551,7 @@ function create(ctx) {
         { key: "csvDigitals", label: "Relay element columns (0/1)", def: true }] },
     ],
     hint: (f) => (f === "csv" ? "Primary amps and kV, one row per sample." : "Uses the channels, mode and notes you have on screen."),
+    fileName: (f) => fileNameFor(f),
     go: (f, v) => ({ docx: exportDocx, png: exportPng, csv: exportCsv })[f](v),
   };
   $("wExportMenu").addEventListener("click", (e) => {
@@ -5322,6 +5339,7 @@ function openExport(cfg) {
   const saved = store.get(cfg.storeKey, {});
   const values = Object.assign({}, ...cfg.groups.flatMap((g) => g.items.map((it) => ({ [it.key]: it.def }))), saved.values || {});
   let format = cfg.format || saved.format || cfg.formats[0][0];
+  let fileName = cfg.fileName ? cfg.fileName(format) : "", nameEdited = false;
   const body = $("expBody");
   $("expTitle").textContent = cfg.title;
   const render = () => {
@@ -5330,10 +5348,18 @@ function openExport(cfg) {
     for (const [k, label] of cfg.formats) {
       const l = document.createElement("label"), r = document.createElement("input");
       r.type = "radio"; r.name = "expFormat"; r.value = k; r.checked = k === format;
-      r.addEventListener("change", () => { format = k; render(); });
+      r.addEventListener("change", () => { format = k; if (cfg.fileName && !nameEdited) fileName = cfg.fileName(format); render(); });
       l.append(r, document.createTextNode(label)); fm.appendChild(l);
     }
     body.appendChild(fm);
+    if (cfg.fileName) {
+      const l = document.createElement("label"); l.className = "field exp-name";
+      const sp = document.createElement("span"); sp.className = "hint"; sp.textContent = "File name";
+      const inp = document.createElement("input"); inp.type = "text"; inp.id = "expName"; inp.value = fileName;
+      inp.addEventListener("input", () => { fileName = inp.value; nameEdited = true; });
+      const ext = document.createElement("span"); ext.className = "hint"; ext.textContent = "." + (format === "pdf" ? "pdf" : format);
+      l.append(sp, inp, ext); body.appendChild(l);
+    }
     for (const g of cfg.groups) {
       if (g.only && !g.only.includes(format)) continue;
       const fs = document.createElement("fieldset"); fs.className = "exp-group";
@@ -5374,7 +5400,12 @@ function openExport(cfg) {
   };
   render();
   const close = () => { $("expDlg").close(); };
-  $("expGo").onclick = () => { store.set(cfg.storeKey, { format, values }); close(); cfg.go(format, values); };
+  $("expGo").onclick = () => {
+    store.set(cfg.storeKey, { format, values });
+    close();
+    const name = safeName(fileName) || (cfg.fileName ? cfg.fileName(format) : "");
+    cfg.go(format, Object.assign({}, values, { fileName: name }));
+  };
   $("expCancel").onclick = close; $("expClose").onclick = close;
   $("expDlg").showModal();
   $("expGo").focus();
@@ -5401,8 +5432,26 @@ const SUMMARY_EXPORT = {
   ],
   hint: (f) => (f === "csv" ? "Same Show / Relay / Search filter and order as the summary. Text typed into the summary isn't included."
     : "Uses the summary as it is now, including anything you typed in it."),
+  fileName: () => summaryName(),
   go: (f, v) => exportAs(f, v),
 };
+const safeName = (s) => String(s || "").replace(/[\\/:*?"<>|\x00-\x1f]+/g, "-").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "").slice(0, 120);
+const isoDay = (dt) => { const d = new Date(dt / 1000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`; };
+/** A file name that says what's in the export: the relay(s), event type and dates. */
+function summaryName() {
+  if (!state.cache) return `Trip summary ${stamp()}`;
+  const shown = core.prepareView(state.cache.events, state.cache.rdb, currentOpts()).shown;
+  if (!shown.length) return `Trip summary ${stamp()}`;
+  const relays = [...new Set(shown.map((it) => core.relayKey(it.e)))];
+  const dts = shown.map((it) => it.dt).filter((x) => x !== null).sort((a, b) => a - b);
+  if (shown.length === 1) {
+    const e = shown[0].e, d = shown[0].dt !== null ? new Date(shown[0].dt / 1000) : null;
+    return safeName(`${core.relayKey(e)} ${e.event_type || "event"} ${d ? isoDay(shown[0].dt) + " " + String(d.getUTCHours()).padStart(2, "0") + String(d.getUTCMinutes()).padStart(2, "0") : ""} trip summary`);
+  }
+  const span = dts.length ? (isoDay(dts[0]) === isoDay(dts[dts.length - 1]) ? isoDay(dts[0]) : `${isoDay(dts[0])} to ${isoDay(dts[dts.length - 1])}`) : stamp();
+  const who = relays.length === 1 ? relays[0] : relays.length <= 3 ? relays.join(", ") : `${relays.length} relays`;
+  return safeName(`${who} trip summary ${span} (${shown.length} events)`);
+}
 function exportDefaults() {
   const saved = store.get(SUMMARY_EXPORT.storeKey, {});
   return Object.assign({}, ...SUMMARY_EXPORT.groups.flatMap((g) => g.items.map((it) => ({ [it.key]: it.def }))), saved.values || {});
@@ -5417,7 +5466,7 @@ function exportAs(kind, values) {
   closeMenu();
   if (state.empty) { setStatus("Generate a summary first"); return; }
   const v = Object.assign(exportDefaults(), values || {});
-  const name = `Trip summary ${stamp()}`;
+  const name = (values && values.fileName) || summaryName();
   if (kind === "csv") {
     if (!state.cache) { setStatus("Generate a summary first"); return; }
     const columns = core.CSV_COLUMNS.filter((c) => v["col:" + c] !== false);
