@@ -217,6 +217,7 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
 
   ok("no page errors", errors.length === 0, errors.join(" | "));
   console.log(results.join("\n"));
+  if (process.env.GITHUB_ACTIONS) for (const r of results.filter((x) => x.startsWith("FAIL"))) console.log("::error title=Browser test::" + r.replace(/\s+/g, " "));
   await browser.close();
   if (results.some((r) => r.startsWith("FAIL"))) process.exit(1);
-})().catch((e) => { console.error(e); process.exit(1); });
+})().catch((e) => { console.error(e); if (process.env.GITHUB_ACTIONS) console.log("::error title=Browser test crashed::" + String(e && e.message || e).split("\n").slice(0, 3).join(" ")); process.exit(1); });
