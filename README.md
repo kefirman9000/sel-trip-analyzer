@@ -8,8 +8,7 @@ and why**, ready to paste into an outage report or export to Word or PDF.
 | | |
 |---|---|
 | **[⬇ Windows program](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.exe)** | `SEL_Trip_Analyzer.exe`: download and double-click, no install |
-| **[⬇ Browser version](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)** | `SEL_Trip_Analyzer.html`: any computer (Windows, Mac, Linux), works offline |
-| **[▶ Use it online](https://kefirman9000.github.io/sel-trip-analyzer/)** | Opens in your browser, nothing to download |
+| **[▶ Browser version](https://kefirman9000.github.io/sel-trip-analyzer/)** | Opens in your browser on any computer, nothing to install. [Download it](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html) to use offline |
 | **[⬇ Sample files](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_sample_files.zip)** | Made-up SEL events in every supported format, to try it out |
 
 Latest version: see [Releases](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest) · [Report a problem or suggest something](https://github.com/kefirman9000/sel-trip-analyzer/issues/new)
@@ -50,8 +49,8 @@ Want to see it work first? Click **Try samples** in the program, or download the
 Can't run `.exe` files, or not on Windows? Use **`SEL_Trip_Analyzer.html`**, a
 single file that does the same analysis inside your web browser.
 
-1. Download [SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html),
-   or [use it online](https://kefirman9000.github.io/sel-trip-analyzer/) without downloading anything.
+1. [Open it online](https://kefirman9000.github.io/sel-trip-analyzer/), or [download SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)
+   to keep a copy that works offline.
 2. Double-click it. It opens in Chrome, Edge, Firefox or Safari, on Windows, Mac
    or Linux. It also works offline.
 3. Drag your event files or a folder onto the page, exactly like the Windows program.
