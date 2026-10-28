@@ -1,6 +1,6 @@
 """Regenerate docs/screenshots/*.png.
 
-    python scripts/screenshots.py <shot> <out.png>      shots: empty | light | dark
+    python scripts/screenshots.py <shot> <out.png>      shots: main | update | empty  (all dark mode)
 
 Windows (used by .github/workflows/screenshots.yml): needs Pillow; captures the
 whole window including the title bar.
@@ -50,18 +50,18 @@ def mainloop(self, n=0):
         self.geometry(f"{w}x{h}+0+0")
 
     def stage():
+        a.v_dark.set(True)
+        a.toggle_dark()
         if shot != "empty":
             a.hide_placeholder()
             a.comments.insert("1.0", "Crew patrol found a cracked insulator at pole 47 on Feeder 12.\n"
                                      "Suggest confirming Zone 1 reach against the 42% fault location.")
             a.add_paths([os.path.join(ROOT, "sample_files")])
-        if shot == "light":
+        if shot == "main":
             a.fb_placeholder(False)
             a.feedback.insert("1.0", "Event 3 was a DTT from the remote end, which the summary got right. "
                                      "Could the quick summary also show the breaker number?")
-        if shot == "dark":
-            a.v_dark.set(True)
-            a.toggle_dark()
+        if shot == "update":
             a.show_update_available({"version": "1.1.0", "notes": "", "url": None, "sha256": None,
                                      "page": "", "source_url": "", "tag": "v1.1.0"})
         self.lift()

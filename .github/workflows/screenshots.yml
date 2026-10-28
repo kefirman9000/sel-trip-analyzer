@@ -39,9 +39,10 @@ jobs:
       - name: Capture
         run: |
           New-Item -ItemType Directory -Force docs/screenshots | Out-Null
+          Remove-Item docs/screenshots/*.png -ErrorAction SilentlyContinue
+          python scripts/screenshots.py main docs/screenshots/main.png
+          python scripts/screenshots.py update docs/screenshots/update.png
           python scripts/screenshots.py empty docs/screenshots/empty.png
-          python scripts/screenshots.py light docs/screenshots/light.png
-          python scripts/screenshots.py dark docs/screenshots/dark.png
 
       - uses: actions/upload-artifact@v4
         with:
@@ -53,7 +54,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots
+          git add -A docs/screenshots
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -m "Update screenshots"
           git pull --rebase origin main

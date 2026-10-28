@@ -4,11 +4,11 @@ A Windows drag-and-drop tool that reads SEL relay event files and AcSELerator
 QuickSet `.rdb` settings databases, then writes an editable, copy-and-paste
 summary of what caused each trip.
 
-![Trip summary in light mode](docs/screenshots/light.png)
+![Trip summary](docs/screenshots/main.png)
 
-| Dark mode, with an update waiting | First launch |
+| Update waiting | First launch |
 |---|---|
-| ![Dark mode](docs/screenshots/dark.png) | ![Empty start screen](docs/screenshots/empty.png) |
+| ![Update available](docs/screenshots/update.png) | ![Empty start screen](docs/screenshots/empty.png) |
 
 ## Download
 
