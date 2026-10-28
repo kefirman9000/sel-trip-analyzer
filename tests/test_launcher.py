@@ -64,6 +64,35 @@ class Server(unittest.TestCase):
         self.assertEqual(e.exception.code, 403)
         self.assertEqual(json.loads(self.call("/api/info")[1])["version"], app.VERSION)
 
+    def test_watch_folder(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(SAMPLES, "Feeder12_AG_Zone1.cev")
+            with open(src, "rb") as f:
+                data = f.read()
+            with open(os.path.join(d, "first.cev"), "wb") as f:
+                f.write(data)
+            open(os.path.join(d, "ignore.pdf"), "w").close()
+            fw = app.FolderWatch(self.app, [d])
+            self.call("/api/pending")
+            self.assertEqual([os.path.basename(p) for p in fw.step(first=True)], ["first.cev"])
+            self.assertEqual(fw.step(), [])
+            with open(os.path.join(d, "second.cev"), "wb") as f:
+                f.write(data)
+            self.assertEqual(fw.step(), [], "a new file waits one check in case it is still being copied")
+            self.assertEqual([os.path.basename(p) for p in fw.step()], ["second.cev"])
+            files = json.loads(self.call("/api/pending")[1])["files"]
+            self.assertEqual([f["name"] for f in files], ["first.cev", "second.cev"])
+            self.assertFalse(files[1]["changed"])
+            with open(os.path.join(d, "first.cev"), "ab") as f:
+                f.write(b"\r\n")
+            fw.step()
+            fw.step()
+            files = json.loads(self.call("/api/pending")[1])["files"]
+            self.assertEqual([(f["name"], f["changed"]) for f in files], [("first.cev", True)])
+            self.app.watching = fw.folders
+            self.assertEqual(json.loads(self.call("/api/watch")[1])["folders"], [os.path.abspath(d)])
+            self.app.watching = []
+
     def test_files_queue_and_handoff(self):
         n = self.app.queue([SAMPLES])
         self.assertGreaterEqual(n, 10)

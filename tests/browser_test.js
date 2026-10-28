@@ -337,6 +337,35 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   ok("waveform page fits a phone", overflowW <= 0, "overflow " + overflowW + "px");
   await shot(phone, "web_phone_wave.png", { fullPage: true });
 
+  // 9) watch a folder (File System Access): a stand-in folder handle; files appear, settle, then load
+  const wp = await ctx.newPage();
+  wp.on("pageerror", (e) => errors.push(e.message));
+  await wp.goto(url);
+  ok("Watch folder button offered in Chromium", await wp.isVisible("#watchBtn"));
+  const b64 = (n) => fs.readFileSync(path.join(REPO, "sample_files", n)).toString("base64");
+  await wp.evaluate(({ a, b }) => {
+    const mk = (name, data, t) => { const bin = atob(data), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new File([u], name, { lastModified: t }); };
+    window.__dir = new Map([["Feeder12_AG_Zone1.cev", mk("Feeder12_AG_Zone1.cev", a, 1000)], ["notes.docx", mk("notes.docx", a, 1000)]]);
+    window.__mk = mk; window.__b = b;
+    const fileH = (name) => ({ kind: "file", name, getFile: async () => window.__dir.get(name) });
+    window.__handle = { kind: "directory", name: "Relay events", queryPermission: async () => "granted", requestPermission: async () => "granted",
+      entries: async function* () { for (const name of [...window.__dir.keys()]) yield [name, fileH(name)]; } };
+  }, { a: b64("Feeder12_AG_Zone1.cev"), b: b64("Line5_Hill_BC_Zone1.cev") });
+  await wp.evaluate(() => window.__selWatch.startWatch(window.__handle));
+  await wp.waitForFunction(() => window.__selApp.state.files.length === 1);
+  ok("watching loads the folder's event files (and skips others)", /Watching Relay events/.test(await wp.textContent("#watchBar")) &&
+     (await wp.evaluate(() => window.__selApp.state.files.map((f) => f.name).join())) === "Feeder12_AG_Zone1.cev");
+  await wp.evaluate(() => window.__dir.set("Line5_Hill_BC_Zone1.cev", window.__mk("Line5_Hill_BC_Zone1.cev", window.__b, 2000)));
+  await wp.evaluate(() => window.__selWatch.pollWatch(false));
+  const waited = await wp.evaluate(() => window.__selApp.state.files.length);
+  await wp.evaluate(() => window.__selWatch.pollWatch(false));
+  await wp.waitForFunction(() => window.__selApp.state.files.length === 2, null, { timeout: 5000 }).catch(() => {});
+  ok("a new file is picked up once it has stopped changing", waited === 1 && (await wp.evaluate(() => window.__selApp.state.files.length)) === 2 &&
+     /1 new file picked up/.test(await wp.textContent("#watchBar")) && (await wp.locator("#evTable tbody tr[data-id]").count()) === 2);
+  await wp.click("#watchStop");
+  ok("Stop ends watching", await wp.isHidden("#watchBar") && (await wp.evaluate(() => window.__selWatch.state())) === null);
+  await wp.close();
+
   ok("no page errors", errors.length === 0, errors.join(" | "));
   console.log(results.join("\n"));
   if (process.env.GITHUB_ACTIONS) for (const r of results.filter((x) => x.startsWith("FAIL"))) console.log("::error title=Browser test::" + r.replace(/\s+/g, " "));
