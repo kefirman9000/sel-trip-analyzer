@@ -42,7 +42,7 @@ def mainloop(self, n=0):
     a = self.app
     sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
     scale = self.winfo_fpixels("1i") / 96.0
-    w, h = int(1180 * scale), int(860 * scale)
+    w, h = int(1180 * scale), int(920 * scale)
     if WIN:
         w, h = min(w, sw - 40), min(h, sh - 80)
         self.geometry(f"{w}x{h}+16+16")
@@ -55,6 +55,10 @@ def mainloop(self, n=0):
             a.comments.insert("1.0", "Crew patrol found a cracked insulator at pole 47 on Feeder 12.\n"
                                      "Suggest confirming Zone 1 reach against the 42% fault location.")
             a.add_paths([os.path.join(ROOT, "sample_files")])
+        if shot == "light":
+            a.fb_placeholder(False)
+            a.feedback.insert("1.0", "Event 3 was a DTT from the remote end, which the summary got right. "
+                                     "Could the quick summary also show the breaker number?")
         if shot == "dark":
             a.v_dark.set(True)
             a.toggle_dark()
