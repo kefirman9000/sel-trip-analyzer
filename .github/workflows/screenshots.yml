@@ -36,6 +36,8 @@ jobs:
         run: |
           npm install --no-save playwright@1.63.0
           npx playwright install --with-deps chromium
+      - name: Fonts (same look as the committed screenshots)
+        run: sudo apt-get install -y -q fonts-inter
       - name: Capture
         run: NODE_PATH=tests/node_modules node scripts/screenshots.js docs/screenshots
       - uses: actions/upload-artifact@v4
