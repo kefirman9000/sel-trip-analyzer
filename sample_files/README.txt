@@ -19,6 +19,8 @@ Line5_Hill_BC_Zone1.cev        CEV      Other end of LINE 5, same fault    Paire
 Feeder8_storm.sum              SUM      Two trips a minute after Feeder 3  Grouped with Feeder 3 as one incident (storm)
 Feeder3_CG_51G.cfg / .dat      COMTRADE Feeder 3 fault, 32 samples/cycle   Waveform analysis: 51G U3 timing vs settings
 Feeder3_settings.rdb           RDB      Feeder 3 relay settings            Used for the 51G evaluation (TD 2.00, U3)
+Line22_other_maker.cfg / .dat  COMTRADE Another maker's relay, B-to-ground Summarized from the waveforms and its own
+                                         fault, ground IOC trip             channel names (no SEL file needed)
 Feeder9_AG_needs_review.cev    CEV      Deliberately inconsistent record   Several CHECK flags: wrong phase, beyond line,
                                                                            slow breaker
 

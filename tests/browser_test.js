@@ -199,6 +199,15 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   await page.click("#tabEvents");
   await pott.locator('button[data-act="why"]').click();
   ok("Why? closes again", (await page.locator("#evTable tr.why").count()) === 0);
+  const l22 = page.locator("#evTable tbody tr[data-id]", { hasText: "GND IOC1 OP" }).first();
+  ok("another maker's COMTRADE shows as an event with its waveforms", /LINE 22/.test(await l22.textContent()) && (await l22.locator('button[data-act="wave"]').count()) === 1);
+  await l22.locator('button[data-act="why"]').click();
+  await page.locator("#evTable tr.why").first().locator('button[data-act="goto"]', { hasText: "Show on graph" }).nth(1).click();
+  await page.waitForSelector("#pageWave:not([hidden])");
+  const f22 = await page.evaluate(() => { const w = window.__selApp.wave().state; return { idx: w.cursor, rec: w.recKey }; });
+  ok("Show on graph works for a COMTRADE event", f22.idx === 144 && f22.rec === "comtrade:Line22_other_maker.cfg", JSON.stringify(f22));
+  await page.click("#tabEvents");
+  await l22.locator('button[data-act="why"]').click();
 
   // 6c3) operation review (PRC-004): suggestion, misoperation with category and cause, summary section, review log
   const hill = page.locator("#evTable tbody tr[data-id]", { hasText: "via M1P @ 0.70" }).first();
