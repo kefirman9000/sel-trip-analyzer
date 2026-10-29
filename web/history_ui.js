@@ -173,6 +173,10 @@ const shared = {
 };
 const SNAP = opts.snapshot || null;          // a read-only snapshot: the data comes with the page
 const reviewsMap = () => (SNAP ? SNAP.reviews || {} : shared.get("reviews", {}));
+/** Plain English or engineering wording: one switch, shared with the Trip Analyzer. */
+const plainOn = () => shared.get("plain", SNAP && SNAP.plain !== undefined ? !!SNAP.plain : false);
+const PL = window.SELPlain;
+const IL = (k) => H.issueLabel(k, state.plain), IS = (k) => H.issueShort(k, state.plain);
 const noteOf = (id) => (state.sharedNotes && state.sharedNotes[id]) || state.notes[id] || "";
 if (SNAP) root.classList.add("hx-snap");
 const MAIN = { id: "main", name: "Main history" };
@@ -252,12 +256,12 @@ function issueChips(r, max) {
   const rec = new Set(m.recurring.filter((x) => x.allIds.includes(r.id)).map((x) => x.key));
   const hot = m.hotspots.some((h) => h.ids.includes(r.id));
   const list = r.issues.filter((x) => H.ISSUE[x.key].group !== "data");
-  const chips = list.slice(0, max || 9).map((x) => `<span class="chip${rec.has(x.key) ? " rec" : ""}" ${rec.has(x.key) ? 'data-tip="Recurring at this location"' : ""}>${esc(H.ISSUE[x.key].short)}${x.detail && !/^[ABC]+G?$/.test(x.detail) ? " " + esc(x.detail) : ""}</span>`);
-  if (hot) chips.push('<span class="chip hot" data-tip="Part of a fault hot spot (same distance as other faults)">hot spot</span>');
-  if (r.pair) chips.push(`<span class="chip pair" data-tip="Same fault seen from the other end">↔ ${esc(r.pair)}</span>`);
+  const chips = list.slice(0, max || 9).map((x) => `<span class="chip${rec.has(x.key) ? " rec" : ""}" ${rec.has(x.key) ? 'data-tip="Recurring at this location"' : ""}>${esc(IS(x.key))}${x.detail && !/^[ABC]+G?$/.test(x.detail) ? " " + esc(x.detail) : ""}</span>`);
+  if (hot) chips.push(`<span class="chip hot" data-tip="Part of a fault hot spot (same distance as other faults)">${state.plain ? "same spot again" : "hot spot"}</span>`);
+  if (r.pair) chips.push(`<span class="chip pair" data-tip="Same fault seen from the other end">${state.plain ? "also seen at " : "↔ "}${esc(r.pair)}</span>`);
   if (r.reviewStatus === "misop") chips.push(`<span class="chip rec" data-tip="${esc("PRC-004 review: misoperation" + (r.review.category ? "\n" + r.review.category : "") + (r.review.cause ? "\nCause: " + r.review.cause : ""))}">misoperation</span>`);
   else if (r.reviewStatus === "overdue") chips.push(`<span class="chip hot" data-tip="${esc(`Not reviewed: the decision was due ${r.reviewDue}`)}">review overdue</span>`);
-  if (r.occSize > 1) chips.push(`<span class="chip" data-tip="Part of a sequence of ${r.occSize} reports (recloses) on this relay">seq ×${r.occSize}</span>`);
+  if (r.occSize > 1) chips.push(`<span class="chip" data-tip="Part of a sequence of ${r.occSize} reports (recloses) on this relay">${state.plain ? `${r.occSize} tries` : `seq ×${r.occSize}`}</span>`);
   return chips.join("");
 }
 
@@ -513,6 +517,8 @@ $("samples").onclick = loadSamples;
 
 // ---------------------------------------------------------------- top-level render
 function render() {
+  state.plain = plainOn();
+  root.classList.toggle("hx-plain", !!state.plain);
   watchStatus();
   const m = state.model;
   const has = !!(m && m.records.length) || state.files.length;
@@ -575,7 +581,7 @@ function renderOverview() {
         <li data-relay="${esc(L.key)}" tabindex="0">
           <span class="rank${L.rank === 1 ? " r1" : ""}">${L.rank}</span>
           <span style="min-width:0;display:block;overflow:hidden"><span class="name">${where(L)}</span>
-            <span class="meta">${L.recurring.length ? `<span class="trip">${L.recurring.map((x) => esc(H.ISSUE[x.key].short.toLowerCase())).join(", ")} recurring</span> · ` : ""}${plural(L.tripOccasions, "trip")} · last ${fmtDate(L.lastTrip)}</span>
+            <span class="meta">${L.recurring.length ? `<span class="trip">${L.recurring.map((x) => esc(IS(x.key).toLowerCase())).join(", ")} recurring</span> · ` : ""}${plural(L.tripOccasions, "trip")} · last ${fmtDate(L.lastTrip)}</span>
             <span class="scorebar" data-tip="Score ${L.score}"><i style="width:${(100 * L.score / maxScore).toFixed(0)}%"></i></span></span>
           <span class="sp" data-tip="Trips per month, last 12 months">${sparkSvg(L.spark)}</span>
           <span style="text-align:right">${trendHtml(L.trend)}</span>
@@ -585,7 +591,7 @@ function renderOverview() {
       <div class="card-head"><h2>Recurring issues</h2><button class="link" data-go="issues">Issues →</button></div>
       ${m.recurring.length ? m.recurring.slice(0, 7).map((x, i) => `
         <div class="recur" data-recur="${i}" tabindex="0">
-          <div class="top"><span class="what">${esc(x.label)}</span><span>${trendHtml(x.trend)}</span></div>
+          <div class="top"><span class="what">${esc(IL(x.key))}</span><span>${trendHtml(x.trend)}</span></div>
           <div class="where">${where(x)} · ${x.inWindow} times in ${x.windowDays} days${x.total > x.inWindow ? ` (${x.total} in all)` : ""} · last ${fmtDate(x.last)}${x.clearing ? ` · ${x.clearing.first} → ${x.clearing.last} cycles` : ""}</div>
         </div>`).join("") : `<p class="hint">Nothing happened ${state.cfg.recurMin} or more times within the recurrence window at one location.</p>`}
     </div>
@@ -596,15 +602,15 @@ function renderOverview() {
     <div class="card"><div class="card-head"><h2>Weather</h2><span class="hint">${m.wx.known ? `${m.wx.known} trips with weather` : ""}</span></div>
       ${m.wx.known ? `<p style="margin:0 0 8px"><b>${m.wx.storm}</b> of ${m.wx.known} trips (${Math.round(100 * m.wx.storm / m.wx.known)}%) happened in storms${Object.keys(m.wx.kinds).length ? `: ${Object.entries(m.wx.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(H.WX_LABEL[k] || k)} ${n}`).join(", ")}` : ""}.</p>
         <table class="t"><tbody>${m.relays.filter((L) => L.wx.known).sort((a, b) => b.wx.known - a.wx.known).slice(0, 8).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="num">${L.wx.calm} calm · ${L.wx.storm} storm</td><td style="width:40%"><span class="scorebar" style="margin:0"><i style="width:${Math.round(100 * L.wx.storm / L.wx.known)}%;background:var(--c-nofault)"></i></span></td></tr>`).join("")}</tbody></table>
-        ${m.recurring.filter((x) => x.weatherNote).map((x) => `<p class="hint" style="margin:6px 0 0"><b>${esc(x.relay)}</b>, ${esc(x.label.toLowerCase())}: ${esc(x.weatherNote)}</p>`).join("")}`
+        ${m.recurring.filter((x) => x.weatherNote).map((x) => `<p class="hint" style="margin:6px 0 0"><b>${esc(x.relay)}</b>, ${esc(IL(x.key).toLowerCase())}: ${esc(x.weatherNote)}</p>`).join("")}`
         : `<p class="hint">Set where each station is and look up the weather at each trip: storms explain some trips; repeat trips in calm weather point to the line itself.</p><button id="hx-ovWx" class="nosnap">Set up weather</button>`}</div>
   </div>` : ""}
   ${m.customers || m.reviews.reviewed ? `<div class="grid2 even">
     ${m.customers ? `<div class="card"><div class="card-head"><h2>Customer impact</h2><span class="hint">last 12 months · estimate</span></div>
-      <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.customers.saifi.toFixed(2)}</div><div class="l">SAIFI: sustained interruptions per customer</div></div>
-        <div class="stat"><div class="v">${m.customers.maifi.toFixed(2)}</div><div class="l">MAIFI: momentary per customer</div></div>
+      <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.customers.saifi.toFixed(2)}</div><div class="l">${state.plain ? "outages per customer (SAIFI)" : "SAIFI: sustained interruptions per customer"}</div></div>
+        <div class="stat"><div class="v">${m.customers.maifi.toFixed(2)}</div><div class="l">${state.plain ? "blinks per customer (MAIFI)" : "MAIFI: momentary per customer"}</div></div>
         <div class="stat"><div class="v">${m.customers.served.toLocaleString()}</div><div class="l">customers on ${plural(m.customers.locations, "circuit")}</div></div></div>
-      <table class="t"><thead><tr><th>Location</th><th class="r">Customers</th><th class="r">Sustained</th><th class="r">Momentary</th></tr></thead><tbody>${m.customers.ranked.slice(0, 6).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="r num">${L.cust.customers.toLocaleString()}</td><td class="r num">${L.cust.ci.toLocaleString()}</td><td class="r num">${L.cust.cmi.toLocaleString()}</td></tr>`).join("")}</tbody></table>
+      <table class="t"><thead><tr><th>Location</th><th class="r">Customers</th><th class="r">${state.plain ? "Customer outages" : "Sustained"}</th><th class="r">${state.plain ? "Blinks" : "Momentary"}</th></tr></thead><tbody>${m.customers.ranked.slice(0, 6).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="r num">${L.cust.customers.toLocaleString()}</td><td class="r num">${L.cust.ci.toLocaleString()}</td><td class="r num">${L.cust.cmi.toLocaleString()}</td></tr>`).join("")}</tbody></table>
       <p class="hint" style="margin:6px 0 0">Customer interruptions = customers × trips${state.cfg.sustained === "all" ? "" : " (a lockout is sustained, other trips momentary)"}.${m.customers.missing ? ` ${plural(m.customers.missing, "location")} have no customer count (Files & settings).` : ""}</p></div>` : ""}
     ${m.reviews.reviewed ? `<div class="card"><div class="card-head"><h2>PRC-004 reviews</h2><span class="hint">from the Trip Analyzer</span></div>
       <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.reviews.reviewed}/${m.reviews.trips}</div><div class="l">trips reviewed</div></div>
@@ -691,7 +697,7 @@ function locationDetail(L) {
   const issueRows = Object.entries(L.counts).filter(([key]) => H.ISSUE[key].group !== "data").sort((a, b) => b[1] - a[1]).map(([key, n]) => {
     const t = L.issueTrends[key], rec = L.recurring.find((x) => x.key === key);
     const ids = L.records.filter((r) => r.issues.some((x) => x.key === key)).map((r) => r.id);
-    return `<tr class="click" data-recur-ids="${esc(ids.join("\n"))}"><td>${esc(H.ISSUE[key].label)}${rec ? ' <span class="chip rec">recurring</span>' : ""}</td><td class="r num">${n}</td><td>${trendHtml(t)}</td><td class="muted">${esc(H.trendWords(t))}</td></tr>`;
+    return `<tr class="click" data-recur-ids="${esc(ids.join("\n"))}"><td>${esc(IL(key))}${rec ? ' <span class="chip rec">recurring</span>' : ""}</td><td class="r num">${n}</td><td>${trendHtml(t)}</td><td class="muted">${esc(H.trendWords(t))}</td></tr>`;
   }).join("");
   const stFrom = { record: "from the event files", settings: "from the settings", folder: "from the folder name", override: "set by you", none: "not in the files" }[L.stationFrom] || "";
   return `
@@ -717,7 +723,7 @@ function locationDetail(L) {
   </div>
   ${L.recurring.length ? `<div class="card section"><div class="card-head"><h2>Recurring here</h2></div>${L.recurring.map((x) => `
     <div class="recur" data-recur-ids="${esc(x.allIds.join("\n"))}" tabindex="0">
-      <div class="top"><span class="what">${esc(x.label)}${x.clearing ? ` <span class="trip">${x.clearing.first} → ${x.clearing.last} cycles</span>` : ""}</span><span>${trendHtml(x.trend)}</span></div>
+      <div class="top"><span class="what">${esc(IL(x.key))}${x.clearing ? ` <span class="trip">${x.clearing.first} → ${x.clearing.last} cycles</span>` : ""}</span><span>${trendHtml(x.trend)}</span></div>
       <div class="where">${x.inWindow} times in ${x.windowDays} days (${fmtDate(x.from)} to ${fmtDate(x.to)}) · ${x.total} in all · last ${fmtDate(x.last)}${Object.keys(x.phases).length ? " · " + Object.entries(x.phases).map(([p, n]) => `${esc(p)} ${n}`).join(", ") : ""}</div>
       ${x.weatherNote ? `<div class="advice"><b>Weather:</b> ${esc(x.weatherNote)}</div>` : ""}
       <div class="advice">${esc(x.advice)}</div>
@@ -751,8 +757,12 @@ function locationDetail(L) {
     ${[...L.records].reverse().map((r) => evRow(r, false)).join("")}</tbody></table></div>
   </div>`;
 }
+function evType(r) {
+  const t = state.plain ? PL.faultShort(r.core, r.tripped) : r.et || (r.tripped ? "TRIP" : "–");
+  return r.tripped ? `<span class="trip">${esc(t)}</span>` : esc(t);
+}
 function evRow(r, withWhere) {
-  return `<tr class="click" data-id="${esc(r.id)}"><td class="num" style="white-space:nowrap">${esc(H.fmtWhen(r))}</td>${withWhere ? `<td>${esc(r.relay)}<div class="hint">${esc(r.stationName)}</div></td>` : ""}<td style="white-space:nowrap">${r.tripped ? `<span class="trip">${esc(r.et || "TRIP")}</span>` : esc(r.et || "–")}</td><td>${esc(r.short.replace(/^(TRIP|No trip) - /, "").replace(/\s+\[\d+ to check\]$/, ""))}${r.checks.length ? ` <span class="warn" data-tip="${esc(r.checks.join("\n"))}">· ${plural(r.checks.length, "item")} to check</span>` : ""}</td><td>${issueChips(r)}${wxTag(r)}</td></tr>`;
+  return `<tr class="click" data-id="${esc(r.id)}"><td class="num" style="white-space:nowrap">${esc(H.fmtWhen(r))}</td>${withWhere ? `<td>${esc(r.relay)}<div class="hint">${esc(r.stationName)}</div></td>` : ""}<td style="white-space:nowrap" data-tip="${esc([r.et, r.targets].filter(Boolean).join(" · "))}">${evType(r)}</td><td>${esc(state.plain ? H.whatHappened(r, true).replace(/^(Tripped|No trip): /, "") : r.short.replace(/^(TRIP|No trip) - /, "").replace(/\s+\[\d+ to check\]$/, ""))}${r.checks.length ? ` <span class="warn" data-tip="${esc(r.checks.join("\n"))}">· ${plural(r.checks.length, "item")} to check</span>` : ""}</td><td>${issueChips(r)}${wxTag(r)}</td></tr>`;
 }
 function openStation(L) {
   $("stHint").textContent = `${L.relay} is at ${L.station}. Set it if the files don't say, or to group relays differently. Applies to every event from this relay.`;
@@ -772,23 +782,23 @@ function renderIssues() {
   el.innerHTML = `
   <div class="card">
     <div class="card-head"><h2>Issues at each location</h2><span class="hint">Times each issue happened (a reclose sequence counts once). <u>Underlined</u> = recurring. Click a cell to see the events.</span></div>
-    <div class="tablewrap"><table class="t heat"><thead><tr><th>Location</th>${keys.map((k) => `<th class="v" data-tip="${esc(H.ISSUE[k].label + "\n" + H.ISSUE[k].advice)}">${esc(H.ISSUE[k].short)}</th>`).join("")}</tr></thead><tbody>
-    ${m.relays.map((L) => `<tr><td style="white-space:nowrap"><button class="link" data-relay="${esc(L.key)}">${esc(L.relay)}</button><div class="hint">${esc(L.station)}</div></td>${keys.map((k) => { const n = L.counts[k] || 0; const rec = L.recurring.some((x) => x.key === k); return `<td class="h${rec ? " rec" : ""}" style="${shade(n)}" data-cell="${esc(L.key)}|${k}" ${n ? `data-tip="${esc(`${L.relay}: ${H.ISSUE[k].label} ${n}×${rec ? " (recurring)" : ""}\n${H.trendWords(L.issueTrends[k])}`)}"` : ""}>${n || ""}</td>`; }).join("")}</tr>`).join("")}
+    <div class="tablewrap"><table class="t heat"><thead><tr><th>Location</th>${keys.map((k) => `<th class="v" data-tip="${esc(IL(k) + "\n" + H.ISSUE[k].advice)}">${esc(IS(k))}</th>`).join("")}</tr></thead><tbody>
+    ${m.relays.map((L) => `<tr><td style="white-space:nowrap"><button class="link" data-relay="${esc(L.key)}">${esc(L.relay)}</button><div class="hint">${esc(L.station)}</div></td>${keys.map((k) => { const n = L.counts[k] || 0; const rec = L.recurring.some((x) => x.key === k); return `<td class="h${rec ? " rec" : ""}" style="${shade(n)}" data-cell="${esc(L.key)}|${k}" ${n ? `data-tip="${esc(`${L.relay}: ${IL(k)} ${n}×${rec ? " (recurring)" : ""}\n${H.trendWords(L.issueTrends[k])}`)}"` : ""}>${n || ""}</td>`; }).join("")}</tr>`).join("")}
     <tr><td><b>All</b></td>${keys.map((k) => `<td class="h num" style="font-weight:600" data-cell="|${k}">${m.relays.reduce((a, L) => a + (L.counts[k] || 0), 0)}</td>`).join("")}</tr>
     </tbody></table></div>
   </div>
   <div class="card section">
     <div class="card-head"><h2>Recurring issues</h2><span class="hint">Faults ${state.cfg.recurMin}+ times in ${state.cfg.recurDays} days; anything else ${state.cfg.recurMin}+ times in ${state.cfg.recurDaysOther} days, at one location. Change this in Files &amp; settings.</span></div>
     ${m.recurring.length ? `<div class="tablewrap"><table class="t"><thead><tr><th>Location</th><th>Issue</th><th>How often</th><th>Latest</th><th>Trend</th><th>What to do</th></tr></thead><tbody>
-    ${m.recurring.map((x, i) => `<tr class="click" data-recur="${i}"><td>${where(x)}</td><td><b>${esc(x.label)}</b>${x.clearing ? `<div class="trip">${x.clearing.first} → ${x.clearing.last} cycles</div>` : ""}</td><td class="num">${x.inWindow} in ${x.windowDays} d<div class="hint">${x.total} in all</div></td><td class="num">${fmtDate(x.last)}</td><td>${trendHtml(x.trend)}</td><td class="hint" style="max-width:340px">${esc(x.advice)}</td></tr>`).join("")}
+    ${m.recurring.map((x, i) => `<tr class="click" data-recur="${i}"><td>${where(x)}</td><td><b>${esc(IL(x.key))}</b>${x.clearing ? `<div class="trip">${x.clearing.first} → ${x.clearing.last} cycles</div>` : ""}</td><td class="num">${x.inWindow} in ${x.windowDays} d<div class="hint">${x.total} in all</div></td><td class="num">${fmtDate(x.last)}</td><td>${trendHtml(x.trend)}</td><td class="hint" style="max-width:340px">${esc(x.advice)}</td></tr>`).join("")}
     </tbody></table></div>` : '<p class="hint">None found.</p>'}
   </div>
   <div class="card section">
     <div class="card-head"><h2>Issue trends, all locations</h2></div>
     <div class="tablewrap"><table class="t"><thead><tr><th>Issue</th><th class="r">Times</th><th class="r">Locations</th><th>Trend</th><th></th><th>Last 12 months</th></tr></thead><tbody>
-    ${m.issues.filter((x) => x.group !== "data").map((x) => `<tr class="click" data-issue="${x.key}"><td>${esc(x.label)}</td><td class="r num">${x.n}</td><td class="r num">${x.relays}</td><td>${trendHtml(x.trend)}</td><td class="muted">${esc(H.trendWords(x.trend))}</td><td>${sparkSvg(x.monthly.slice(-12), 110, 22)}</td></tr>`).join("")}
+    ${m.issues.filter((x) => x.group !== "data").map((x) => `<tr class="click" data-issue="${x.key}"><td>${esc(IL(x.key))}</td><td class="r num">${x.n}</td><td class="r num">${x.relays}</td><td>${trendHtml(x.trend)}</td><td class="muted">${esc(H.trendWords(x.trend))}</td><td>${sparkSvg(x.monthly.slice(-12), 110, 22)}</td></tr>`).join("")}
     </tbody></table></div>
-    ${m.issues.some((x) => x.group === "data") ? `<p class="hint">Data gaps: ${m.issues.filter((x) => x.group === "data").map((x) => `${esc(x.label.toLowerCase())} (${x.n})`).join(", ")}. Adding the .CEV and settings for those relays makes the checks more reliable.</p>` : ""}
+    ${m.issues.some((x) => x.group === "data") ? `<p class="hint">Data gaps: ${m.issues.filter((x) => x.group === "data").map((x) => `${esc(IL(x.key).toLowerCase())} (${x.n})`).join(", ")}. Adding the .CEV and settings for those relays makes the checks more reliable.</p>` : ""}
   </div>`;
   el.querySelectorAll("[data-relay]").forEach((b) => { b.onclick = () => go("locations", { relay: b.dataset.relay }); });
   el.querySelectorAll("[data-cell]").forEach((c) => { c.onclick = () => { const [relay, issue] = c.dataset.cell.split("|"); if (relay && !state.model.relays.find((L) => L.key === relay).counts[issue]) return; go("events", { ev: { relay, issue } }); }; });
@@ -806,7 +816,7 @@ function filteredEvents() {
      (f.show === "recurring" && m.recurring.some((x) => x.allIds.includes(r.id))) || (f.show === "hot" && m.hotspots.some((h) => h.ids.includes(r.id))) ||
      (f.show === "storm" && r.tripped && r.storm === true) || (f.show === "calm" && r.tripped && r.storm === false) || (f.show === "breaker" && r.clearCyc !== null) ||
      (f.show === "misop" && r.reviewStatus === "misop") || (f.show === "overdue" && r.reviewStatus === "overdue") || (f.show === "unreviewed" && (r.reviewStatus === "overdue" || r.reviewStatus === "open"))) &&
-    (!q || [r.relay, r.stationName, r.et, r.targets, r.short, r.date, r.loc, noteOf(r.id), ...r.checks, ...r.cause, ...r.sources.map((s) => s.path), ...r.issues.map((x) => H.ISSUE[x.key].label)].join(" ").toUpperCase().includes(q)));
+    (!q || [r.relay, r.stationName, r.et, r.targets, r.short, r.date, r.loc, noteOf(r.id), ...r.checks, ...r.cause, ...r.sources.map((s) => s.path), ...r.issues.map((x) => IL(x.key)), PL ? PL.sentence(r, { withChecks: false }) : ""].join(" ").toUpperCase().includes(q)));
   if (f.sort === "newest") list = list.slice().reverse();
   else if (f.sort === "relay") list = list.slice().sort((a, b) => (a.stationName + a.relay < b.stationName + b.relay ? -1 : a.stationName + a.relay > b.stationName + b.relay ? 1 : (a.ms || 0) - (b.ms || 0)));
   return list;
@@ -831,7 +841,7 @@ function renderEvents() {
   $("evQ").value = f.q;
   $("evStation").innerHTML = opt("", "All stations", f.station) + m.stations.map((S) => opt(S.name, S.name, f.station)).join("");
   $("evRelay").innerHTML = opt("", "All relays", f.relay) + m.relays.filter((L) => !f.station || L.station === f.station).map((L) => opt(L.key, L.relay, f.relay)).join("");
-  $("evIssue").innerHTML = opt("", "Any issue", f.issue) + issueKeys.map((I) => opt(I.key, I.label, f.issue)).join("");
+  $("evIssue").innerHTML = opt("", "Any issue", f.issue) + issueKeys.map((I) => opt(I.key, IL(I.key), f.issue)).join("");
   $("evShow").innerHTML = [["all", "All events"], ["trips", "Trips"], ["faults", "Faults"], ["review", "Needs review"], ["recurring", "Part of a recurring issue"], ["hot", "In a hot spot"], ["storm", "Trips in storms"], ["calm", "Trips in calm weather"], ["breaker", "Breaker timed"], ["misop", "Misoperations"], ["overdue", "Reviews overdue"], ["unreviewed", "Trips not reviewed"]].map(([v, t]) => opt(v, t, f.show)).join("");
   $("evMonth").innerHTML = opt("", "Any month", f.month) + [...m.months].reverse().map((k) => opt(k, monthLabel(k), f.month)).join("");
   $("evSort").value = f.sort;
@@ -1173,22 +1183,30 @@ function renderDrawer() {
   if (!r) { closeDrawer(); return; }
   const { list } = state.drawer, i = list.indexOf(r.id);
   $("dPrev").disabled = i <= 0; $("dNext").disabled = i < 0 || i >= list.length - 1;
-  $("dTitle").innerHTML = `${esc(r.relay)} · ${r.tripped ? `<span class="trip">${esc(r.et || "TRIP")}</span>` : esc(r.et || "event")}`;
+  $("dTitle").innerHTML = `${esc(r.relay)} · ${evType(r)}`;
   $("dSub").textContent = `${H.fmtWhen(r)} · ${r.stationName}${list.length > 1 ? ` · ${i + 1} of ${list.length}` : ""}`;
   const L = m.relays.find((x) => x.key === upper(r.relay));
   const recs = m.recurring.filter((x) => x.allIds.includes(r.id));
   const hot = m.hotspots.filter((h) => h.ids.includes(r.id));
   const seqMates = L ? L.records.filter((x) => x.occ === r.occ && x.id !== r.id) : [];
   const amps = Object.entries(r.amps).filter(([k]) => k !== "N");
-  const kv = [["Event type", `${esc(r.et)}${r.desc ? ` <span class="muted">(${esc(r.desc)})</span>` : ""}`], ["Targets", esc(r.targets || "–")],
+  const code = (c) => (c ? ` <span class="muted mono" style="font-size:11.5px">${esc(c)}</span>` : "");
+  const kv = state.plain ? [
+    ["What it was", `${esc(PL.faultShort(r.core, r.tripped))}${code(r.et)}`],
+    ["Where", `${esc(PL.where(r) || "distance not known")}`],
+    ["What tripped it", `${esc(PL.kindsOf(r.primary, r.targets).join("; ") || (r.tripped ? "not identified in the record" : "nothing tripped"))}${code([r.targets, r.primary.join(" ")].filter(Boolean).join(" · "))}`],
+    ["Breaker opened", r.clearCyc !== null ? `${esc(PL.cycles(r.clearCyc))} after the trip${r.clearCyc > state.cfg.slowCycles ? ' <span class="trip">(slow)</span>' : ""}` : "–"],
+  ] : [["Event type", `${esc(r.et)}${r.desc ? ` <span class="muted">(${esc(r.desc)})</span>` : ""}`], ["Targets", esc(r.targets || "–")],
     ["Fault location", r.loc ? `${esc(r.loc)}${r.locPct !== null ? ` <span class="muted">(~${r.locPct}% of the line, LL ${r.ll})</span>` : ""}` : "–"],
     ["Breaker cleared", r.clearCyc !== null ? `${r.clearCyc} cycles after the trip` : "–"], ["Tripping element", esc(r.primary.join(", ") || "–")],
     ["Fault current", amps.length ? amps.map(([k, v]) => `${{ A: "IA", B: "IB", C: "IC", G: "IG", Q: "3I2", F: "max" }[k] || k} ${v.toLocaleString()} A`).join(" · ") : "–"],
     ["Shot / frequency", `${esc(r.shot || "–")} / ${esc(r.freq || "–")} Hz`], ["Confidence", `${esc(r.confidence)} <span class="muted">(${esc(r.basis)})</span>`]];
+  if (state.plain) kv.push(["Fault current", amps.length ? `highest ${Math.max(...amps.map(([, v]) => v)).toLocaleString()} A${code(amps.map(([k, v]) => `${{ A: "IA", B: "IB", C: "IC", G: "IG", Q: "3I2", F: "max" }[k] || k} ${v}`).join(" "))}` : "–"],
+    ["How sure", `${esc({ High: "Fairly sure", Medium: "Somewhat sure", Low: "Not sure" }[r.confidence] || r.confidence)} <span class="muted">(${esc(r.basis)})</span>`]);
   $("dBody").innerHTML = `
-    <p style="margin:0 0 8px;font-weight:600">${esc(r.short.replace(/\s+\[\d+ to check\]$/, ""))}</p>
+    <p style="margin:0 0 8px;font-weight:600">${esc(H.whatHappened(r, state.plain))}</p>
     <div>${issueChips(r, 20)}</div>
-    ${recs.length || hot.length ? `<h4>Part of a pattern</h4><ul>${recs.map((x) => `<li><b>Recurring ${esc(x.label.toLowerCase())}</b> at ${esc(x.relay)}: ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). <button class="link" data-list="${esc(x.allIds.join("\n"))}">step through them</button></li>`).join("")}
+    ${recs.length || hot.length ? `<h4>Part of a pattern</h4><ul>${recs.map((x) => `<li><b>Recurring ${esc(IL(x.key).toLowerCase())}</b> at ${esc(x.relay)}: ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). <button class="link" data-list="${esc(x.allIds.join("\n"))}">step through them</button></li>`).join("")}
       ${hot.map((h) => `<li><b>Fault hot spot</b>: ${h.n} faults between ${h.from.toFixed(2)} and ${h.to.toFixed(2)}. <button class="link" data-list="${esc(h.ids.join("\n"))}">step through them</button></li>`).join("")}</ul>` : ""}
     ${seqMates.length ? `<h4>Same sequence</h4><ul>${seqMates.map((x) => `<li><button class="link" data-open="${esc(x.id)}">${esc(H.fmtWhen(x))} ${esc(x.et)}</button> <span class="muted">${esc(x.targets)}</span></li>`).join("")}</ul>` : ""}
     <div class="nosnap" style="margin:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="hx-dAnalyzer" title="Open this event's files in the SEL Trip Analyzer${r.waveId ? ", on the Waveforms page" : ""}">${r.waveId ? "Open waveforms in Trip Analyzer ↗" : "Open in Trip Analyzer ↗"}</button></div>
@@ -1199,7 +1217,7 @@ function renderDrawer() {
     ${r.checks.length ? `<h4>Check</h4><ul class="checkl">${r.checks.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${r.gaps.length ? `<h4>Missing data</h4><ul class="hint">${r.gaps.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${r.evidence.length ? `<h4>Evidence</h4><ul>${r.evidence.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
-    ${r.seq.length ? `<h4>Elements that asserted (cycles)</h4><div class="seq mono">${r.seq.map(([c, e]) => `${c.toFixed(2).padStart(6, " ")}  ${esc(e)}`).join("<br>")}</div>` : ""}
+    ${r.seq.length ? `<h4>${state.plain ? "What the relay saw, in order (cycles from the start)" : "Elements that asserted (cycles)"}</h4><div class="seq mono">${r.seq.map(([c, e]) => `${c.toFixed(2).padStart(6, " ")}  ${esc(e)}${state.plain ? ` <span style="font-family:inherit" class="muted">${esc(PL.element(e))}</span>` : ""}`).join("<br>")}</div>` : ""}
     <h4>Note</h4><textarea id="hx-dNote" rows="2" placeholder="e.g. Crew found a cracked insulator at pole 112"${SNAP ? " readonly" : ""}>${esc(noteOf(r.id))}</textarea>
     <p class="hint" style="margin:3px 0 0">${SNAP ? "" : "The same note shows in the Trip Analyzer's events table."}</p>
     <h4>Source files</h4><ul>${r.sources.map((s) => `<li class="mono" style="font-size:12px">${esc(s.path)} ${!SNAP && state.files.some((f) => f.hash === s.hash) ? `<button class="link" data-dl="${esc(s.hash)}">download</button>` : ""}</li>`).join("")}</ul>
@@ -1552,7 +1570,7 @@ function paperSeries(m, recs) {
 function exportOpts() {
   const sections = {};
   root.querySelectorAll("#hx-expSections [data-s]").forEach((c) => { sections[c.dataset.s] = c.checked; });
-  return { station: $("expStation").value, relay: $("expRelay").value, sections, notes: $("expNotes").value, now: core.nowStamp() };
+  return { station: $("expStation").value, relay: $("expRelay").value, sections, notes: $("expNotes").value, now: core.nowStamp(), plain: !!state.plain };
 }
 function exportName(fmt) {
   const m = state.model, o = exportOpts();
@@ -1623,7 +1641,7 @@ function makeSnapshot(o, name) {
   const scope = o.relay ? (m.relays.find((L) => L.key === o.relay) || {}).relay || o.relay : o.station || "";
   const data = { app: "sel-trip-history-snapshot", version: VERSION, name: SNAP ? SNAP.name : currentName(), scope, made: new Date().toISOString(),
     records: recs.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !DROP.has(k)))),
-    cfg: Object.assign({}, state.cfg), notes: pick(Object.assign({}, state.notes, state.sharedNotes)), reviews: pick(reviewsMap()), weather: pick(state.weather),
+    plain: !!state.plain, cfg: Object.assign({}, state.cfg), notes: pick(Object.assign({}, state.notes, state.sharedNotes)), reviews: pick(reviewsMap()), weather: pick(state.weather),
     worklog: state.worklog, overrides: state.overrides, customers: state.customers || {} };
   const empty = (html, id) => {
     const tag = `<script id="${id}" type="application/json">`, a = html.indexOf(tag);
@@ -1701,7 +1719,7 @@ async function load() {
 
 const ready = load().catch((e) => { console.error(e); toast("Couldn't open the history: " + (e.message || e)); });
 return {
-  ready, state, render: () => (state.model ? render() : undefined), refresh: () => (state.model ? rebuild(false) : undefined), go, openDrawer, rebuild, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h),
+  ready, state, render: () => (state.model ? render() : undefined), plainChanged: () => { if (state.model) { render(); if (state.drawer.id) renderDrawer(); } }, refresh: () => (state.model ? rebuild(false) : undefined), go, openDrawer, rebuild, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h),
   addFiles: async (list, label) => { await ready; return addFiles(list, label); },
   currentName, histories: histList, switchTo, readData, mergeInto, createHistory,
 };

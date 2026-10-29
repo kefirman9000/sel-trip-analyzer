@@ -41,7 +41,7 @@ def main():
 
     page = (page.replace("{{VERSION}}", version).replace("{{REPO}}", repo).replace("{{ICON}}", icon)
                 .replace("{{SAMPLES_JSON}}", json.dumps(samples).replace("</", "<\\/")))
-    for key, name in [("CORE_JS", "core.js"), ("ANALYSIS_JS", "analysis.js"), ("DOCX_JS", "docx.js"), ("WEATHER_JS", "weather.js"), ("HISTORY_JS", "history.js"),
+    for key, name in [("CORE_JS", "core.js"), ("ANALYSIS_JS", "analysis.js"), ("DOCX_JS", "docx.js"), ("WEATHER_JS", "weather.js"), ("PLAIN_JS", "plain.js"), ("HISTORY_JS", "history.js"),
                       ("HISTORY_UI_JS", "history_ui.js"), ("HISTORY_CSS", "history_ui.css")]:
         with open(os.path.join(ROOT, "web", name), encoding="utf-8") as f:
             code = f.read()

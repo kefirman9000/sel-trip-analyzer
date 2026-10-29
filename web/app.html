@@ -422,6 +422,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
       <button id="stationsBtn" title="Where each relay is, and the weather at each event">Stations &amp; weather</button>
       <button id="helpBtn" title="Help (F1)">Help</button>
       <label class="switch" title="Dark mode (Ctrl+D)"><input type="checkbox" id="dark"> Dark mode</label>
+      <label class="switch" title="Say things in everyday words instead of relay codes and engineering terms (the codes stay in the details and on hover)"><input type="checkbox" id="plainSw"> Plain English</label>
       <button id="updBtn">Check for updates</button>
     </div>
   </header>
@@ -850,6 +851,9 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
 /*{{WEATHER_JS}}*/
 </script>
 <script>
+/*{{PLAIN_JS}}*/
+</script>
+<script>
 /*{{HISTORY_JS}}*/
 </script>
 <script>
@@ -860,6 +864,10 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
 "use strict";
 // this page as it arrived (before anything is drawn), for the History tab's read-only snapshots
 const PAGE_SOURCE = "<!doctype html>\n" + document.documentElement.outerHTML;
+// a snapshot made on the History tab carries its data in the page
+const snapEl = document.getElementById("hx-snapshot");
+let SNAPSHOT = null;
+try { SNAPSHOT = snapEl ? JSON.parse(snapEl.textContent) : null; } catch (e) { SNAPSHOT = null; }
 const VERSION = "{{VERSION}}";
 const REPO = "{{REPO}}";
 const HTML_ASSET = "SEL_Trip_Analyzer.html";
@@ -913,7 +921,8 @@ function refreshChoices(ch) {
   fillSelect($("vSort"), core.SORT_OPTIONS, view.sort);
   fillSelect($("vDetail"), core.DETAIL_OPTIONS, view.detail);
 }
-const currentOpts = () => ({ show: view.show, relay: view.relay, sort: view.sort, detail: view.detail,
+const plainOn = () => store.get("plain", SNAPSHOT ? !!SNAPSHOT.plain : false);
+const currentOpts = () => ({ plain: plainOn(), show: view.show, relay: view.relay, sort: view.sort, detail: view.detail,
                              hide_duplicates: $("vDups").checked, search: $("vSearch").value.trim(), notes: store.get("notes", {}),
                              weather: store.get("wxOn", true) ? store.get("wxResults", {}) : {}, reviews: reviewsOrNull() });
 /** Operation reviews (PRC-004), or null until the first one is saved (the summary then gets a review section). */
@@ -931,6 +940,15 @@ for (const [id, key] of [["vShow", "show"], ["vRelay", "relay"], ["vSort", "sort
     if (state.files.length) generate(false);
   });
 }
+// Plain English / engineering wording: the events table, the summary and the History tab
+$("plainSw").checked = plainOn();
+$("plainSw").addEventListener("change", () => {
+  if (!editsOk()) { $("plainSw").checked = !$("plainSw").checked; return; }
+  store.set("plain", $("plainSw").checked);
+  if (state.files.length) generate(false); else renderEvents();
+  if (hist) hist.plainChanged();
+  setStatus($("plainSw").checked ? "Plain English: everyday words, with the relay codes in the details and on hover" : "Engineering terms and relay codes");
+});
 $("vDups").addEventListener("change", () => {
   if (!editsOk()) { $("vDups").checked = !$("vDups").checked; return; }
   store.set("hideDups", $("vDups").checked);
@@ -1417,8 +1435,9 @@ function renderEvents() {
   $("evBadge").textContent = `${all.length}`;
   const th = (k, label) => `<th${k ? ` data-sort="${k}" class="sortable${evSort.key === k ? (evSort.dir > 0 ? " asc" : " desc") : ""}"` : ""}>${label}</th>`;
   const head = `<thead><tr>${th("", "#")}${th("time", "When")}${th("relay", "Relay")}${th("type", "Type")}${th("", "What happened")}${th("checks", "Check")}${th("weather", "Weather")}${th("", "Note")}${th("", "")}</tr></thead>`;
+  const plain = plainOn();
   const body = rows.map((it) => {
-    const e = it.e, id = it.id, cause = core.shortCause(e, it.s, it.a);
+    const e = it.e, id = it.id, cause = plain ? window.SELPlain.itemSentence(it) : core.shortCause(e, it.s, it.a);
     const runs = core.tripRuns(cause).map(([t, c]) => (c ? `<b class="${c}">${esc(t)}</b>` : esc(t))).join("");
     const chips = [];
     if (it.pair) chips.push(`<span class="chip2" title="${esc(it.pair.info.likely ? "Locations add up to the line length: likely the same fault" : "Same time and phases")}">↔ ${esc(core.relayKey(it.pair.other.e))}</span>`);
@@ -1436,7 +1455,7 @@ function renderEvents() {
       <td class="n">${num.get(it)}</td>
       <td class="when">${esc(e.date)}<br><span class="hint">${esc(e.time)}</span></td>
       <td class="relay"><b>${esc(core.relayKey(e))}</b>${e.terminal_id && e.terminal_id !== core.relayKey(e) ? `<br><span class="hint">${esc(e.terminal_id)}</span>` : ""}</td>
-      <td class="type">${esc(e.event_type || "?")}</td>
+      <td class="type"${plain ? ` title="${esc([e.event_type, e.targets].filter(Boolean).join(" · "))}"` : ""}>${esc(plain ? window.SELPlain.faultShort(core.eventCore(e.event_type), it.a.tripped) : e.event_type || "?")}</td>
       <td class="cause">${runs}${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}</td>
       <td class="chk">${nc ? `<span class="badge-w" title="${esc(it.a.checks.concat(it.a.gaps).join("\n"))}">${nc}</span>` : `<span class="okmark" title="Nothing to check">✓</span>`}</td>
       <td class="wx${stormy(it) ? " storm" : ""}" title="${esc(w ? w.text + "\n" + (w.hints || []).map((h) => h.text).join("\n") : "")}">${esc(wtxt) || '<span class="hint">-</span>'}</td>
@@ -1651,9 +1670,6 @@ function showPage(which, recId, focus) {
 // ---------------------------------------------------------------- Trip History link and hand-off
 // The History tab (the same screen as the standalone Trip History page), loaded the first time it's needed
 let hist = null;
-const snapEl = document.getElementById("hx-snapshot");
-let SNAPSHOT = null;
-try { SNAPSHOT = snapEl ? JSON.parse(snapEl.textContent) : null; } catch (e) { SNAPSHOT = null; }
 const histSamples = () => { try { return JSON.parse($("history-samples").textContent || "[]"); } catch (e) { return []; } };
 function ensureHistory() {
   if (!hist) {

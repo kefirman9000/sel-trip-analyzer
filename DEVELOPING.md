@@ -13,6 +13,7 @@ launcher that shows that page in its own window.
 | `web/wave_ui.js` | The Waveform analysis page (charts, phasor diagram, notes, exports) |
 | `web/app.html` | The page: layout, summary, notes, weather, updates, desktop bridge |
 | `web/cli.js` | The same analysis from the command line |
+| `web/plain.js` | Plain-English wording (the *Plain English* switch): event sentences, protection in everyday words, issue names; `core.buildReport(..., {plain: true})` uses it |
 | `web/history.js` | Trip History: event records across files, issue types, recurrence, hot spots, trends, ranking, report blocks and CSV |
 | `web/history_ui.js`, `web/history_ui.css` | The History screen as a module (`SELHistoryUI.mount`), scoped to `.hx` with `hx-` ids: used by the Analyzer's History tab and by `history.html`. One IndexedDB database per history (`sel-trip-history`, `sel-trip-history:<id>`), list in `localStorage` |
 | `web/history.html` | The standalone Trip History page: header, theme and the mounted module |

@@ -17,6 +17,7 @@
 const isNode = typeof module !== "undefined" && module.exports;
 const core = isNode ? require("./core.js") : root.SELCore;
 if (isNode) { try { require("./analysis.js"); } catch (e) { /* COMTRADE reader is optional */ } }
+const Plain = isNode ? require("./plain.js") : root.SELPlain;
 
 const DAY = 86400e3;
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -655,7 +656,12 @@ function changes(before, after, newIds) {
 const fmtDate = (ms) => (ms === null || ms === undefined ? "-" : isoDate(ms));
 const fmtWhen = (r) => (r.ms === null ? `${r.rawDate} ${r.rawTime}`.trim() || "(no date)" : `${r.date} ${r.time.slice(0, 8)}`);
 const arrow = (t) => (t.dir === "up" ? "▲ " : t.dir === "down" ? "▼ " : "") + t.label;
-const issueList = (r) => r.issues.filter((x) => ISSUE[x.key].group !== "data").map((x) => ISSUE[x.key].label + (x.detail && !FAULT_KEYS[x.detail] ? ` (${x.detail})` : "")).join("; ");
+/** Issue names, technical or in everyday words. */
+const issueLabel = (k, plain) => (plain && Plain ? Plain.issue(k)[1] : ISSUE[k].label);
+const issueShort = (k, plain) => (plain && Plain ? Plain.issue(k)[0] : ISSUE[k].short);
+const issueList = (r, plain) => r.issues.filter((x) => ISSUE[x.key].group !== "data").map((x) => issueLabel(x.key, plain) + (x.detail && !FAULT_KEYS[x.detail] ? ` (${x.detail})` : "")).join("; ");
+/** An event in one line: the analysis's summary, or a plain-English sentence. */
+const whatHappened = (r, plain) => (plain && Plain ? Plain.sentence(r, { withChecks: false }) : r.short.replace(/\s+\[\d+ to check\]$/, ""));
 const WX_LABEL = { lightning: "thunderstorm", wind: "wind", ice: "ice/snow", rain: "heavy rain", heat: "heat" };
 const trendWords = (t) => (t.days >= 360 ? `${t.recent} in the last year vs ${t.prev} the year before` : `${t.recent} in the last ${t.days} days vs ${t.prev} before`);
 const whereText = (L) => `${L.relay}${L.station && L.station !== "Unassigned" ? ` (${L.station})` : ""}`;
@@ -672,6 +678,7 @@ function scoped(model, opts) {
 /** opts: {station, relay, sections: {overview, ranking, recurring, hotspots, trends, matrix, details, events, worklog}, top, notes} */
 function reportBlocks(model, opts) {
   opts = opts || {};
+  const PL = !!opts.plain;
   const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, breakers: true, weather: true, customers: true, reviews: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
   const S = scoped(model, opts);
   const recs = S.records;
@@ -708,14 +715,14 @@ function reportBlocks(model, opts) {
     blocks.push(["note", "Score = trips (older ones count less, half-life " + model.cfg.halfLifeDays + " days) + severity of the issues + recurring issues and hot spots, raised 30% when trips are increasing."]);
     blocks.push(["table", ["Rank", "Location", "Trips", "Last trip", "Trend", "Main issues", "Score"],
       S.relays.slice(0, opts.top || 25).map((L) => [String(L.rank), whereText(L), String(L.trips), fmtDate(L.lastTrip), `${arrow(L.trend)} (${L.trend.recent} vs ${L.trend.prev}${L.trend.basis === "year" ? ", yearly" : ""})`,
-        L.top.map((t) => `${t.label} ${t.n}${t.recurring ? " (recurring)" : ""}`).join("; ") || "-", String(L.score)]),
+        L.top.map((t) => `${issueLabel(t.key, PL)} ${t.n}${t.recurring ? " (recurring)" : ""}`).join("; ") || "-", String(L.score)]),
       [7, 20, 7, 12, 16, 30, 8]]);
   }
   if (sec.recurring) {
     blocks.push(["h1", "Recurring issues"]);
     if (!S.recurring.length) blocks.push(["para", `No issue happened ${model.cfg.recurMin} or more times within ${model.cfg.recurDays} days at one location.`]);
     else blocks.push(["table", ["Location", "Issue", "How often", "Most recent", "Trend", "Events"],
-      S.recurring.map((x) => [whereText(x), x.label + (x.clearing ? ` (${x.clearing.first} → ${x.clearing.last} cycles)` : ""),
+      S.recurring.map((x) => [whereText(x), issueLabel(x.key, PL) + (x.clearing ? ` (${x.clearing.first} → ${x.clearing.last} cycles)` : ""),
         `${x.inWindow} in ${x.windowDays} days (${x.total} in all)`, fmtDate(x.last), arrow(x.trend),
         x.allIds.map((id) => fmtDate(model.byId.get(id).ms)).join(", ")]), [18, 22, 15, 11, 10, 24]]);
   }
@@ -734,7 +741,7 @@ function reportBlocks(model, opts) {
     blocks.push(["note", `Trip occasions (a reclose sequence counts once) in the last ${model.cfg.trendDays} days against the ${model.cfg.trendDays} days before, and the last year against the year before, ending ${fmtDate(model.anchor)}. A recent rise is reported first; otherwise the year-on-year change.`]);
     const rows = S.relays.filter((L) => L.trend.dir === "up" || L.trend.dir === "down").map((L) => [whereText(L), arrow(L.trend), trendWords(L.trend)]);
     const issueRows = [];
-    for (const L of S.relays) for (const [key, t] of Object.entries(L.issueTrends)) if ((t.dir === "up" || t.dir === "down") && ISSUE[key].group !== "data") issueRows.push([whereText(L), ISSUE[key].label, arrow(t), trendWords(t)]);
+    for (const L of S.relays) for (const [key, t] of Object.entries(L.issueTrends)) if ((t.dir === "up" || t.dir === "down") && ISSUE[key].group !== "data") issueRows.push([whereText(L), issueLabel(key, PL), arrow(t), trendWords(t)]);
     if (rows.length) blocks.push(["table", ["Location", "Trips", "Compared"], rows, [34, 20, 46]]);
     else blocks.push(["para", "No location's trip count changed much."]);
     if (issueRows.length) { blocks.push(["h2", "By issue"]); blocks.push(["table", ["Location", "Issue", "Trend", "Compared"], issueRows, [24, 30, 16, 30]]); }
@@ -757,7 +764,8 @@ function reportBlocks(model, opts) {
       blocks.push(["h1", "Customer impact (last 12 months)"]);
       blocks.push(["note", `Estimate: each trip interrupts every customer on the circuit; ${model.cfg.sustained === "all" ? "every trip counts as sustained" : "a recloser lockout is a sustained interruption and other trips are momentary"}. Trips in the 12 months to ${fmtDate(model.anchor)}.`]);
       blocks.push(["kv", [["Customers served", `${c.served.toLocaleString("en-US")} on ${plural(c.locations, "circuit")}${c.missing ? ` (${c.missing} without a customer count)` : ""}`],
-        ["SAIFI (estimate)", `${c.saifi.toFixed(2)} sustained interruptions per customer`], ["MAIFI (estimate)", `${c.maifi.toFixed(2)} momentary interruptions per customer`]]]);
+        [PL ? "Outages per customer" : "SAIFI (estimate)", `${c.saifi.toFixed(2)} sustained interruptions per customer${PL ? " (SAIFI, estimate)" : ""}`],
+        [PL ? "Blinks per customer" : "MAIFI (estimate)", `${c.maifi.toFixed(2)} momentary interruptions per customer${PL ? " (MAIFI, estimate)" : ""}`]]]);
       blocks.push(["table", ["Location", "Customers", "Trips", "Sustained", "Sustained customer interruptions", "Momentary customer interruptions"], rows, [28, 12, 9, 11, 22, 18]]);
     }
   }
@@ -777,18 +785,18 @@ function reportBlocks(model, opts) {
       blocks.push(["note", "Weather in the station's area at the hour of each trip (Open-Meteo). A storm makes weather a likely cause; repeat trips in calm weather point to the line itself."]);
       blocks.push(["table", ["Location", "Trips with weather", "In storms", "Calm", "Storm share", "What kind"], rows, [26, 12, 10, 10, 10, 32]]);
       const calmRec = S.recurring.filter((x) => x.weatherNote);
-      if (calmRec.length) blocks.push(["bullets", calmRec.map((x) => `${whereText(x)}, ${x.label.toLowerCase()}: ${x.weatherNote}`)]);
+      if (calmRec.length) blocks.push(["bullets", calmRec.map((x) => `${whereText(x)}, ${issueLabel(x.key, PL).toLowerCase()}: ${x.weatherNote}`)]);
     }
   }
   if (sec.matrix && S.relays.length) {
     const keys = ISSUES.filter((I) => I.group !== "data" && S.relays.some((L) => L.counts[I.key])).map((I) => I.key);
     if (keys.length) {
       blocks.push(["h1", "Issue counts by location"]);
-      const short = (k) => ISSUE[k].short;
+      const short = (k) => issueShort(k, PL);
       const show = keys.slice(0, 9);
       blocks.push(["table", ["Location"].concat(show.map(short)), S.relays.map((L) => [whereText(L)].concat(show.map((k) => String(L.counts[k] || "")))),
         [100 - 9 * show.length].concat(show.map(() => 9))]);
-      if (keys.length > show.length) blocks.push(["note", `Also found: ${keys.slice(show.length).map((k) => ISSUE[k].label).join(", ")}.`]);
+      if (keys.length > show.length) blocks.push(["note", `Also found: ${keys.slice(show.length).map((k) => issueLabel(k, PL)).join(", ")}.`]);
     }
   }
   if (sec.details) {
@@ -799,17 +807,17 @@ function reportBlocks(model, opts) {
       const img = opts.chart ? opts.chart("relay", L) : null;
       if (img) blocks.push(img);
       const bl = [];
-      for (const x of L.recurring) bl.push(`Recurring: ${x.label}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.weatherNote ? x.weatherNote + " " : ""}${x.advice}`);
+      for (const x of L.recurring) bl.push(`Recurring: ${issueLabel(x.key, PL)}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.weatherNote ? x.weatherNote + " " : ""}${x.advice}`);
       if (L.breaker && L.breaker.n) bl.push(`Breaker: ${L.breaker.verdict}. ${L.breaker.ops} operations, ${L.breaker.kA} kA interrupted.`);
       if (L.wx.known) bl.push(`Weather: ${L.wx.storm} of ${L.wx.known} trips in storms${Object.keys(L.wx.kinds).length ? ` (${topEntries(L.wx.kinds, 4).map(([k, n]) => `${WX_LABEL[k] || k} ${n}`).join(", ")})` : ""}.`);
       for (const h of L.hotspots) bl.push(`Hot spot: ${h.n} faults at ${fx(h.from, 2)} to ${fx(h.to, 2)}${h.pct !== null ? ` (~${h.pct}% of the line)` : ""}, ${fmtDate(h.first)} to ${fmtDate(h.last)}.`);
-      for (const [key, n] of topEntries(L.counts, 12)) if (!L.recurring.some((x) => x.key === key)) bl.push(`${ISSUE[key].label}: ${n}`);
+      for (const [key, n] of topEntries(L.counts, 12)) if (!L.recurring.some((x) => x.key === key)) bl.push(`${issueLabel(key, PL)}: ${n}`);
       const ph = ["A", "B", "C"].filter((p) => L.phases[p]).map((p) => `phase ${p} ${L.phases[p]}`).concat(L.phases.G ? [`ground ${L.phases.G}`] : []);
       if (ph.length) bl.push(`Faulted phases: ${ph.join(", ")}`);
       if (bl.length) blocks.push(["bullets", bl]);
       if (sec.worklog && L.worklog.length) blocks.push(["bullets", L.worklog.map((w) => `Work done ${w.date}: ${w.text}`)]);
       if (sec.events) blocks.push(["table", ["Date", "Event", "What happened", "Issues"],
-        L.records.map((r) => [fmtWhen(r), r.et || "-", r.short.replace(/\s+\[\d+ to check\]$/, ""), issueList(r) || "-"]), [17, 9, 44, 30]]);
+        L.records.map((r) => [fmtWhen(r), PL && Plain ? Plain.faultShort(r.core, r.tripped) : r.et || "-", whatHappened(r, PL), issueList(r, PL) || "-"]), [17, 9, 44, 30]]);
     }
   }
   blocks.push(["note", "Automated interpretation of relay records: confirm against the event reports and settings before acting on it."]);
@@ -845,12 +853,12 @@ function blocksToText(blocks) {
 const csvField = (v) => { v = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const csv = (rows) => rows.map((r) => r.map(csvField).join(",")).join("\r\n") + "\r\n";
 const EVENT_COLUMNS = ["Date", "Time", "Station", "Relay", "Event type", "Tripped", "Fault", "Phases", "Location", "% of line",
-  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Review", "Decide by", "Source files"];
+  "Clearing (cycles)", "Issues", "What happened", "In plain English", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Review", "Decide by", "Source files"];
 function eventsCsv(model, opts) {
   const S = scoped(model, opts || {});
   const recurIds = new Set(S.recurring.flatMap((x) => x.allIds)), hotIds = new Set(S.hotspots.flatMap((h) => h.ids));
   return csv([EVENT_COLUMNS].concat(S.records.map((r) => [r.date || r.rawDate, r.time || r.rawTime, r.stationName, r.relay, r.et, r.tripped ? "Yes" : "No",
-    r.fault ? "Yes" : "No", r.phases, r.loc, r.locPct ?? "", r.clearCyc ?? "", issueList(r), r.short, r.checks.join(" | "), r.confidence,
+    r.fault ? "Yes" : "No", r.phases, r.loc, r.locPct ?? "", r.clearCyc ?? "", issueList(r), r.short, Plain ? Plain.sentence(r, { withChecks: false }) : "", r.checks.join(" | "), r.confidence,
     recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.wx ? r.wx.text : "", r.review ? ({ correct: "Correct operation", misop: "Misoperation", na: "Not applicable" }[r.review.outcome] || r.review.outcome) + (r.review.category ? ` - ${r.review.category}` : "") : r.reviewStatus === "overdue" ? "Overdue" : r.tripped ? "Not reviewed" : "", r.reviewDue, r.sources.map((s) => s.path).join(" | ")])));
 }
 const LOCATION_COLUMNS = ["Rank", "Station", "Relay", "Score", "Events", "Trips", "Faults", "First event", "Last trip", "Trend",
@@ -867,7 +875,7 @@ function locationsCsv(model, opts) {
 const api = {
   analyzeFiles, buildModel, mergeRecords, combineTrends, changes, breakerHealth, fitLine, WX_LABEL, issuesFor, trendOf, bestWindow, hotSpots, monthRange,
   reportBlocks, blocksToText, eventsCsv, locationsCsv, EVENT_COLUMNS, LOCATION_COLUMNS,
-  ISSUES, ISSUE, GROUPS, DEFAULTS, trendWords, isoDate, monthKey, fmtWhen, issueList, whereText, arrow,
+  ISSUES, ISSUE, GROUPS, DEFAULTS, trendWords, issueLabel, issueShort, whatHappened, isoDate, monthKey, fmtWhen, issueList, whereText, arrow,
 };
 if (isNode) module.exports = api;
 else root.SELHistory = api;
