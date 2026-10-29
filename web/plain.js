@@ -1,4 +1,4 @@
-/* SEL Trip Event Analyzer - plain-English wording for people who don't read relay codes.
+/* Relay Trip Analyzer - plain-English wording for people who don't read relay codes.
  *
  * Used when "Plain English" is switched on (the Analyzer header, the History page). It only rewords
  * what the record shows; the codes stay available (in the details and on hover), and causes stay

@@ -1,4 +1,4 @@
-/* SEL Trip History - styles for the History screen, scoped to .hx so it can live inside the Trip Analyzer.
+/* Relay Trip History - styles for the History screen, scoped to .hx so it can live inside the Trip Analyzer.
    The page supplies the base colour tokens (--bg, --surface, --text, --accent...); these are the History's own. */
 .hx { --c-fault: #005fb8; --c-nofault: #c27c0e; --c-other: #a0a0a0; --heat: 196, 43, 28; --pA: #c42b1c; --pB: #1b1b1b; --pC: #005fb8; --pX: #8a8a8a; }
 @media (prefers-color-scheme: dark) {

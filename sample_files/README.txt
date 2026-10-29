@@ -1,4 +1,4 @@
-SEL TRIP EVENT ANALYZER - SAMPLE FILES
+RELAY TRIP ANALYZER - SAMPLE FILES
 ======================================
 
 Made-up events written in SEL's file formats so you can see how the program

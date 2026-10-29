@@ -1,4 +1,4 @@
-/* SEL Trip Event Analyzer - Waveform analysis page (browser UI).
+/* Relay Trip Analyzer - Waveform analysis page (browser UI).
  *
  * Uses SELAnalysis (signal maths), SELReference (reference library) and SELDocx.
  * The app page creates it with SELWaveUI.create(ctx); see app.html.
@@ -1231,7 +1231,7 @@ function create(ctx) {
         (e.initial ? ["on at start"] : []).concat(e.intervals.filter(([a]) => !(a === 0 && e.initial)).map(([a]) => fmt(rec.t[a] * rec.freq, 2))).join(", "), e.intervals.map(([, b]) => (b >= rec.n - 1 ? "end" : fmt(rec.t[b] * rec.freq, 2))).join(", ")]), [14, 54, 16, 16]]);
     }
     blocks.push(["note", "Automated analysis from the recorded waveforms. Confirm against the relay's own event report and settings."]);
-    const bytes = DOCX.build(blocks, { title: "Waveform analysis", footer: `SEL Trip Event Analyzer v${ctx.version}`, runs: core.tripRuns, paper: v.paper });
+    const bytes = DOCX.build(blocks, { title: "Waveform analysis", footer: `Relay Trip Analyzer v${ctx.version}`, runs: core.tripRuns, paper: v.paper });
     ctx.download(`${v.fileName || fileNameFor("docx")}.docx`, new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
     ctx.setStatus("Saved the waveform analysis as a Word document");
   }

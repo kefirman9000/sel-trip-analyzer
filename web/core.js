@@ -1,4 +1,4 @@
-/* SEL Trip Event Analyzer - analysis core for the browser version.
+/* Relay Trip Analyzer - analysis core for the browser version.
  *
  * A line-for-line JavaScript port of the parsing and analysis in
  * sel_trip_analyzer.py. tests/web_parity.js checks that both produce the same
@@ -1408,7 +1408,7 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
   };
 
   const out = [];
-  out.push("SEL TRIP EVENT SUMMARY", "=".repeat(60), `Generated: ${now}`,
+  out.push("RELAY TRIP EVENT SUMMARY", "=".repeat(60), `Generated: ${now}`,
            `Files analyzed: ${nFiles}   Events found: ${items.length}   Settings databases: ${rdb.size}`);
   const viewText = describeView(opts, nDups);
   if (items.length && (viewText || shown.length !== items.length))
@@ -1647,7 +1647,7 @@ function parseReportText(text) {
     const s = strip(ln);
     if (!s) { flush(); continue; }
     if (fullmatch("[=\\-]{6,}", s)) continue;
-    if (!blocks.length && !para.length && s.toUpperCase().startsWith("SEL TRIP")) { blocks.push(["title", pyTitle(s).split("Sel ").join("SEL ")]); continue; }
+    if (!blocks.length && !para.length && /^(RELAY|SEL) TRIP/.test(s.toUpperCase())) { blocks.push(["title", pyTitle(s).split("Sel ").join("SEL ")]); continue; }
     if (!section && pmatch("^(Generated|Files analyzed|Showing|Needs review)\\b", s)) { add("meta", [s]); continue; }
     if (ln === s && fullmatch("[A-Z][A-Z /&\\-]{3,}(\\s*\\(.*\\))?", s)) {
       section = s; subh = "";

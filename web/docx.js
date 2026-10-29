@@ -1,4 +1,4 @@
-/* SEL Trip Event Analyzer - Word (.docx) writer.
+/* Relay Trip Analyzer - Word (.docx) writer.
  *
  * Builds a real Office Open XML document from "blocks" (the same blocks
  * core.parseReportText makes from the summary text, plus image blocks), with
@@ -187,7 +187,7 @@ function build(blocks, opts) {
       imgId++;
     }
   }
-  const footerText = opts.footer || "SEL Trip Event Analyzer";
+  const footerText = opts.footer || "Relay Trip Analyzer";
   const sect = `<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter"/><w:pgSz w:w="${PAGE_W}" w:h="${PAGE_H}"/>` +
     `<w:pgMar w:top="1008" w:right="${MARGIN}" w:bottom="1008" w:left="${MARGIN}" w:header="576" w:footer="576" w:gutter="0"/></w:sectPr>`;
   const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
@@ -218,7 +218,7 @@ function build(blocks, opts) {
   const iso = new Date().toISOString().replace(/\.\d+Z$/, "Z");
   const coreXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" ` +
     `xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` +
-    `<dc:title>${X(opts.title || "SEL Trip Event Summary")}</dc:title><dc:creator>SEL Trip Event Analyzer</dc:creator>` +
+    `<dc:title>${X(opts.title || "Relay Trip Event Summary")}</dc:title><dc:creator>Relay Trip Analyzer</dc:creator>` +
     `<dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified></cp:coreProperties>`;
   return zip([
     ["[Content_Types].xml", enc(types)], ["_rels/.rels", enc(pkgRels)], ["docProps/core.xml", enc(coreXml)],

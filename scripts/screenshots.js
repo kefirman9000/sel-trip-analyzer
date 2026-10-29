@@ -40,7 +40,7 @@ const W = 1360;
   await ctx.route("https://archive-api.open-meteo.com/**", wx);
 
   const page = await ctx.newPage();
-  await page.goto("file://" + path.join(ROOT, "dist", "SEL_Trip_Analyzer.html"));
+  await page.goto("file://" + path.join(ROOT, "dist", "Relay_Trip_Analyzer.html"));
   await page.evaluate(() => { localStorage.clear(); });
   await page.reload();
   const shot = (name, opts) => page.screenshot(Object.assign({ path: path.join(OUT, name) }, opts || {}));

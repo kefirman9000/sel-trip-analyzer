@@ -1,4 +1,4 @@
-"""Generate the sample files in sample_files/ (and SEL_sample_files.zip).
+"""Generate the sample files in sample_files/ (and Relay_sample_files.zip).
 
     python scripts/make_samples.py
 
@@ -436,7 +436,7 @@ Currents (A Pri), ABCNGQ:   228  1395  221  4  1172  781
     ])
 
     write("README.txt", SAMPLES_README)
-    zpath = os.path.join(ROOT, "SEL_sample_files.zip")
+    zpath = os.path.join(ROOT, "Relay_sample_files.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for f in sorted(os.listdir(OUT)):
             z.write(os.path.join(OUT, f), f"SEL sample files/{f}")
@@ -444,7 +444,7 @@ Currents (A Pri), ABCNGQ:   228  1395  221  4  1172  781
 
 
 SAMPLES_README = """\
-SEL TRIP EVENT ANALYZER - SAMPLE FILES
+RELAY TRIP ANALYZER - SAMPLE FILES
 ======================================
 
 Made-up events written in SEL's file formats so you can see how the program

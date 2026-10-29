@@ -1,7 +1,7 @@
 """Tests for the desktop launcher (sel_trip_analyzer.py): local server, file hand-off, updater.
 
 Run:  python -m unittest discover -s tests -v       (the analysis itself is tested in tests/*.test.js)
-Needs dist/SEL_Trip_Analyzer.html or web/ (it builds the page).
+Needs dist/Relay_Trip_Analyzer.html or web/ (it builds the page).
 """
 import base64
 import hashlib

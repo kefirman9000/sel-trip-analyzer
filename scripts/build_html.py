@@ -1,4 +1,4 @@
-"""Build the single-file browser version: dist/SEL_Trip_Analyzer.html
+"""Build the single-file browser version: dist/Relay_Trip_Analyzer.html
 
     python scripts/build_html.py [output.html]
 
@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def main():
-    out_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "SEL_Trip_Analyzer.html")
+    out_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "Relay_Trip_Analyzer.html")
     with open(os.path.join(ROOT, "sel_trip_analyzer.py"), encoding="utf-8") as f:
         py = f.read()
     version = re.search(r'^VERSION = "([^"]+)"', py, re.M).group(1)
