@@ -93,16 +93,17 @@ PyInstaller and runs the exe's self-test. The output is `dist\SEL_Trip_Analyzer.
 
 1. Bump `VERSION` in `sel_trip_analyzer.py`, write the notes in
    `docs/releases/vX.Y.Z.md`, and merge to `main`.
-2. Push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+2. **Actions → Build and release → Run workflow**, tick **Publish**, run it
+   (or push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`).
 3. `.github/workflows/release.yml` checks the tag matches `VERSION`, runs the
    tests, builds the page, the History page, both sample zips and the `.exe` on
-   Windows, self-tests the `.exe`, and publishes the release with those notes
-   and files. Installed copies then offer the update.
+   Windows, self-tests the `.exe`, creates the tag and publishes the release
+   with those notes and files. Installed copies then offer the update.
 
 Publishing a release by hand on GitHub (**Releases → Draft a new release**,
 tag `vX.Y.Z`) still works: the same workflow builds and attaches the files.
-It can also be run by hand (**Actions → Build and release → Run workflow**) to
-trial-build a branch without publishing anything.
+Run without **Publish** it only trial-builds (the files are kept as a
+workflow artifact), on any branch.
 
 ## Website
 
