@@ -282,9 +282,11 @@ name before saving.
 also runs on its own as **`Relay_Trip_History.html`** (the same screen) for
 people who only want the history.
 
-- **Add to history**: on the Events page, *Add to history* puts the files
-  you've loaded into the open history; tick *Add new files automatically* and
-  everything you load from then on goes in too. Each event counts once, so
+- **Send to history**: on the Events page, pick a history in the *History*
+  list (one you've saved, or *＋ New history…*) and click *Send to history* to
+  put the files you've loaded into it; *View in History* opens that history on
+  the History tab. Tick *Send new files automatically* and everything you load
+  from then on goes into the picked history too. Each event counts once, so
   adding a file twice is harmless. (The single-event samples aren't added.)
 - **Open in the Analyzer**: any event on the History tab opens on the
   Waveforms page (or in the summary), with its settings.
