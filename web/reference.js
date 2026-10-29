@@ -1,4 +1,4 @@
-/* SEL Trip Event Analyzer - reference waveform library.
+/* Relay Trip Analyzer - reference waveform library.
  *
  * Synthetic but realistic records of the events you meet in the field, built on
  * demand in the same "record" format as CEV / COMTRADE files, so the Waveform

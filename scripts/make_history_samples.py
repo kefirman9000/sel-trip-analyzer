@@ -1,4 +1,4 @@
-"""Generate sample_history/ (and SEL_history_samples.zip): two years of made-up
+"""Generate sample_history/ (and Relay_history_samples.zip): two years of made-up
 relay files from five substations, for trying the Trip History page and for
 its tests.
 
@@ -204,12 +204,12 @@ def line5_cevs():
             ms.OUT = old
 
 
-README = """SEL TRIP HISTORY - SAMPLE FILES
+README = """RELAY TRIP HISTORY - SAMPLE FILES
 ================================
 
 Two years (Nov 2024 to Oct 2026) of made-up relay files from five substations,
 kept in folders by station and relay. Drag the whole sample_history folder (or
-SEL_history_samples.zip) onto the Trip History page, or click "Try samples".
+Relay_history_samples.zip) onto the Trip History page, or click "Try samples".
 
 WHERE            WHAT HAPPENED                                     WHAT THE HISTORY PAGE SHOULD SHOW
 FEEDER 12        A-G faults at ~4.1-4.4 miles since June 2026,     Top problem location: recurring ground faults, a fault
@@ -255,7 +255,7 @@ def main():
         rows = [e for e in events if e[0] == relay and e[1] <= upto][-20:]
         write(os.path.join(folder(relay), f"{relay.replace(' ', '')}_history_{upto:%Y-%m-%d}.his"), his_text(relay, rows, upto))
     write(os.path.join(OUT, "README.txt"), README)
-    zpath = os.path.join(ROOT, "SEL_history_samples.zip")
+    zpath = os.path.join(ROOT, "Relay_history_samples.zip")
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for dirpath, _, names in os.walk(OUT):
             for n in sorted(names):

@@ -1,4 +1,4 @@
-/* SEL Trip History - the analysis behind the history page.
+/* Relay Trip History - the analysis behind the history page.
  *
  * Reads the same files as the trip analyzer (through core.js), keeps one record
  * per real event across every file ever loaded, and works out, per location:

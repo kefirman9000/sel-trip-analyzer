@@ -1,9 +1,9 @@
-SEL TRIP HISTORY - SAMPLE FILES
+RELAY TRIP HISTORY - SAMPLE FILES
 ================================
 
 Two years (Nov 2024 to Oct 2026) of made-up relay files from five substations,
 kept in folders by station and relay. Drag the whole sample_history folder (or
-SEL_history_samples.zip) onto the Trip History page, or click "Try samples".
+Relay_history_samples.zip) onto the Relay Trip History page, or click "Try samples".
 
 WHERE            WHAT HAPPENED                                     WHAT THE HISTORY PAGE SHOULD SHOW
 FEEDER 12        A-G faults at ~4.1-4.4 miles since June 2026,     Top problem location: recurring ground faults, a fault

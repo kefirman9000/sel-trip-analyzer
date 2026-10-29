@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-SEL Trip Event Analyzer - Windows desktop app
+Relay Trip Analyzer - Windows desktop app
 ----------------------------------------------
 The program itself is the same single page as the browser version
-(web/app.html + web/*.js, built into SEL_Trip_Analyzer.html). This file is a
+(web/app.html + web/*.js, built into Relay_Trip_Analyzer.html). This file is a
 small launcher around it, using only the Python standard library:
 
   * serves the page from 127.0.0.1 and opens it in a Microsoft Edge (or Chrome)
@@ -15,7 +15,7 @@ small launcher around it, using only the Python standard library:
   * "Check for updates" downloads the new .exe from GitHub Releases and
     restarts into it
 
-    SEL_Trip_Analyzer.exe [files or folders ...]
+    Relay_Trip_Analyzer.exe [files or folders ...]
     python sel_trip_analyzer.py [files or folders ...]
     python sel_trip_analyzer.py --selftest        (used by the release build)
     python sel_trip_analyzer.py --browser         (use the default browser)
@@ -34,13 +34,16 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-APP_NAME = "SEL Trip Event Analyzer"
-VERSION = "2.2.0"
+APP_NAME = "Relay Trip Analyzer"
+VERSION = "2.3.0"
 # GitHub "owner/repo" that publishes releases. Each release attaches
-# SEL_Trip_Analyzer.exe and SEL_Trip_Analyzer.html (the release workflow does that).
+# Relay_Trip_Analyzer.exe and Relay_Trip_Analyzer.html (the release workflow does that).
 GITHUB_REPO = "kefirman9000/sel-trip-analyzer"
-EXE_ASSET_NAME = "SEL_Trip_Analyzer.exe"
-HTML_ASSET_NAME = "SEL_Trip_Analyzer.html"
+EXE_ASSET_NAME = "Relay_Trip_Analyzer.exe"
+HTML_ASSET_NAME = "Relay_Trip_Analyzer.html"
+# The program's first name; releases also attach these copies so copies installed before the rename can update.
+LEGACY_EXE_ASSET_NAME = "SEL_Trip_Analyzer.exe"
+LEGACY_HTML_ASSET_NAME = "SEL_Trip_Analyzer.html"
 PORT = 47615                       # fixed, so the page keeps its saved notes and settings between runs
 FILE_EXTS = {".cev", ".eve", ".txt", ".sum", ".his", ".ser", ".hdr", ".log", ".chi", ".rdb", ".set", ".cfg", ".dat", ".cff", ".zip"}
 MAX_FILE = 64 * 1024 * 1024
@@ -52,7 +55,7 @@ WIN = sys.platform == "win32"
 # --------------------------------------------------------------------------
 def data_dir():
     base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
-    d = os.path.join(base, "SEL Trip Analyzer")
+    d = os.path.join(base, "SEL Trip Analyzer")    # the folder keeps its first name: it holds everyone's saved notes and histories
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -113,7 +116,7 @@ def version_tuple(v):
 def _http_get(url, accept="application/vnd.github+json", timeout=20):
     import urllib.request
     req = urllib.request.Request(url, headers={
-        "Accept": accept, "User-Agent": f"SEL-Trip-Analyzer/{VERSION}"})
+        "Accept": accept, "User-Agent": f"Relay-Trip-Analyzer/{VERSION}"})
     return urllib.request.urlopen(req, timeout=timeout)
 
 
@@ -125,7 +128,8 @@ def check_for_update():
     if version_tuple(tag) <= version_tuple(VERSION):
         return None
     assets = {a.get("name"): a for a in rel.get("assets", [])}
-    asset = assets.get(EXE_ASSET_NAME)
+    asset = assets.get(EXE_ASSET_NAME) or assets.get(LEGACY_EXE_ASSET_NAME)
+    html_asset = assets.get(HTML_ASSET_NAME) or assets.get(LEGACY_HTML_ASSET_NAME)
     digest = (asset or {}).get("digest") or ""
     return {
         "version": tag.lstrip("vV"),
@@ -135,7 +139,7 @@ def check_for_update():
         "sha256": digest.split(":", 1)[1].lower() if digest.startswith("sha256:") else None,
         "page": rel.get("html_url", ""),
         "source_url": f"https://raw.githubusercontent.com/{GITHUB_REPO}/{tag}/sel_trip_analyzer.py",
-        "html_url": assets[HTML_ASSET_NAME]["browser_download_url"] if HTML_ASSET_NAME in assets else None,
+        "html_url": html_asset["browser_download_url"] if html_asset else None,
     }
 
 
@@ -171,7 +175,7 @@ def install_update(info, progress=None):
         folder = os.path.dirname(exe)
         if not os.access(folder, os.W_OK):
             raise RuntimeError(f"No permission to write to {folder}. "
-                               "Move SEL_Trip_Analyzer.exe to a folder you own (e.g. Desktop) and retry.")
+                               f"Move {os.path.basename(exe)} to a folder you own (e.g. Desktop) and retry.")
         new_exe = exe + ".new"
         digest = download_file(info["url"], new_exe, progress)
         if info["sha256"] and digest != info["sha256"]:

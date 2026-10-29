@@ -51,5 +51,5 @@ jobs:
         with:
           name: browser-version
           path: |
-            dist/SEL_Trip_Analyzer.html
+            dist/Relay_Trip_Analyzer.html
             screenshots/

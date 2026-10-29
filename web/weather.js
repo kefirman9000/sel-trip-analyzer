@@ -1,4 +1,4 @@
-/* SEL Trip Event Analyzer - weather at the time of an event.
+/* Relay Trip Analyzer - weather at the time of an event.
  *
  * Uses Open-Meteo (free, no account): the geocoding API to turn a town name into
  * coordinates, and the historical weather API (or the forecast API's recent past)

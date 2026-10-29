@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SEL Trip Analyzer</title>
-<meta name="description" content="Drop SEL relay event files and get an editable summary of what tripped and why. Runs entirely in your browser.">
+<title>Relay Trip Analyzer: protective relay event and fault analysis</title>
+<meta name="description" content="Relay Trip Analyzer: free protective relay event and fault analysis in your browser. Reads SEL event reports (.CEV, .EVE, .HIS), COMTRADE from any relay or DFR, and QuickSet settings: what tripped and why, waveforms, phasors, PRC-004 reviews, and a trip history by location.">
 <link rel="icon" type="image/png" href="{{ICON}}">
 <style>
 :root {
@@ -415,8 +415,8 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
   <header>
     <img src="{{ICON}}" alt="">
     <div class="titles">
-      <h1>SEL Trip Event Analyzer</h1>
-      <div class="sub">Trip-cause summaries from SEL relay event reports and QuickSet settings</div>
+      <h1>Relay Trip Analyzer</h1>
+      <div class="sub">What tripped and why, from protective relay event reports (SEL, COMTRADE) and their settings</div>
     </div>
     <div class="head-actions">
       <button id="stationsBtn" title="Where each relay is, and the weather at each event">Stations &amp; weather</button>
@@ -870,7 +870,7 @@ let SNAPSHOT = null;
 try { SNAPSHOT = snapEl ? JSON.parse(snapEl.textContent) : null; } catch (e) { SNAPSHOT = null; }
 const VERSION = "{{VERSION}}";
 const REPO = "{{REPO}}";
-const HTML_ASSET = "SEL_Trip_Analyzer.html";
+const HTML_ASSET = "Relay_Trip_Analyzer.html";
 const core = window.SELCore;
 const $ = (id) => document.getElementById(id);
 const out = $("out");
@@ -1197,7 +1197,7 @@ function lineHtml(ln, i) {
   const s = ln.trim(), n = ln.length;
   const cls = Array.from({ length: n }, () => new Set());
   const mark = (a, b, c) => { for (let k = Math.max(0, a); k < Math.min(n, b); k++) cls[k].add(c); };
-  if (i === 0 && s.startsWith("SEL TRIP")) mark(0, n, "h1");
+  if (i === 0 && /^(RELAY|SEL) TRIP/.test(s)) mark(0, n, "h1");
   else if (/^[=\-]{10,}$/.test(s)) mark(0, n, "rule");
   else if (ln === s && /^[A-Z][A-Z /&()\-]{3,}$/.test(s)) mark(0, n, "h2");
   else if (/^Event \d+ of \d+/.test(ln) || s.startsWith("Probable cause")) mark(0, n, "b");
@@ -1836,7 +1836,7 @@ function reportHtml(text, withFigures, figOpts) {
     }
   }
   return `<div style="font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:10.5pt;color:${C.ink};line-height:1.35">${parts.join("\n")}` +
-         `<p style="font-size:7.5pt;color:${C.muted};margin-top:14pt;border-top:0.5pt solid ${C.rule};padding-top:4pt">SEL Trip Event Analyzer v${VERSION}</p></div>`;
+         `<p style="font-size:7.5pt;color:${C.muted};margin-top:14pt;border-top:0.5pt solid ${C.rule};padding-top:4pt">Relay Trip Analyzer v${VERSION}</p></div>`;
 }
 // ---------------------------------------------------------------- desktop app bridge
 const DESK = window.SEL_DESKTOP || null;
@@ -2018,7 +2018,7 @@ function exportAs(kind, values) {
   if (kind === "txt") download(name + ".txt", new Blob([text.replace(/\n/g, "\r\n")], { type: "text/plain;charset=utf-8" }));
   else if (kind === "docx") {
     const blocks = reportBlocks(text, pics, figOpts);
-    const bytes = window.SELDocx.build(blocks, { title: name, footer: `SEL Trip Event Analyzer v${VERSION}`, runs: core.tripRuns, paper: v.paper });
+    const bytes = window.SELDocx.build(blocks, { title: name, footer: `Relay Trip Analyzer v${VERSION}`, runs: core.tripRuns, paper: v.paper });
     download(name + ".docx", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
   } else if (kind === "pdf") {
     $("print-root").innerHTML = reportHtml(text, pics, figOpts);
@@ -2081,7 +2081,7 @@ async function checkUpdates(manual) {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
     if (!r.ok) throw new Error("GitHub said " + r.status);
     const rel = await r.json();
-    const asset = (rel.assets || []).find((a) => a.name === HTML_ASSET);
+    const asset = (rel.assets || []).find((a) => a.name === HTML_ASSET) || (rel.assets || []).find((a) => a.name === "SEL_Trip_Analyzer.html");
     if (newer(rel.tag_name, VERSION) && asset) {
       state.update = { version: rel.tag_name.replace(/^v/i, ""), url: asset.browser_download_url, notes: (rel.body || "").trim() };
       $("updBtn").textContent = "Update to v" + state.update.version; $("updBtn").classList.add("accent");

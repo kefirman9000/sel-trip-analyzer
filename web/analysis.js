@@ -1,4 +1,4 @@
-/* SEL Trip Event Analyzer - waveform analysis.
+/* Relay Trip Analyzer - waveform analysis.
  *
  * Turns SEL CEV event reports and COMTRADE records into a common "record"
  * (sampled analog channels + relay element channels), and computes what the

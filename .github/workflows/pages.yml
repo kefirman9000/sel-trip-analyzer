@@ -42,8 +42,10 @@ jobs:
           git worktree add "$RUNNER_TEMP/site" origin/gh-pages
           cd "$RUNNER_TEMP/site"
           cp "$RUNNER_TEMP/index.html" index.html
-          cp index.html SEL_Trip_Analyzer.html
+          cp index.html Relay_Trip_Analyzer.html
+          cp index.html SEL_Trip_Analyzer.html          # links shared before the rename keep working
           cp "$RUNNER_TEMP/history.html" history.html
+          cp history.html Relay_Trip_History.html
           cp history.html SEL_Trip_History.html
           touch .nojekyll
           git add -A

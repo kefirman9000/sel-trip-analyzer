@@ -1,24 +1,30 @@
 <img src="assets/icon.png" width="72" align="left" alt="">
 
-# SEL Trip Event Analyzer
+# Relay Trip Analyzer
 
-**Find out what tripped and why, in plain English.** Drop in SEL relay event
-files and get an editable trip summary ready for an outage report. Open any
+**Find out what tripped and why, in plain English.** A free protective relay
+event and fault analyzer: drop in relay event files (SEL `.CEV`, `.EVE`, `.HIS`
+and more, or COMTRADE from any relay or fault recorder) and get an editable trip
+summary ready for an outage report. Open any
 `.CEV` or COMTRADE record to see the waveforms, phasors, harmonics and every
 relay element, and to check the overcurrent elements against the relay's own
 settings.
 
 <p>
   <a href="https://kefirman9000.github.io/sel-trip-analyzer/"><b>▶ Open it online</b></a> ·
-  <a href="https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html"><b>⬇ Download (one .html file)</b></a> ·
-  <a href="https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.exe">Windows program</a> ·
-  <a href="https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_sample_files.zip">Sample files</a> ·
+  <a href="https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/Relay_Trip_Analyzer.html"><b>⬇ Download (one .html file)</b></a> ·
+  <a href="https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/Relay_Trip_Analyzer.exe">Windows program</a> ·
+  <a href="https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/Relay_sample_files.zip">Sample files</a> ·
   <a href="https://github.com/kefirman9000/sel-trip-analyzer/issues/new">Feedback</a>
 </p>
 
 Nothing to install, no account, and **your files never leave your computer**.
 
 ![Events page](docs/screenshots/main.png)
+
+*Formerly "SEL Trip Event Analyzer". Not affiliated with or endorsed by
+Schweitzer Engineering Laboratories; SEL is their trademark and is used here
+only to say which file formats it reads.*
 
 ## Contents
 
@@ -66,7 +72,7 @@ Analyzer and the History page.
 ## Get started
 
 1. **[Open it online](https://kefirman9000.github.io/sel-trip-analyzer/)**, or
-   **[download SEL_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/SEL_Trip_Analyzer.html)**
+   **[download Relay_Trip_Analyzer.html](https://github.com/kefirman9000/sel-trip-analyzer/releases/latest/download/Relay_Trip_Analyzer.html)**
    and double-click it to use it offline. It works in Chrome, Edge, Firefox and
    Safari, on Windows, Mac or Linux.
 2. **Drag your event files, a folder, or a .zip** onto the page. Every event
@@ -273,7 +279,7 @@ name before saving.
 ![History tab](docs/screenshots/history.png)
 
 **It's built into the Analyzer as a fourth tab, *History*** (`Alt+4`), and
-also runs on its own as **`SEL_Trip_History.html`** (the same screen) for
+also runs on its own as **`Relay_Trip_History.html`** (the same screen) for
 people who only want the history.
 
 - **Add to history**: on the Events page, *Add to history* puts the files
@@ -295,7 +301,7 @@ people who only want the history.
   history, on this computer or another. *Back up this history* still saves
   just the open one.
 
-**`SEL_Trip_History.html`** is a companion page for looking across *everything*
+**`Relay_Trip_History.html`** is a companion page for looking across *everything*
 you've downloaded, not one event at a time. It reads the same files with the
 same analysis, keeps them in your browser, and answers: *what keeps happening,
 where, and is it getting worse?*
@@ -388,7 +394,7 @@ They're the same program and give the same results. Use whichever suits you.
 | Opening files | Drag onto the page, Add files, Add folder | Also drag onto the program's icon |
 | Updates | Online is always current; a downloaded file shows a banner when there's a newer one | Installs updates itself when you say yes |
 
-**Windows program**: put `SEL_Trip_Analyzer.exe` in a folder you own (Desktop
+**Windows program**: put `Relay_Trip_Analyzer.exe` in a folder you own (Desktop
 or Documents, not Program Files, so it can update itself). The first time,
 Windows may say *"Windows protected your PC"*: click **More info → Run anyway**
 (the program isn't code-signed). It opens in its own window, drawn by Microsoft
@@ -449,7 +455,7 @@ future (relay clock wrong) has no weather.
 **The Windows program opened in a browser tab.** Edge wasn't found, so it used
 your default browser. Everything still works.
 
-**The update fails with a permission error.** Move `SEL_Trip_Analyzer.exe` out
+**The update fails with a permission error.** Move `Relay_Trip_Analyzer.exe` out
 of Program Files to Desktop or Documents.
 
 **Antivirus quarantined the program.** Single-file programs are sometimes

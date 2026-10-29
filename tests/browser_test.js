@@ -1,10 +1,10 @@
-/* End-to-end test of the built browser version (dist/SEL_Trip_Analyzer.html).
+/* End-to-end test of the built browser version (dist/Relay_Trip_Analyzer.html).
  *   python scripts/build_html.py && node tests/browser_test.js [screenshot-folder]
  * Needs Playwright with Chromium. */
 const { chromium } = require("playwright");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const REPO = path.resolve(__dirname, ".."), OUT = process.argv[2] || null;
-const url = "file://" + path.join(REPO, "dist/SEL_Trip_Analyzer.html");
+const url = "file://" + path.join(REPO, "dist/Relay_Trip_Analyzer.html");
 // reference output: the same core run from the command line
 const pyOut = (args) => {
   const ci = args.indexOf("--comments");
@@ -29,7 +29,7 @@ const ok = (name, cond, extra) => { results.push(`${cond ? "PASS" : "FAIL"}  ${n
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   // fake GitHub: a newer release with the html asset
   await ctx.route("https://api.github.com/**", (r) => r.fulfill({ status: 200, contentType: "application/json",
-    body: JSON.stringify({ tag_name: "v9.9.0", body: "notes", assets: [{ name: "SEL_Trip_Analyzer.html", browser_download_url: "https://example.invalid/new.html" }] }) }));
+    body: JSON.stringify({ tag_name: "v9.9.0", body: "notes", assets: [{ name: "Relay_Trip_Analyzer.html", browser_download_url: "https://example.invalid/new.html" }] }) }));
   await page.goto(url);
   await shot(page, "web_empty_light.png");
 

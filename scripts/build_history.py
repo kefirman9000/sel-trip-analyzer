@@ -1,4 +1,4 @@
-"""Build the single-file Trip History page: dist/SEL_Trip_History.html
+"""Build the single-file Trip History page: dist/Relay_Trip_History.html
 
     python scripts/build_history.py [output.html]
 
@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def main():
-    out_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "SEL_Trip_History.html")
+    out_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "Relay_Trip_History.html")
     with open(os.path.join(ROOT, "sel_trip_analyzer.py"), encoding="utf-8") as f:
         py = f.read()
     version = re.search(r'^VERSION = "([^"]+)"', py, re.M).group(1)

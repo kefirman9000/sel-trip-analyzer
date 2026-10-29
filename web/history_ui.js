@@ -1,4 +1,4 @@
-/* SEL Trip History - the History screen (overview, locations, issues, events, files & settings, the event
+/* Relay Trip History - the History screen (overview, locations, issues, events, files & settings, the event
  * panel and the export dialog), as a module that mounts into any element. Used by the standalone page
  * (history.html) and by the Trip Analyzer's History tab.
  *
@@ -20,7 +20,7 @@ root.innerHTML = `<div class="toolbar">
   <button id="hx-addFolder" class="nosnap" title="Add a folder (and its subfolders)">Add folder</button>
   <button class="nosnap" id="hx-watchBtn" title="Keep a folder watched: new relay files are added as they arrive (Chrome / Edge)" hidden>Watch a folder</button>
   <span class="grow"></span>
-  <button id="hx-analyzerBtn" title="Open the SEL Trip Analyzer (one event at a time, with waveforms)">Trip Analyzer ↗</button>
+  <button id="hx-analyzerBtn" title="Open the Relay Trip Analyzer (one event at a time, with waveforms)">Trip Analyzer ↗</button>
   <button id="hx-exportBtn" class="accent" title="Export a historical report (Ctrl+S)" disabled>Export report</button>
 </div>
   <input type="file" id="hx-pickFiles" multiple hidden>
@@ -1209,7 +1209,7 @@ function renderDrawer() {
     ${recs.length || hot.length ? `<h4>Part of a pattern</h4><ul>${recs.map((x) => `<li><b>Recurring ${esc(IL(x.key).toLowerCase())}</b> at ${esc(x.relay)}: ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). <button class="link" data-list="${esc(x.allIds.join("\n"))}">step through them</button></li>`).join("")}
       ${hot.map((h) => `<li><b>Fault hot spot</b>: ${h.n} faults between ${h.from.toFixed(2)} and ${h.to.toFixed(2)}. <button class="link" data-list="${esc(h.ids.join("\n"))}">step through them</button></li>`).join("")}</ul>` : ""}
     ${seqMates.length ? `<h4>Same sequence</h4><ul>${seqMates.map((x) => `<li><button class="link" data-open="${esc(x.id)}">${esc(H.fmtWhen(x))} ${esc(x.et)}</button> <span class="muted">${esc(x.targets)}</span></li>`).join("")}</ul>` : ""}
-    <div class="nosnap" style="margin:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="hx-dAnalyzer" title="Open this event's files in the SEL Trip Analyzer${r.waveId ? ", on the Waveforms page" : ""}">${r.waveId ? "Open waveforms in Trip Analyzer ↗" : "Open in Trip Analyzer ↗"}</button></div>
+    <div class="nosnap" style="margin:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="hx-dAnalyzer" title="Open this event's files in the Relay Trip Analyzer${r.waveId ? ", on the Waveforms page" : ""}">${r.waveId ? "Open waveforms in Trip Analyzer ↗" : "Open in Trip Analyzer ↗"}</button></div>
     ${r.wx ? `<h4>Weather</h4><p style="margin:0">${wxTag(r)} ${esc(r.wx.text)}${r.wx.location ? ` <span class="hint">at ${esc(r.wx.location)}</span>` : ""}</p>${r.wx.hints ? `<ul class="hint">${r.wx.hints.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}` : ""}
     ${r.tripped ? `<h4>PRC-004 review</h4><p style="margin:0">${reviewHtml(r)}</p>${opts.reviewEvent && !SNAP ? `<p style="margin:6px 0 0"><button class="small" id="hx-dReview">${r.review ? "Change the review" : "Review this trip"}</button></p>` : ""}` : ""}
     <h4>Details</h4><table class="kv">${kv.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
@@ -1381,9 +1381,9 @@ function reviewHtml(r) {
 
 // ---------------------------------------------------------------- open in the Trip Analyzer
 function defaultAnalyzerUrl() {
-  if (/^https?:$/.test(location.protocol)) return new URL("SEL_Trip_Analyzer.html", location.href).href;
+  if (/^https?:$/.test(location.protocol)) return new URL("Relay_Trip_Analyzer.html", location.href).href;
   const [owner, repo] = REPO.split("/");
-  return `https://${owner}.github.io/${repo}/SEL_Trip_Analyzer.html`;
+  return `https://${owner}.github.io/${repo}/Relay_Trip_Analyzer.html`;
 }
 const analyzerUrl = () => state.cfg.analyzerUrl || defaultAnalyzerUrl();
 $("analyzerBtn").hidden = EMBED;
@@ -1624,7 +1624,7 @@ $("expGo").onclick = () => {
       } : null,
     }));
     if (fmt === "txt") download(name, new Blob([H.blocksToText(blocks)], { type: "text/plain" }));
-    else if (fmt === "docx") download(name, new Blob([Docx.build(blocks, { title: name.replace(/\.docx$/, ""), footer: "SEL Trip History" })], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    else if (fmt === "docx") download(name, new Blob([Docx.build(blocks, { title: name.replace(/\.docx$/, ""), footer: "Relay Trip History" })], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
     else printBlocks(blocks, name.replace(/\.pdf$/, ""));
   }
   $("expDlg").close();
