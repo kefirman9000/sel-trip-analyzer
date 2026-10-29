@@ -1,9 +1,11 @@
 name: Build and release
 
-# Two ways to release (the tag must match VERSION in sel_trip_analyzer.py):
-#  - push a tag like v2.1.0: this builds everything and publishes the release,
-#    with the notes from docs/releases/v2.1.0.md (if that file exists);
+# Three ways to release version X.Y.Z (VERSION in sel_trip_analyzer.py), all with the notes in docs/releases/vX.Y.Z.md:
+#  - Actions -> Build and release -> Run workflow, with "Publish" ticked: builds everything, creates the tag vX.Y.Z
+#    on the commit it ran on, and publishes the release;
+#  - or push a tag vX.Y.Z: the same;
 #  - or publish a release on GitHub by hand: this builds and attaches the files.
+# Run without "Publish" it only test-builds (the files are kept as a workflow artifact).
 # Installed copies pick the new version up via "Check for updates".
 on:
   push:
@@ -11,6 +13,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a release for the VERSION in sel_trip_analyzer.py"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -25,15 +32,32 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Check tag matches VERSION
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Which release
+        id: rel
         shell: python
+        env:
+          EVENT: ${{ github.event_name }}
+          PUBLISH: ${{ inputs.publish }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          import re, os, sys
+          import os, re, sys, subprocess
           v = re.search(r'^VERSION = "([^"]+)"', open("sel_trip_analyzer.py", encoding="utf-8").read(), re.M).group(1)
-          tag = os.environ["GITHUB_REF_NAME"].lstrip("vV")
-          if v != tag:
-              sys.exit(f"Tag {tag} does not match VERSION {v} in sel_trip_analyzer.py")
+          tag = "v" + v
+          event, ref = os.environ["EVENT"], os.environ.get("GITHUB_REF", "")
+          if ref.startswith("refs/tags/") and os.environ["GITHUB_REF_NAME"].lstrip("vV") != v:
+              sys.exit(f"Tag {os.environ['GITHUB_REF_NAME']} does not match VERSION {v} in sel_trip_analyzer.py")
+          publish = event == "push" or (event == "workflow_dispatch" and os.environ.get("PUBLISH") == "true")
+          if publish and event == "workflow_dispatch":
+              r = subprocess.run(["gh", "release", "view", tag, "--repo", os.environ["GITHUB_REPOSITORY"]], capture_output=True)
+              if r.returncode == 0:
+                  sys.exit(f"Release {tag} already exists: bump VERSION first")
+          notes = f"docs/releases/{tag}.md"
+          if not os.path.exists(notes):
+              notes = "release-notes.md"
+              open(notes, "w", encoding="utf-8").write(f"Release {tag}.")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"tag={tag}\npublish={'true' if publish else 'false'}\nnotes={notes}\n")
+          print(f"{tag}: {'publishing' if publish else 'build only'}")
 
       - uses: actions/setup-node@v4
         with:
@@ -60,26 +84,14 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "exe self-test exited with $($p.ExitCode)" }
           Write-Host "exe self-test passed"
 
-      - name: Release notes for a pushed tag
-        id: notes
-        if: github.event_name == 'push'
-        shell: python
-        run: |
-          import os
-          tag = os.environ["GITHUB_REF_NAME"]
-          path = f"docs/releases/{tag}.md"
-          if not os.path.exists(path):
-              path = "release-notes.md"
-              open(path, "w", encoding="utf-8").write(f"Release {tag}.")
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-              f.write(f"path={path}\n")
-
-      - name: Publish release (pushed tag)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      - name: Publish release
+        if: steps.rel.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
-          body_path: ${{ steps.notes.outputs.path }}
+          tag_name: ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.rel.outputs.tag }}
+          body_path: ${{ steps.rel.outputs.notes }}
           make_latest: "true"
           fail_on_unmatched_files: true
           files: |
