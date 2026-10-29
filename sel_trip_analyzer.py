@@ -35,7 +35,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 APP_NAME = "Relay Trip Analyzer"
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 # GitHub "owner/repo" that publishes releases. Each release attaches
 # Relay_Trip_Analyzer.exe and Relay_Trip_Analyzer.html (the release workflow does that).
 GITHUB_REPO = "kefirman9000/sel-trip-analyzer"

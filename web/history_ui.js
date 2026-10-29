@@ -1721,7 +1721,7 @@ const ready = load().catch((e) => { console.error(e); toast("Couldn't open the h
 return {
   ready, state, render: () => (state.model ? render() : undefined), plainChanged: () => { if (state.model) { render(); if (state.drawer.id) renderDrawer(); } }, refresh: () => (state.model ? rebuild(false) : undefined), go, openDrawer, rebuild, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h),
   addFiles: async (list, label) => { await ready; return addFiles(list, label); },
-  currentName, histories: histList, switchTo, readData, mergeInto, createHistory,
+  currentName, currentId: () => current, histories: histList, switchTo, readData, mergeInto, createHistory,
 };
 }
 
