@@ -638,6 +638,7 @@ dialog.wide { max-width: min(980px, calc(100vw - 32px)); }
       <button id="stationsBtn" title="Where each relay is, and the weather at each event">Stations &amp; weather</button>
       <button id="helpBtn" title="Help (F1)">Help</button>
       <label class="switch" title="Dark mode (Ctrl+D)"><input type="checkbox" id="dark"> Dark mode</label>
+      <label class="switch" title="Say things in everyday words instead of relay codes and engineering terms (the codes stay in the details and on hover)"><input type="checkbox" id="plainSw"> Plain English</label>
       <button id="updBtn">Check for updates</button>
     </div>
   </header>
@@ -2140,6 +2141,10 @@ function shortCause(rec, settings, a) {
   return (a.tripped ? "TRIP - " : "No trip - ") + parts.join(" ") + (n ? `  [${n} to check]` : "");
 }
 
+// plain-English wording (plain.js), when the page or Node has it
+let plainText = null;
+function usePlain(p) { plainText = p; }
+
 // ---- dates (mirrors datetime.strptime for the formats used)
 function daysIn(y, m) { return [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]; }
 function parseDate(d) {
@@ -2472,7 +2477,8 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
     shown.forEach((it, idx) => {
       const e = it.e;
       const when = strip(`${e.date} ${e.time}`) || "date n/a";
-      out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${e.event_type || "?"} | ${shortCause(e, it.s, it.a)}`);
+      if (opts.plain && plainText) out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${plainText.faultShort(eventCore(e.event_type), it.a.tripped)} | ${plainText.itemSentence(it)}`);
+      else out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${e.event_type || "?"} | ${shortCause(e, it.s, it.a)}`);
     });
     out.push("");
     out.push(...relationSections(view, number));
@@ -2492,6 +2498,7 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
       shown.forEach((it, idx) => {
         const n = idx + 1, e = it.e, s = it.s, a = it.a, lbl = it.label;
         out.push(`Event ${n} of ${shown.length}  (${e.kind === "history" ? "history row" : "event report"})`);
+        if (opts.plain && plainText) out.push(`  Plain English: ${plainText.itemSentence(it).replace(/\s+\[\d+ to check\]$/, "")}`);
         out.push(`  Source file : ${e.source}`);
         const relay = [e.relay_id, e.terminal_id].filter(Boolean).join(" / ");
         if (relay) out.push(`  Relay       : ${relay}`);
@@ -2781,7 +2788,7 @@ function filterReportText(text, inc) {
 /** Split a cause string so TRIP / No trip / CHECK prefixes and [n to check] can be coloured. */
 function tripRuns(text) {
   let runs = [[text, null]];
-  for (const [word, color] of [["Relay TRIPPED", "trip"], ["TRIP", "trip"], ["No trip recorded", "ok"], ["No trip", "ok"], ["CHECK:", "warn"]]) {
+  for (const [word, color] of [["Relay TRIPPED", "trip"], ["Tripped:", "trip"], ["TRIP", "trip"], ["No trip recorded", "ok"], ["No trip", "ok"], ["CHECK:", "warn"]]) {
     if (text.startsWith(word)) { runs = [[word, color], [text.slice(word.length), null]]; break; }
   }
   const lastText = runs[runs.length - 1][0];
@@ -2878,7 +2885,7 @@ function reviewCsv(events, rdb, reviews) {
 }
 
 const api = {
-  loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
+  loadFiles, buildReport, usePlain, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
   parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, ARCHIVE_EXTS, SETTINGS_TEXT_EXTS, unzip, settingsFromText, nowStamp, eventDatetime, eventCore,
   interpretEventType, interpretTargets, extractSettings, splitWS, strip, splitlines, csvLine, latin1, FAULT_TYPES, fx, fc, pyTitle, elementClass,
   newRec, useComtradeReader, BREAKER_NAMES, TRIP_NAMES, MISOP_CATEGORIES, MISOP_CAUSES, REVIEW_OUTCOMES, REVIEW_COLUMNS, REVIEW_DAYS, CAP_DAYS, reviewDue, suggestReview, reviewRows, reviewLine, reviewCsv, addDays,
@@ -5536,6 +5543,184 @@ else root.SELWeather = api;
 
 </script>
 <script>
+/* SEL Trip Event Analyzer - plain-English wording for people who don't read relay codes.
+ *
+ * Used when "Plain English" is switched on (the Analyzer header, the History page). It only rewords
+ * what the record shows; the codes stay available (in the details and on hover), and causes stay
+ * "possible" exactly as the analysis says.
+ *
+ *   SELPlain.sentence({core, tripped, primary, targets, locNum, locPct, loc, shot}) -> "Tripped: phase A touched ground..."
+ *   SELPlain.faultShort("AG") -> "A to ground"      SELPlain.element("Z1G") -> "Zone 1 distance protection..."
+ *   SELPlain.issue(key) -> [short, long]            SELPlain.cycles(7.75) -> "7.75 cycles (0.13 s)"
+ * Works in browsers (window.SELPlain) and Node.
+ */
+(function (root) {
+"use strict";
+const isNode = typeof module !== "undefined" && module.exports;
+const core = isNode ? require("./core.js") : root.SELCore;
+
+const FAULT_SHORT = { AG: "A to ground", BG: "B to ground", CG: "C to ground", AB: "A and B", BC: "B and C", CA: "C and A",
+  ABG: "A, B to ground", BCG: "B, C to ground", CAG: "C, A to ground", ABC: "All 3 phases", ABCG: "All 3 phases",
+  TRIP: "No fault found", ER: "Record only", TRIG: "Manual record" };
+const FAULT_SENTENCE = {
+  AG: "phase A touched ground", BG: "phase B touched ground", CG: "phase C touched ground",
+  AB: "phases A and B touched each other", BC: "phases B and C touched each other", CA: "phases C and A touched each other",
+  ABG: "phases A and B touched ground", BCG: "phases B and C touched ground", CAG: "phases C and A touched ground",
+  ABC: "all three phases faulted together", ABCG: "all three phases faulted to ground",
+};
+
+/** What kind of protection, in words: from the tripping elements, else from the front-panel targets. */
+const KINDS = [
+  ["comm", "a trip signal from the relay at the other end of the line"],
+  ["dist", null],                          // zone-specific, below
+  ["87", "differential protection (the current going in and out didn't match)"],
+  ["50", "instant overcurrent protection (the current was very high)"],
+  ["51", "timed overcurrent protection (the current stayed too high for too long)"],
+  ["67", "directional overcurrent protection"],
+  ["81", "low-frequency load shedding (the power system's frequency dropped)"],
+  ["27", "low-voltage protection"],
+  ["59", "high-voltage protection"],
+  ["bf", "breaker-failure protection (another breaker didn't open)"],
+  ["sotf", "switch-onto-fault protection (it closed onto a fault)"],
+];
+const zoneText = (z) => (z === "1" ? "Zone 1 distance protection (fast: the fault was close, on this line)"
+  : z === "2" ? "Zone 2 distance protection (slower backup: the fault was near the far end of the line)"
+  : `Zone ${z} distance protection (backup for faults further away)`);
+function kindsOf(primary, targets) {
+  const kinds = new Map();               // kind -> text
+  const add = (k, text) => { if (!kinds.has(k)) kinds.set(k, text); };
+  for (const el of primary || []) {
+    const n = String(el).toUpperCase(), cls = core.elementClass(n);
+    const z = /^(?:Z|M)(\d)/.exec(n) || /\bZ(?:ONE)?\s*-?(\d)/.exec(n) || /ZM0?(\d)/.exec(n);
+    if (/distance/.test(cls)) add("dist" + (z ? z[1] : ""), z ? zoneText(z[1]) : "distance protection");
+    else if (/communications/.test(cls)) add("comm", KINDS[0][1]);
+    else if (/differential/.test(cls)) add("87", KINDS[2][1]);
+    else if (/instantaneous overcurrent/.test(cls)) add("50", KINDS[3][1]);
+    else if (/time-overcurrent/.test(cls)) add("51", KINDS[4][1]);
+    else if (/directional overcurrent/.test(cls)) add("67", KINDS[5][1]);
+    else if (/frequency/.test(cls)) add("81", KINDS[6][1]);
+    else if (/undervoltage/.test(cls)) add("27", KINDS[7][1]);
+    else if (/overvoltage/.test(cls)) add("59", KINDS[8][1]);
+    else if (/breaker failure/.test(cls)) add("bf", KINDS[9][1]);
+    else if (/switch-onto-fault/.test(cls)) add("sotf", KINDS[10][1]);
+  }
+  if (!kinds.size && targets) {
+    const t = ` ${String(targets).toUpperCase()} `;
+    const z = /\bZ(?:ONE)?\s*(\d)\b/.exec(t);
+    if (/\bCOMM\b/.test(t)) add("comm", KINDS[0][1]);
+    if (z) add("dist" + z[1], zoneText(z[1]));
+    if (/\b87/.test(t)) add("87", KINDS[2][1]);
+    if (/\b51/.test(t) || (/\bTIME\b/.test(t) && !z)) add("51", KINDS[4][1]);
+    if (/\b50(?!BF)/.test(t) || (/\bINST\b/.test(t) && !z)) add("50", KINDS[3][1]);
+    if (/\b67/.test(t)) add("67", KINDS[5][1]);
+    if (/\b81|\bFREQ\b/.test(t)) add("81", KINDS[6][1]);
+    if (/\b27/.test(t)) add("27", KINDS[7][1]);
+    if (/\b59/.test(t)) add("59", KINDS[8][1]);
+    if (/\bBF\b|50BF/.test(t)) add("bf", KINDS[9][1]);
+    if (/\bSOTF\b/.test(t)) add("sotf", KINDS[10][1]);
+  }
+  return [...kinds.values()];
+}
+const shortKind = (text) => text.replace(/ \(.*\)$/, "");
+
+function where(r) {
+  if (r.locNum === null || r.locNum === undefined || !Number.isFinite(r.locNum)) return "";
+  if (r.locNum < 0) return "behind the relay (in the other direction from the line)";
+  if (r.locPct !== null && r.locPct !== undefined) {
+    if (r.locPct > 105) return `beyond the end of the line (${r.loc || r.locNum} from the relay)`;
+    return `about ${r.locPct}% of the way along the line (${r.loc || r.locNum} from the relay)`;
+  }
+  return `${r.loc || r.locNum} from the relay (in the relay's distance units)`;
+}
+
+/** One sentence for an event. r: {core, tripped, primary, targets, locNum, locPct, loc, shot, checks} */
+function sentence(r, opts) {
+  opts = opts || {};
+  const c = r.core || core.eventCore(r.et || r.event_type || "");
+  const tokens = String(r.targets || "").toUpperCase().split(/\s+/);
+  const lockout = tokens.includes("LO") || (r.seq || []).some(([, el]) => /^79LO/.test(el));
+  const kinds = kindsOf(r.primary, r.targets);
+  const by = kinds.length ? kinds.map(opts.long ? (x) => x : shortKind).join(" and ") : "";
+  const w = where(r);
+  let s;
+  if (FAULT_SENTENCE[c]) {
+    s = `${r.tripped ? "Tripped" : "No trip"}: ${FAULT_SENTENCE[c]}${w ? " " + w : ""}`;
+    if (r.tripped) s += by ? `; ${by} opened the breaker` : "; the breaker opened";
+    else s += "; the relay recorded it but didn't trip";
+  } else if (c === "TRIP" || (r.tripped && !FAULT_SENTENCE[c])) {
+    s = `Tripped: no fault was found${by ? `; it came from ${by}` : "; the reason isn't in the record (possibly a manual or remote open)"}`;
+  } else if (c === "ER" || c === "TRIG") {
+    s = c === "TRIG" ? "No trip: someone took a manual recording" : "No trip: the relay saw something worth recording, but nothing tripped";
+  } else s = `${r.tripped ? "Tripped" : "No trip"}: event type ${r.et || c || "unknown"}`;
+  if (lockout) s += ". The recloser tried again and then gave up, so the circuit stayed off (lockout)";
+  else if (r.tripped && Number(r.shot) > 0) s += ` (after ${r.shot} reclose${Number(r.shot) === 1 ? "" : "s"})`;
+  s += ".";
+  const n = opts.checks === undefined ? (r.checks || []).length + (r.gaps || []).length : opts.checks;
+  return n && opts.withChecks !== false ? `${s}  [${n} to check]` : s;
+}
+function faultShort(c, tripped) { return FAULT_SHORT[c] || (tripped ? "Tripped" : c || "?"); }
+
+/** A relay element in everyday words (the technical explanation is on the Waveforms page). */
+function element(name) {
+  const n = String(name).toUpperCase();
+  if (/^TRIP\d?$|^3PT$|^TP[ABC]/.test(n)) return "the relay's trip signal";
+  if (/^OUT\d+/.test(n)) return "an output to the breaker or alarms";
+  if (/^IN\d+/.test(n)) return "a wired input (often the breaker position or an outside trip)";
+  if (/^52A/.test(n)) return "breaker closed";
+  if (/^52B/.test(n)) return "breaker open";
+  if (/^79LO/.test(n)) return "recloser gave up (lockout)";
+  if (/^79RS/.test(n)) return "recloser ready";
+  if (/^79CY/.test(n)) return "recloser trying again";
+  if (/^KEY$/.test(n)) return "trip permission sent to the other end";
+  const k = kindsOf([n], "");
+  return k.length ? shortKind(k[0]) : core.elementClass(n) || "a relay logic bit";
+}
+
+/** Issue types in everyday words: [short, long]. */
+const ISSUES = {
+  f_slg: ["Touched ground", "Faults where a phase touched ground"],
+  f_ll: ["Phases touched", "Faults where two phases touched each other"],
+  f_llg: ["Two phases to ground", "Faults where two phases touched ground"],
+  f_3ph: ["All three phases", "Faults on all three phases"],
+  trip_nofault: ["Tripped, no fault", "Trips with no fault and no reason found"],
+  transfer: ["Tripped by other end", "Trips sent from the other end of the line"],
+  underfreq: ["Load shedding", "Load shedding because the system frequency dropped"],
+  lockout: ["Stayed off", "Recloser gave up and the circuit stayed off (lockouts)"],
+  slow_breaker: ["Slow breaker", "Breaker slow to open"],
+  breaker_status: ["Breaker position unclear", "Breaker position not seen, or seen in the wrong order"],
+  unexplained: ["Unexplained trip", "Trips no protection explains"],
+  z1_reach: ["Reached too far", "Fast protection tripped for a fault too far away"],
+  beyond_line: ["Past the line end", "Faults located past the end of the line"],
+  reverse: ["Behind the relay", "Faults behind the relay (the other direction)"],
+  mismatch: ["Record contradicts itself", "Records that contradict themselves"],
+  low_current: ["Weak fault", "Weak faults (possibly a wire on the ground)"],
+  off_freq: ["Frequency off normal", "System frequency off normal"],
+  no_location: ["Distance unknown", "No distance to the fault"],
+  other_check: ["Other checks", "Other things to check"],
+  no_settings: ["No settings", "No relay settings loaded"],
+  summary_only: ["Summary only", "Only a summary of the event (no detailed record)"],
+};
+const issue = (key) => ISSUES[key] || [key, key];
+const cycles = (c, hz) => (c === null || c === undefined ? "" : `${c} cycles (${(c / (hz || 60)).toFixed(2)} s)`);
+
+/** Plain sentence for an Analyzer event item ({e, s, a} from core.prepareView). */
+function itemSentence(it) {
+  const e = it.e, s = it.s || {}, a = it.a;
+  const locNum = e.location && !e.location.includes("$") ? parseFloat(e.location) : null;
+  const ll = parseFloat(s.LL);
+  return sentence({ core: core.eventCore(e.event_type), tripped: a.tripped, primary: a.primary, targets: e.targets, loc: e.location,
+    locNum: Number.isFinite(locNum) ? locNum : null, locPct: Number.isFinite(locNum) && ll ? Math.round(100 * locNum / ll) : null,
+    shot: e.shot, seq: e.sequence.filter((x) => x[2] === "asserted").map(([cy, el]) => [cy, el]), checks: a.checks, gaps: a.gaps });
+}
+
+const api = { sentence, itemSentence, faultShort, element, issue, cycles, kindsOf, where, ISSUES, FAULT_SHORT };
+if (core && core.usePlain) core.usePlain(api);
+if (isNode) module.exports = api;
+else root.SELPlain = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
 /* SEL Trip History - the analysis behind the history page.
  *
  * Reads the same files as the trip analyzer (through core.js), keeps one record
@@ -5555,6 +5740,7 @@ else root.SELWeather = api;
 const isNode = typeof module !== "undefined" && module.exports;
 const core = isNode ? require("./core.js") : root.SELCore;
 if (isNode) { try { require("./analysis.js"); } catch (e) { /* COMTRADE reader is optional */ } }
+const Plain = isNode ? require("./plain.js") : root.SELPlain;
 
 const DAY = 86400e3;
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -6193,7 +6379,12 @@ function changes(before, after, newIds) {
 const fmtDate = (ms) => (ms === null || ms === undefined ? "-" : isoDate(ms));
 const fmtWhen = (r) => (r.ms === null ? `${r.rawDate} ${r.rawTime}`.trim() || "(no date)" : `${r.date} ${r.time.slice(0, 8)}`);
 const arrow = (t) => (t.dir === "up" ? "▲ " : t.dir === "down" ? "▼ " : "") + t.label;
-const issueList = (r) => r.issues.filter((x) => ISSUE[x.key].group !== "data").map((x) => ISSUE[x.key].label + (x.detail && !FAULT_KEYS[x.detail] ? ` (${x.detail})` : "")).join("; ");
+/** Issue names, technical or in everyday words. */
+const issueLabel = (k, plain) => (plain && Plain ? Plain.issue(k)[1] : ISSUE[k].label);
+const issueShort = (k, plain) => (plain && Plain ? Plain.issue(k)[0] : ISSUE[k].short);
+const issueList = (r, plain) => r.issues.filter((x) => ISSUE[x.key].group !== "data").map((x) => issueLabel(x.key, plain) + (x.detail && !FAULT_KEYS[x.detail] ? ` (${x.detail})` : "")).join("; ");
+/** An event in one line: the analysis's summary, or a plain-English sentence. */
+const whatHappened = (r, plain) => (plain && Plain ? Plain.sentence(r, { withChecks: false }) : r.short.replace(/\s+\[\d+ to check\]$/, ""));
 const WX_LABEL = { lightning: "thunderstorm", wind: "wind", ice: "ice/snow", rain: "heavy rain", heat: "heat" };
 const trendWords = (t) => (t.days >= 360 ? `${t.recent} in the last year vs ${t.prev} the year before` : `${t.recent} in the last ${t.days} days vs ${t.prev} before`);
 const whereText = (L) => `${L.relay}${L.station && L.station !== "Unassigned" ? ` (${L.station})` : ""}`;
@@ -6210,6 +6401,7 @@ function scoped(model, opts) {
 /** opts: {station, relay, sections: {overview, ranking, recurring, hotspots, trends, matrix, details, events, worklog}, top, notes} */
 function reportBlocks(model, opts) {
   opts = opts || {};
+  const PL = !!opts.plain;
   const sec = Object.assign({ overview: true, ranking: true, recurring: true, hotspots: true, trends: true, breakers: true, weather: true, customers: true, reviews: true, matrix: true, details: true, events: true, worklog: true }, opts.sections || {});
   const S = scoped(model, opts);
   const recs = S.records;
@@ -6246,14 +6438,14 @@ function reportBlocks(model, opts) {
     blocks.push(["note", "Score = trips (older ones count less, half-life " + model.cfg.halfLifeDays + " days) + severity of the issues + recurring issues and hot spots, raised 30% when trips are increasing."]);
     blocks.push(["table", ["Rank", "Location", "Trips", "Last trip", "Trend", "Main issues", "Score"],
       S.relays.slice(0, opts.top || 25).map((L) => [String(L.rank), whereText(L), String(L.trips), fmtDate(L.lastTrip), `${arrow(L.trend)} (${L.trend.recent} vs ${L.trend.prev}${L.trend.basis === "year" ? ", yearly" : ""})`,
-        L.top.map((t) => `${t.label} ${t.n}${t.recurring ? " (recurring)" : ""}`).join("; ") || "-", String(L.score)]),
+        L.top.map((t) => `${issueLabel(t.key, PL)} ${t.n}${t.recurring ? " (recurring)" : ""}`).join("; ") || "-", String(L.score)]),
       [7, 20, 7, 12, 16, 30, 8]]);
   }
   if (sec.recurring) {
     blocks.push(["h1", "Recurring issues"]);
     if (!S.recurring.length) blocks.push(["para", `No issue happened ${model.cfg.recurMin} or more times within ${model.cfg.recurDays} days at one location.`]);
     else blocks.push(["table", ["Location", "Issue", "How often", "Most recent", "Trend", "Events"],
-      S.recurring.map((x) => [whereText(x), x.label + (x.clearing ? ` (${x.clearing.first} → ${x.clearing.last} cycles)` : ""),
+      S.recurring.map((x) => [whereText(x), issueLabel(x.key, PL) + (x.clearing ? ` (${x.clearing.first} → ${x.clearing.last} cycles)` : ""),
         `${x.inWindow} in ${x.windowDays} days (${x.total} in all)`, fmtDate(x.last), arrow(x.trend),
         x.allIds.map((id) => fmtDate(model.byId.get(id).ms)).join(", ")]), [18, 22, 15, 11, 10, 24]]);
   }
@@ -6272,7 +6464,7 @@ function reportBlocks(model, opts) {
     blocks.push(["note", `Trip occasions (a reclose sequence counts once) in the last ${model.cfg.trendDays} days against the ${model.cfg.trendDays} days before, and the last year against the year before, ending ${fmtDate(model.anchor)}. A recent rise is reported first; otherwise the year-on-year change.`]);
     const rows = S.relays.filter((L) => L.trend.dir === "up" || L.trend.dir === "down").map((L) => [whereText(L), arrow(L.trend), trendWords(L.trend)]);
     const issueRows = [];
-    for (const L of S.relays) for (const [key, t] of Object.entries(L.issueTrends)) if ((t.dir === "up" || t.dir === "down") && ISSUE[key].group !== "data") issueRows.push([whereText(L), ISSUE[key].label, arrow(t), trendWords(t)]);
+    for (const L of S.relays) for (const [key, t] of Object.entries(L.issueTrends)) if ((t.dir === "up" || t.dir === "down") && ISSUE[key].group !== "data") issueRows.push([whereText(L), issueLabel(key, PL), arrow(t), trendWords(t)]);
     if (rows.length) blocks.push(["table", ["Location", "Trips", "Compared"], rows, [34, 20, 46]]);
     else blocks.push(["para", "No location's trip count changed much."]);
     if (issueRows.length) { blocks.push(["h2", "By issue"]); blocks.push(["table", ["Location", "Issue", "Trend", "Compared"], issueRows, [24, 30, 16, 30]]); }
@@ -6295,7 +6487,8 @@ function reportBlocks(model, opts) {
       blocks.push(["h1", "Customer impact (last 12 months)"]);
       blocks.push(["note", `Estimate: each trip interrupts every customer on the circuit; ${model.cfg.sustained === "all" ? "every trip counts as sustained" : "a recloser lockout is a sustained interruption and other trips are momentary"}. Trips in the 12 months to ${fmtDate(model.anchor)}.`]);
       blocks.push(["kv", [["Customers served", `${c.served.toLocaleString("en-US")} on ${plural(c.locations, "circuit")}${c.missing ? ` (${c.missing} without a customer count)` : ""}`],
-        ["SAIFI (estimate)", `${c.saifi.toFixed(2)} sustained interruptions per customer`], ["MAIFI (estimate)", `${c.maifi.toFixed(2)} momentary interruptions per customer`]]]);
+        [PL ? "Outages per customer" : "SAIFI (estimate)", `${c.saifi.toFixed(2)} sustained interruptions per customer${PL ? " (SAIFI, estimate)" : ""}`],
+        [PL ? "Blinks per customer" : "MAIFI (estimate)", `${c.maifi.toFixed(2)} momentary interruptions per customer${PL ? " (MAIFI, estimate)" : ""}`]]]);
       blocks.push(["table", ["Location", "Customers", "Trips", "Sustained", "Sustained customer interruptions", "Momentary customer interruptions"], rows, [28, 12, 9, 11, 22, 18]]);
     }
   }
@@ -6315,18 +6508,18 @@ function reportBlocks(model, opts) {
       blocks.push(["note", "Weather in the station's area at the hour of each trip (Open-Meteo). A storm makes weather a likely cause; repeat trips in calm weather point to the line itself."]);
       blocks.push(["table", ["Location", "Trips with weather", "In storms", "Calm", "Storm share", "What kind"], rows, [26, 12, 10, 10, 10, 32]]);
       const calmRec = S.recurring.filter((x) => x.weatherNote);
-      if (calmRec.length) blocks.push(["bullets", calmRec.map((x) => `${whereText(x)}, ${x.label.toLowerCase()}: ${x.weatherNote}`)]);
+      if (calmRec.length) blocks.push(["bullets", calmRec.map((x) => `${whereText(x)}, ${issueLabel(x.key, PL).toLowerCase()}: ${x.weatherNote}`)]);
     }
   }
   if (sec.matrix && S.relays.length) {
     const keys = ISSUES.filter((I) => I.group !== "data" && S.relays.some((L) => L.counts[I.key])).map((I) => I.key);
     if (keys.length) {
       blocks.push(["h1", "Issue counts by location"]);
-      const short = (k) => ISSUE[k].short;
+      const short = (k) => issueShort(k, PL);
       const show = keys.slice(0, 9);
       blocks.push(["table", ["Location"].concat(show.map(short)), S.relays.map((L) => [whereText(L)].concat(show.map((k) => String(L.counts[k] || "")))),
         [100 - 9 * show.length].concat(show.map(() => 9))]);
-      if (keys.length > show.length) blocks.push(["note", `Also found: ${keys.slice(show.length).map((k) => ISSUE[k].label).join(", ")}.`]);
+      if (keys.length > show.length) blocks.push(["note", `Also found: ${keys.slice(show.length).map((k) => issueLabel(k, PL)).join(", ")}.`]);
     }
   }
   if (sec.details) {
@@ -6337,17 +6530,17 @@ function reportBlocks(model, opts) {
       const img = opts.chart ? opts.chart("relay", L) : null;
       if (img) blocks.push(img);
       const bl = [];
-      for (const x of L.recurring) bl.push(`Recurring: ${x.label}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.weatherNote ? x.weatherNote + " " : ""}${x.advice}`);
+      for (const x of L.recurring) bl.push(`Recurring: ${issueLabel(x.key, PL)}, ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). ${x.weatherNote ? x.weatherNote + " " : ""}${x.advice}`);
       if (L.breaker && L.breaker.n) bl.push(`Breaker: ${L.breaker.verdict}. ${L.breaker.ops} operations, ${L.breaker.kA} kA interrupted.`);
       if (L.wx.known) bl.push(`Weather: ${L.wx.storm} of ${L.wx.known} trips in storms${Object.keys(L.wx.kinds).length ? ` (${topEntries(L.wx.kinds, 4).map(([k, n]) => `${WX_LABEL[k] || k} ${n}`).join(", ")})` : ""}.`);
       for (const h of L.hotspots) bl.push(`Hot spot: ${h.n} faults at ${fx(h.from, 2)} to ${fx(h.to, 2)}${h.pct !== null ? ` (~${h.pct}% of the line)` : ""}, ${fmtDate(h.first)} to ${fmtDate(h.last)}.`);
-      for (const [key, n] of topEntries(L.counts, 12)) if (!L.recurring.some((x) => x.key === key)) bl.push(`${ISSUE[key].label}: ${n}`);
+      for (const [key, n] of topEntries(L.counts, 12)) if (!L.recurring.some((x) => x.key === key)) bl.push(`${issueLabel(key, PL)}: ${n}`);
       const ph = ["A", "B", "C"].filter((p) => L.phases[p]).map((p) => `phase ${p} ${L.phases[p]}`).concat(L.phases.G ? [`ground ${L.phases.G}`] : []);
       if (ph.length) bl.push(`Faulted phases: ${ph.join(", ")}`);
       if (bl.length) blocks.push(["bullets", bl]);
       if (sec.worklog && L.worklog.length) blocks.push(["bullets", L.worklog.map((w) => `Work done ${w.date}: ${w.text}`)]);
       if (sec.events) blocks.push(["table", ["Date", "Event", "What happened", "Issues"],
-        L.records.map((r) => [fmtWhen(r), r.et || "-", r.short.replace(/\s+\[\d+ to check\]$/, ""), issueList(r) || "-"]), [17, 9, 44, 30]]);
+        L.records.map((r) => [fmtWhen(r), PL && Plain ? Plain.faultShort(r.core, r.tripped) : r.et || "-", whatHappened(r, PL), issueList(r, PL) || "-"]), [17, 9, 44, 30]]);
     }
   }
   blocks.push(["note", "Automated interpretation of relay records: confirm against the event reports and settings before acting on it."]);
@@ -6383,12 +6576,12 @@ function blocksToText(blocks) {
 const csvField = (v) => { v = v === null || v === undefined ? "" : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const csv = (rows) => rows.map((r) => r.map(csvField).join(",")).join("\r\n") + "\r\n";
 const EVENT_COLUMNS = ["Date", "Time", "Station", "Relay", "Event type", "Tripped", "Fault", "Phases", "Location", "% of line",
-  "Clearing (cycles)", "Issues", "What happened", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Review", "Decide by", "Source files"];
+  "Clearing (cycles)", "Issues", "What happened", "In plain English", "Items to check", "Confidence", "Recurring", "Hot spot", "Weather", "Review", "Decide by", "Source files"];
 function eventsCsv(model, opts) {
   const S = scoped(model, opts || {});
   const recurIds = new Set(S.recurring.flatMap((x) => x.allIds)), hotIds = new Set(S.hotspots.flatMap((h) => h.ids));
   return csv([EVENT_COLUMNS].concat(S.records.map((r) => [r.date || r.rawDate, r.time || r.rawTime, r.stationName, r.relay, r.et, r.tripped ? "Yes" : "No",
-    r.fault ? "Yes" : "No", r.phases, r.loc, r.locPct ?? "", r.clearCyc ?? "", issueList(r), r.short, r.checks.join(" | "), r.confidence,
+    r.fault ? "Yes" : "No", r.phases, r.loc, r.locPct ?? "", r.clearCyc ?? "", issueList(r), r.short, Plain ? Plain.sentence(r, { withChecks: false }) : "", r.checks.join(" | "), r.confidence,
     recurIds.has(r.id) ? "Yes" : "", hotIds.has(r.id) ? "Yes" : "", r.wx ? r.wx.text : "", r.review ? ({ correct: "Correct operation", misop: "Misoperation", na: "Not applicable" }[r.review.outcome] || r.review.outcome) + (r.review.category ? ` - ${r.review.category}` : "") : r.reviewStatus === "overdue" ? "Overdue" : r.tripped ? "Not reviewed" : "", r.reviewDue, r.sources.map((s) => s.path).join(" | ")])));
 }
 const LOCATION_COLUMNS = ["Rank", "Station", "Relay", "Score", "Events", "Trips", "Faults", "First event", "Last trip", "Trend",
@@ -6405,7 +6598,7 @@ function locationsCsv(model, opts) {
 const api = {
   analyzeFiles, buildModel, mergeRecords, combineTrends, changes, breakerHealth, fitLine, WX_LABEL, issuesFor, trendOf, bestWindow, hotSpots, monthRange,
   reportBlocks, blocksToText, eventsCsv, locationsCsv, EVENT_COLUMNS, LOCATION_COLUMNS,
-  ISSUES, ISSUE, GROUPS, DEFAULTS, trendWords, isoDate, monthKey, fmtWhen, issueList, whereText, arrow,
+  ISSUES, ISSUE, GROUPS, DEFAULTS, trendWords, issueLabel, issueShort, whatHappened, isoDate, monthKey, fmtWhen, issueList, whereText, arrow,
 };
 if (isNode) module.exports = api;
 else root.SELHistory = api;
@@ -6588,6 +6781,10 @@ const shared = {
 };
 const SNAP = opts.snapshot || null;          // a read-only snapshot: the data comes with the page
 const reviewsMap = () => (SNAP ? SNAP.reviews || {} : shared.get("reviews", {}));
+/** Plain English or engineering wording: one switch, shared with the Trip Analyzer. */
+const plainOn = () => shared.get("plain", SNAP && SNAP.plain !== undefined ? !!SNAP.plain : false);
+const PL = window.SELPlain;
+const IL = (k) => H.issueLabel(k, state.plain), IS = (k) => H.issueShort(k, state.plain);
 const noteOf = (id) => (state.sharedNotes && state.sharedNotes[id]) || state.notes[id] || "";
 if (SNAP) root.classList.add("hx-snap");
 const MAIN = { id: "main", name: "Main history" };
@@ -6667,12 +6864,12 @@ function issueChips(r, max) {
   const rec = new Set(m.recurring.filter((x) => x.allIds.includes(r.id)).map((x) => x.key));
   const hot = m.hotspots.some((h) => h.ids.includes(r.id));
   const list = r.issues.filter((x) => H.ISSUE[x.key].group !== "data");
-  const chips = list.slice(0, max || 9).map((x) => `<span class="chip${rec.has(x.key) ? " rec" : ""}" ${rec.has(x.key) ? 'data-tip="Recurring at this location"' : ""}>${esc(H.ISSUE[x.key].short)}${x.detail && !/^[ABC]+G?$/.test(x.detail) ? " " + esc(x.detail) : ""}</span>`);
-  if (hot) chips.push('<span class="chip hot" data-tip="Part of a fault hot spot (same distance as other faults)">hot spot</span>');
-  if (r.pair) chips.push(`<span class="chip pair" data-tip="Same fault seen from the other end">↔ ${esc(r.pair)}</span>`);
+  const chips = list.slice(0, max || 9).map((x) => `<span class="chip${rec.has(x.key) ? " rec" : ""}" ${rec.has(x.key) ? 'data-tip="Recurring at this location"' : ""}>${esc(IS(x.key))}${x.detail && !/^[ABC]+G?$/.test(x.detail) ? " " + esc(x.detail) : ""}</span>`);
+  if (hot) chips.push(`<span class="chip hot" data-tip="Part of a fault hot spot (same distance as other faults)">${state.plain ? "same spot again" : "hot spot"}</span>`);
+  if (r.pair) chips.push(`<span class="chip pair" data-tip="Same fault seen from the other end">${state.plain ? "also seen at " : "↔ "}${esc(r.pair)}</span>`);
   if (r.reviewStatus === "misop") chips.push(`<span class="chip rec" data-tip="${esc("PRC-004 review: misoperation" + (r.review.category ? "\n" + r.review.category : "") + (r.review.cause ? "\nCause: " + r.review.cause : ""))}">misoperation</span>`);
   else if (r.reviewStatus === "overdue") chips.push(`<span class="chip hot" data-tip="${esc(`Not reviewed: the decision was due ${r.reviewDue}`)}">review overdue</span>`);
-  if (r.occSize > 1) chips.push(`<span class="chip" data-tip="Part of a sequence of ${r.occSize} reports (recloses) on this relay">seq ×${r.occSize}</span>`);
+  if (r.occSize > 1) chips.push(`<span class="chip" data-tip="Part of a sequence of ${r.occSize} reports (recloses) on this relay">${state.plain ? `${r.occSize} tries` : `seq ×${r.occSize}`}</span>`);
   return chips.join("");
 }
 
@@ -6928,6 +7125,8 @@ $("samples").onclick = loadSamples;
 
 // ---------------------------------------------------------------- top-level render
 function render() {
+  state.plain = plainOn();
+  root.classList.toggle("hx-plain", !!state.plain);
   watchStatus();
   const m = state.model;
   const has = !!(m && m.records.length) || state.files.length;
@@ -6990,7 +7189,7 @@ function renderOverview() {
         <li data-relay="${esc(L.key)}" tabindex="0">
           <span class="rank${L.rank === 1 ? " r1" : ""}">${L.rank}</span>
           <span style="min-width:0;display:block;overflow:hidden"><span class="name">${where(L)}</span>
-            <span class="meta">${L.recurring.length ? `<span class="trip">${L.recurring.map((x) => esc(H.ISSUE[x.key].short.toLowerCase())).join(", ")} recurring</span> · ` : ""}${plural(L.tripOccasions, "trip")} · last ${fmtDate(L.lastTrip)}</span>
+            <span class="meta">${L.recurring.length ? `<span class="trip">${L.recurring.map((x) => esc(IS(x.key).toLowerCase())).join(", ")} recurring</span> · ` : ""}${plural(L.tripOccasions, "trip")} · last ${fmtDate(L.lastTrip)}</span>
             <span class="scorebar" data-tip="Score ${L.score}"><i style="width:${(100 * L.score / maxScore).toFixed(0)}%"></i></span></span>
           <span class="sp" data-tip="Trips per month, last 12 months">${sparkSvg(L.spark)}</span>
           <span style="text-align:right">${trendHtml(L.trend)}</span>
@@ -7000,7 +7199,7 @@ function renderOverview() {
       <div class="card-head"><h2>Recurring issues</h2><button class="link" data-go="issues">Issues →</button></div>
       ${m.recurring.length ? m.recurring.slice(0, 7).map((x, i) => `
         <div class="recur" data-recur="${i}" tabindex="0">
-          <div class="top"><span class="what">${esc(x.label)}</span><span>${trendHtml(x.trend)}</span></div>
+          <div class="top"><span class="what">${esc(IL(x.key))}</span><span>${trendHtml(x.trend)}</span></div>
           <div class="where">${where(x)} · ${x.inWindow} times in ${x.windowDays} days${x.total > x.inWindow ? ` (${x.total} in all)` : ""} · last ${fmtDate(x.last)}${x.clearing ? ` · ${x.clearing.first} → ${x.clearing.last} cycles` : ""}</div>
         </div>`).join("") : `<p class="hint">Nothing happened ${state.cfg.recurMin} or more times within the recurrence window at one location.</p>`}
     </div>
@@ -7011,15 +7210,15 @@ function renderOverview() {
     <div class="card"><div class="card-head"><h2>Weather</h2><span class="hint">${m.wx.known ? `${m.wx.known} trips with weather` : ""}</span></div>
       ${m.wx.known ? `<p style="margin:0 0 8px"><b>${m.wx.storm}</b> of ${m.wx.known} trips (${Math.round(100 * m.wx.storm / m.wx.known)}%) happened in storms${Object.keys(m.wx.kinds).length ? `: ${Object.entries(m.wx.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(H.WX_LABEL[k] || k)} ${n}`).join(", ")}` : ""}.</p>
         <table class="t"><tbody>${m.relays.filter((L) => L.wx.known).sort((a, b) => b.wx.known - a.wx.known).slice(0, 8).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="num">${L.wx.calm} calm · ${L.wx.storm} storm</td><td style="width:40%"><span class="scorebar" style="margin:0"><i style="width:${Math.round(100 * L.wx.storm / L.wx.known)}%;background:var(--c-nofault)"></i></span></td></tr>`).join("")}</tbody></table>
-        ${m.recurring.filter((x) => x.weatherNote).map((x) => `<p class="hint" style="margin:6px 0 0"><b>${esc(x.relay)}</b>, ${esc(x.label.toLowerCase())}: ${esc(x.weatherNote)}</p>`).join("")}`
+        ${m.recurring.filter((x) => x.weatherNote).map((x) => `<p class="hint" style="margin:6px 0 0"><b>${esc(x.relay)}</b>, ${esc(IL(x.key).toLowerCase())}: ${esc(x.weatherNote)}</p>`).join("")}`
         : `<p class="hint">Set where each station is and look up the weather at each trip: storms explain some trips; repeat trips in calm weather point to the line itself.</p><button id="hx-ovWx" class="nosnap">Set up weather</button>`}</div>
   </div>` : ""}
   ${m.customers || m.reviews.reviewed ? `<div class="grid2 even">
     ${m.customers ? `<div class="card"><div class="card-head"><h2>Customer impact</h2><span class="hint">last 12 months · estimate</span></div>
-      <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.customers.saifi.toFixed(2)}</div><div class="l">SAIFI: sustained interruptions per customer</div></div>
-        <div class="stat"><div class="v">${m.customers.maifi.toFixed(2)}</div><div class="l">MAIFI: momentary per customer</div></div>
+      <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.customers.saifi.toFixed(2)}</div><div class="l">${state.plain ? "outages per customer (SAIFI)" : "SAIFI: sustained interruptions per customer"}</div></div>
+        <div class="stat"><div class="v">${m.customers.maifi.toFixed(2)}</div><div class="l">${state.plain ? "blinks per customer (MAIFI)" : "MAIFI: momentary per customer"}</div></div>
         <div class="stat"><div class="v">${m.customers.served.toLocaleString()}</div><div class="l">customers on ${plural(m.customers.locations, "circuit")}</div></div></div>
-      <table class="t"><thead><tr><th>Location</th><th class="r">Customers</th><th class="r">Sustained</th><th class="r">Momentary</th></tr></thead><tbody>${m.customers.ranked.slice(0, 6).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="r num">${L.cust.customers.toLocaleString()}</td><td class="r num">${L.cust.ci.toLocaleString()}</td><td class="r num">${L.cust.cmi.toLocaleString()}</td></tr>`).join("")}</tbody></table>
+      <table class="t"><thead><tr><th>Location</th><th class="r">Customers</th><th class="r">${state.plain ? "Customer outages" : "Sustained"}</th><th class="r">${state.plain ? "Blinks" : "Momentary"}</th></tr></thead><tbody>${m.customers.ranked.slice(0, 6).map((L) => `<tr class="click" data-relay="${esc(L.key)}"><td>${where(L)}</td><td class="r num">${L.cust.customers.toLocaleString()}</td><td class="r num">${L.cust.ci.toLocaleString()}</td><td class="r num">${L.cust.cmi.toLocaleString()}</td></tr>`).join("")}</tbody></table>
       <p class="hint" style="margin:6px 0 0">Customer interruptions = customers × trips${state.cfg.sustained === "all" ? "" : " (a lockout is sustained, other trips momentary)"}.${m.customers.missing ? ` ${plural(m.customers.missing, "location")} have no customer count (Files & settings).` : ""}</p></div>` : ""}
     ${m.reviews.reviewed ? `<div class="card"><div class="card-head"><h2>PRC-004 reviews</h2><span class="hint">from the Trip Analyzer</span></div>
       <div class="stats" style="margin:0 0 10px"><div class="stat"><div class="v">${m.reviews.reviewed}/${m.reviews.trips}</div><div class="l">trips reviewed</div></div>
@@ -7106,7 +7305,7 @@ function locationDetail(L) {
   const issueRows = Object.entries(L.counts).filter(([key]) => H.ISSUE[key].group !== "data").sort((a, b) => b[1] - a[1]).map(([key, n]) => {
     const t = L.issueTrends[key], rec = L.recurring.find((x) => x.key === key);
     const ids = L.records.filter((r) => r.issues.some((x) => x.key === key)).map((r) => r.id);
-    return `<tr class="click" data-recur-ids="${esc(ids.join("\n"))}"><td>${esc(H.ISSUE[key].label)}${rec ? ' <span class="chip rec">recurring</span>' : ""}</td><td class="r num">${n}</td><td>${trendHtml(t)}</td><td class="muted">${esc(H.trendWords(t))}</td></tr>`;
+    return `<tr class="click" data-recur-ids="${esc(ids.join("\n"))}"><td>${esc(IL(key))}${rec ? ' <span class="chip rec">recurring</span>' : ""}</td><td class="r num">${n}</td><td>${trendHtml(t)}</td><td class="muted">${esc(H.trendWords(t))}</td></tr>`;
   }).join("");
   const stFrom = { record: "from the event files", settings: "from the settings", folder: "from the folder name", override: "set by you", none: "not in the files" }[L.stationFrom] || "";
   return `
@@ -7132,7 +7331,7 @@ function locationDetail(L) {
   </div>
   ${L.recurring.length ? `<div class="card section"><div class="card-head"><h2>Recurring here</h2></div>${L.recurring.map((x) => `
     <div class="recur" data-recur-ids="${esc(x.allIds.join("\n"))}" tabindex="0">
-      <div class="top"><span class="what">${esc(x.label)}${x.clearing ? ` <span class="trip">${x.clearing.first} → ${x.clearing.last} cycles</span>` : ""}</span><span>${trendHtml(x.trend)}</span></div>
+      <div class="top"><span class="what">${esc(IL(x.key))}${x.clearing ? ` <span class="trip">${x.clearing.first} → ${x.clearing.last} cycles</span>` : ""}</span><span>${trendHtml(x.trend)}</span></div>
       <div class="where">${x.inWindow} times in ${x.windowDays} days (${fmtDate(x.from)} to ${fmtDate(x.to)}) · ${x.total} in all · last ${fmtDate(x.last)}${Object.keys(x.phases).length ? " · " + Object.entries(x.phases).map(([p, n]) => `${esc(p)} ${n}`).join(", ") : ""}</div>
       ${x.weatherNote ? `<div class="advice"><b>Weather:</b> ${esc(x.weatherNote)}</div>` : ""}
       <div class="advice">${esc(x.advice)}</div>
@@ -7166,8 +7365,12 @@ function locationDetail(L) {
     ${[...L.records].reverse().map((r) => evRow(r, false)).join("")}</tbody></table></div>
   </div>`;
 }
+function evType(r) {
+  const t = state.plain ? PL.faultShort(r.core, r.tripped) : r.et || (r.tripped ? "TRIP" : "–");
+  return r.tripped ? `<span class="trip">${esc(t)}</span>` : esc(t);
+}
 function evRow(r, withWhere) {
-  return `<tr class="click" data-id="${esc(r.id)}"><td class="num" style="white-space:nowrap">${esc(H.fmtWhen(r))}</td>${withWhere ? `<td>${esc(r.relay)}<div class="hint">${esc(r.stationName)}</div></td>` : ""}<td style="white-space:nowrap">${r.tripped ? `<span class="trip">${esc(r.et || "TRIP")}</span>` : esc(r.et || "–")}</td><td>${esc(r.short.replace(/^(TRIP|No trip) - /, "").replace(/\s+\[\d+ to check\]$/, ""))}${r.checks.length ? ` <span class="warn" data-tip="${esc(r.checks.join("\n"))}">· ${plural(r.checks.length, "item")} to check</span>` : ""}</td><td>${issueChips(r)}${wxTag(r)}</td></tr>`;
+  return `<tr class="click" data-id="${esc(r.id)}"><td class="num" style="white-space:nowrap">${esc(H.fmtWhen(r))}</td>${withWhere ? `<td>${esc(r.relay)}<div class="hint">${esc(r.stationName)}</div></td>` : ""}<td style="white-space:nowrap" data-tip="${esc([r.et, r.targets].filter(Boolean).join(" · "))}">${evType(r)}</td><td>${esc(state.plain ? H.whatHappened(r, true).replace(/^(Tripped|No trip): /, "") : r.short.replace(/^(TRIP|No trip) - /, "").replace(/\s+\[\d+ to check\]$/, ""))}${r.checks.length ? ` <span class="warn" data-tip="${esc(r.checks.join("\n"))}">· ${plural(r.checks.length, "item")} to check</span>` : ""}</td><td>${issueChips(r)}${wxTag(r)}</td></tr>`;
 }
 function openStation(L) {
   $("stHint").textContent = `${L.relay} is at ${L.station}. Set it if the files don't say, or to group relays differently. Applies to every event from this relay.`;
@@ -7187,23 +7390,23 @@ function renderIssues() {
   el.innerHTML = `
   <div class="card">
     <div class="card-head"><h2>Issues at each location</h2><span class="hint">Times each issue happened (a reclose sequence counts once). <u>Underlined</u> = recurring. Click a cell to see the events.</span></div>
-    <div class="tablewrap"><table class="t heat"><thead><tr><th>Location</th>${keys.map((k) => `<th class="v" data-tip="${esc(H.ISSUE[k].label + "\n" + H.ISSUE[k].advice)}">${esc(H.ISSUE[k].short)}</th>`).join("")}</tr></thead><tbody>
-    ${m.relays.map((L) => `<tr><td style="white-space:nowrap"><button class="link" data-relay="${esc(L.key)}">${esc(L.relay)}</button><div class="hint">${esc(L.station)}</div></td>${keys.map((k) => { const n = L.counts[k] || 0; const rec = L.recurring.some((x) => x.key === k); return `<td class="h${rec ? " rec" : ""}" style="${shade(n)}" data-cell="${esc(L.key)}|${k}" ${n ? `data-tip="${esc(`${L.relay}: ${H.ISSUE[k].label} ${n}×${rec ? " (recurring)" : ""}\n${H.trendWords(L.issueTrends[k])}`)}"` : ""}>${n || ""}</td>`; }).join("")}</tr>`).join("")}
+    <div class="tablewrap"><table class="t heat"><thead><tr><th>Location</th>${keys.map((k) => `<th class="v" data-tip="${esc(IL(k) + "\n" + H.ISSUE[k].advice)}">${esc(IS(k))}</th>`).join("")}</tr></thead><tbody>
+    ${m.relays.map((L) => `<tr><td style="white-space:nowrap"><button class="link" data-relay="${esc(L.key)}">${esc(L.relay)}</button><div class="hint">${esc(L.station)}</div></td>${keys.map((k) => { const n = L.counts[k] || 0; const rec = L.recurring.some((x) => x.key === k); return `<td class="h${rec ? " rec" : ""}" style="${shade(n)}" data-cell="${esc(L.key)}|${k}" ${n ? `data-tip="${esc(`${L.relay}: ${IL(k)} ${n}×${rec ? " (recurring)" : ""}\n${H.trendWords(L.issueTrends[k])}`)}"` : ""}>${n || ""}</td>`; }).join("")}</tr>`).join("")}
     <tr><td><b>All</b></td>${keys.map((k) => `<td class="h num" style="font-weight:600" data-cell="|${k}">${m.relays.reduce((a, L) => a + (L.counts[k] || 0), 0)}</td>`).join("")}</tr>
     </tbody></table></div>
   </div>
   <div class="card section">
     <div class="card-head"><h2>Recurring issues</h2><span class="hint">Faults ${state.cfg.recurMin}+ times in ${state.cfg.recurDays} days; anything else ${state.cfg.recurMin}+ times in ${state.cfg.recurDaysOther} days, at one location. Change this in Files &amp; settings.</span></div>
     ${m.recurring.length ? `<div class="tablewrap"><table class="t"><thead><tr><th>Location</th><th>Issue</th><th>How often</th><th>Latest</th><th>Trend</th><th>What to do</th></tr></thead><tbody>
-    ${m.recurring.map((x, i) => `<tr class="click" data-recur="${i}"><td>${where(x)}</td><td><b>${esc(x.label)}</b>${x.clearing ? `<div class="trip">${x.clearing.first} → ${x.clearing.last} cycles</div>` : ""}</td><td class="num">${x.inWindow} in ${x.windowDays} d<div class="hint">${x.total} in all</div></td><td class="num">${fmtDate(x.last)}</td><td>${trendHtml(x.trend)}</td><td class="hint" style="max-width:340px">${esc(x.advice)}</td></tr>`).join("")}
+    ${m.recurring.map((x, i) => `<tr class="click" data-recur="${i}"><td>${where(x)}</td><td><b>${esc(IL(x.key))}</b>${x.clearing ? `<div class="trip">${x.clearing.first} → ${x.clearing.last} cycles</div>` : ""}</td><td class="num">${x.inWindow} in ${x.windowDays} d<div class="hint">${x.total} in all</div></td><td class="num">${fmtDate(x.last)}</td><td>${trendHtml(x.trend)}</td><td class="hint" style="max-width:340px">${esc(x.advice)}</td></tr>`).join("")}
     </tbody></table></div>` : '<p class="hint">None found.</p>'}
   </div>
   <div class="card section">
     <div class="card-head"><h2>Issue trends, all locations</h2></div>
     <div class="tablewrap"><table class="t"><thead><tr><th>Issue</th><th class="r">Times</th><th class="r">Locations</th><th>Trend</th><th></th><th>Last 12 months</th></tr></thead><tbody>
-    ${m.issues.filter((x) => x.group !== "data").map((x) => `<tr class="click" data-issue="${x.key}"><td>${esc(x.label)}</td><td class="r num">${x.n}</td><td class="r num">${x.relays}</td><td>${trendHtml(x.trend)}</td><td class="muted">${esc(H.trendWords(x.trend))}</td><td>${sparkSvg(x.monthly.slice(-12), 110, 22)}</td></tr>`).join("")}
+    ${m.issues.filter((x) => x.group !== "data").map((x) => `<tr class="click" data-issue="${x.key}"><td>${esc(IL(x.key))}</td><td class="r num">${x.n}</td><td class="r num">${x.relays}</td><td>${trendHtml(x.trend)}</td><td class="muted">${esc(H.trendWords(x.trend))}</td><td>${sparkSvg(x.monthly.slice(-12), 110, 22)}</td></tr>`).join("")}
     </tbody></table></div>
-    ${m.issues.some((x) => x.group === "data") ? `<p class="hint">Data gaps: ${m.issues.filter((x) => x.group === "data").map((x) => `${esc(x.label.toLowerCase())} (${x.n})`).join(", ")}. Adding the .CEV and settings for those relays makes the checks more reliable.</p>` : ""}
+    ${m.issues.some((x) => x.group === "data") ? `<p class="hint">Data gaps: ${m.issues.filter((x) => x.group === "data").map((x) => `${esc(IL(x.key).toLowerCase())} (${x.n})`).join(", ")}. Adding the .CEV and settings for those relays makes the checks more reliable.</p>` : ""}
   </div>`;
   el.querySelectorAll("[data-relay]").forEach((b) => { b.onclick = () => go("locations", { relay: b.dataset.relay }); });
   el.querySelectorAll("[data-cell]").forEach((c) => { c.onclick = () => { const [relay, issue] = c.dataset.cell.split("|"); if (relay && !state.model.relays.find((L) => L.key === relay).counts[issue]) return; go("events", { ev: { relay, issue } }); }; });
@@ -7221,7 +7424,7 @@ function filteredEvents() {
      (f.show === "recurring" && m.recurring.some((x) => x.allIds.includes(r.id))) || (f.show === "hot" && m.hotspots.some((h) => h.ids.includes(r.id))) ||
      (f.show === "storm" && r.tripped && r.storm === true) || (f.show === "calm" && r.tripped && r.storm === false) || (f.show === "breaker" && r.clearCyc !== null) ||
      (f.show === "misop" && r.reviewStatus === "misop") || (f.show === "overdue" && r.reviewStatus === "overdue") || (f.show === "unreviewed" && (r.reviewStatus === "overdue" || r.reviewStatus === "open"))) &&
-    (!q || [r.relay, r.stationName, r.et, r.targets, r.short, r.date, r.loc, noteOf(r.id), ...r.checks, ...r.cause, ...r.sources.map((s) => s.path), ...r.issues.map((x) => H.ISSUE[x.key].label)].join(" ").toUpperCase().includes(q)));
+    (!q || [r.relay, r.stationName, r.et, r.targets, r.short, r.date, r.loc, noteOf(r.id), ...r.checks, ...r.cause, ...r.sources.map((s) => s.path), ...r.issues.map((x) => IL(x.key)), PL ? PL.sentence(r, { withChecks: false }) : ""].join(" ").toUpperCase().includes(q)));
   if (f.sort === "newest") list = list.slice().reverse();
   else if (f.sort === "relay") list = list.slice().sort((a, b) => (a.stationName + a.relay < b.stationName + b.relay ? -1 : a.stationName + a.relay > b.stationName + b.relay ? 1 : (a.ms || 0) - (b.ms || 0)));
   return list;
@@ -7246,7 +7449,7 @@ function renderEvents() {
   $("evQ").value = f.q;
   $("evStation").innerHTML = opt("", "All stations", f.station) + m.stations.map((S) => opt(S.name, S.name, f.station)).join("");
   $("evRelay").innerHTML = opt("", "All relays", f.relay) + m.relays.filter((L) => !f.station || L.station === f.station).map((L) => opt(L.key, L.relay, f.relay)).join("");
-  $("evIssue").innerHTML = opt("", "Any issue", f.issue) + issueKeys.map((I) => opt(I.key, I.label, f.issue)).join("");
+  $("evIssue").innerHTML = opt("", "Any issue", f.issue) + issueKeys.map((I) => opt(I.key, IL(I.key), f.issue)).join("");
   $("evShow").innerHTML = [["all", "All events"], ["trips", "Trips"], ["faults", "Faults"], ["review", "Needs review"], ["recurring", "Part of a recurring issue"], ["hot", "In a hot spot"], ["storm", "Trips in storms"], ["calm", "Trips in calm weather"], ["breaker", "Breaker timed"], ["misop", "Misoperations"], ["overdue", "Reviews overdue"], ["unreviewed", "Trips not reviewed"]].map(([v, t]) => opt(v, t, f.show)).join("");
   $("evMonth").innerHTML = opt("", "Any month", f.month) + [...m.months].reverse().map((k) => opt(k, monthLabel(k), f.month)).join("");
   $("evSort").value = f.sort;
@@ -7588,22 +7791,30 @@ function renderDrawer() {
   if (!r) { closeDrawer(); return; }
   const { list } = state.drawer, i = list.indexOf(r.id);
   $("dPrev").disabled = i <= 0; $("dNext").disabled = i < 0 || i >= list.length - 1;
-  $("dTitle").innerHTML = `${esc(r.relay)} · ${r.tripped ? `<span class="trip">${esc(r.et || "TRIP")}</span>` : esc(r.et || "event")}`;
+  $("dTitle").innerHTML = `${esc(r.relay)} · ${evType(r)}`;
   $("dSub").textContent = `${H.fmtWhen(r)} · ${r.stationName}${list.length > 1 ? ` · ${i + 1} of ${list.length}` : ""}`;
   const L = m.relays.find((x) => x.key === upper(r.relay));
   const recs = m.recurring.filter((x) => x.allIds.includes(r.id));
   const hot = m.hotspots.filter((h) => h.ids.includes(r.id));
   const seqMates = L ? L.records.filter((x) => x.occ === r.occ && x.id !== r.id) : [];
   const amps = Object.entries(r.amps).filter(([k]) => k !== "N");
-  const kv = [["Event type", `${esc(r.et)}${r.desc ? ` <span class="muted">(${esc(r.desc)})</span>` : ""}`], ["Targets", esc(r.targets || "–")],
+  const code = (c) => (c ? ` <span class="muted mono" style="font-size:11.5px">${esc(c)}</span>` : "");
+  const kv = state.plain ? [
+    ["What it was", `${esc(PL.faultShort(r.core, r.tripped))}${code(r.et)}`],
+    ["Where", `${esc(PL.where(r) || "distance not known")}`],
+    ["What tripped it", `${esc(PL.kindsOf(r.primary, r.targets).join("; ") || (r.tripped ? "not identified in the record" : "nothing tripped"))}${code([r.targets, r.primary.join(" ")].filter(Boolean).join(" · "))}`],
+    ["Breaker opened", r.clearCyc !== null ? `${esc(PL.cycles(r.clearCyc))} after the trip${r.clearCyc > state.cfg.slowCycles ? ' <span class="trip">(slow)</span>' : ""}` : "–"],
+  ] : [["Event type", `${esc(r.et)}${r.desc ? ` <span class="muted">(${esc(r.desc)})</span>` : ""}`], ["Targets", esc(r.targets || "–")],
     ["Fault location", r.loc ? `${esc(r.loc)}${r.locPct !== null ? ` <span class="muted">(~${r.locPct}% of the line, LL ${r.ll})</span>` : ""}` : "–"],
     ["Breaker cleared", r.clearCyc !== null ? `${r.clearCyc} cycles after the trip` : "–"], ["Tripping element", esc(r.primary.join(", ") || "–")],
     ["Fault current", amps.length ? amps.map(([k, v]) => `${{ A: "IA", B: "IB", C: "IC", G: "IG", Q: "3I2", F: "max" }[k] || k} ${v.toLocaleString()} A`).join(" · ") : "–"],
     ["Shot / frequency", `${esc(r.shot || "–")} / ${esc(r.freq || "–")} Hz`], ["Confidence", `${esc(r.confidence)} <span class="muted">(${esc(r.basis)})</span>`]];
+  if (state.plain) kv.push(["Fault current", amps.length ? `highest ${Math.max(...amps.map(([, v]) => v)).toLocaleString()} A${code(amps.map(([k, v]) => `${{ A: "IA", B: "IB", C: "IC", G: "IG", Q: "3I2", F: "max" }[k] || k} ${v}`).join(" "))}` : "–"],
+    ["How sure", `${esc({ High: "Fairly sure", Medium: "Somewhat sure", Low: "Not sure" }[r.confidence] || r.confidence)} <span class="muted">(${esc(r.basis)})</span>`]);
   $("dBody").innerHTML = `
-    <p style="margin:0 0 8px;font-weight:600">${esc(r.short.replace(/\s+\[\d+ to check\]$/, ""))}</p>
+    <p style="margin:0 0 8px;font-weight:600">${esc(H.whatHappened(r, state.plain))}</p>
     <div>${issueChips(r, 20)}</div>
-    ${recs.length || hot.length ? `<h4>Part of a pattern</h4><ul>${recs.map((x) => `<li><b>Recurring ${esc(x.label.toLowerCase())}</b> at ${esc(x.relay)}: ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). <button class="link" data-list="${esc(x.allIds.join("\n"))}">step through them</button></li>`).join("")}
+    ${recs.length || hot.length ? `<h4>Part of a pattern</h4><ul>${recs.map((x) => `<li><b>Recurring ${esc(IL(x.key).toLowerCase())}</b> at ${esc(x.relay)}: ${x.inWindow} times in ${x.windowDays} days (${x.total} in all). <button class="link" data-list="${esc(x.allIds.join("\n"))}">step through them</button></li>`).join("")}
       ${hot.map((h) => `<li><b>Fault hot spot</b>: ${h.n} faults between ${h.from.toFixed(2)} and ${h.to.toFixed(2)}. <button class="link" data-list="${esc(h.ids.join("\n"))}">step through them</button></li>`).join("")}</ul>` : ""}
     ${seqMates.length ? `<h4>Same sequence</h4><ul>${seqMates.map((x) => `<li><button class="link" data-open="${esc(x.id)}">${esc(H.fmtWhen(x))} ${esc(x.et)}</button> <span class="muted">${esc(x.targets)}</span></li>`).join("")}</ul>` : ""}
     <div class="nosnap" style="margin:12px 0 4px;display:flex;gap:8px;flex-wrap:wrap"><button class="accent small" id="hx-dAnalyzer" title="Open this event's files in the SEL Trip Analyzer${r.waveId ? ", on the Waveforms page" : ""}">${r.waveId ? "Open waveforms in Trip Analyzer ↗" : "Open in Trip Analyzer ↗"}</button></div>
@@ -7614,7 +7825,7 @@ function renderDrawer() {
     ${r.checks.length ? `<h4>Check</h4><ul class="checkl">${r.checks.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${r.gaps.length ? `<h4>Missing data</h4><ul class="hint">${r.gaps.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
     ${r.evidence.length ? `<h4>Evidence</h4><ul>${r.evidence.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
-    ${r.seq.length ? `<h4>Elements that asserted (cycles)</h4><div class="seq mono">${r.seq.map(([c, e]) => `${c.toFixed(2).padStart(6, " ")}  ${esc(e)}`).join("<br>")}</div>` : ""}
+    ${r.seq.length ? `<h4>${state.plain ? "What the relay saw, in order (cycles from the start)" : "Elements that asserted (cycles)"}</h4><div class="seq mono">${r.seq.map(([c, e]) => `${c.toFixed(2).padStart(6, " ")}  ${esc(e)}${state.plain ? ` <span style="font-family:inherit" class="muted">${esc(PL.element(e))}</span>` : ""}`).join("<br>")}</div>` : ""}
     <h4>Note</h4><textarea id="hx-dNote" rows="2" placeholder="e.g. Crew found a cracked insulator at pole 112"${SNAP ? " readonly" : ""}>${esc(noteOf(r.id))}</textarea>
     <p class="hint" style="margin:3px 0 0">${SNAP ? "" : "The same note shows in the Trip Analyzer's events table."}</p>
     <h4>Source files</h4><ul>${r.sources.map((s) => `<li class="mono" style="font-size:12px">${esc(s.path)} ${!SNAP && state.files.some((f) => f.hash === s.hash) ? `<button class="link" data-dl="${esc(s.hash)}">download</button>` : ""}</li>`).join("")}</ul>
@@ -7967,7 +8178,7 @@ function paperSeries(m, recs) {
 function exportOpts() {
   const sections = {};
   root.querySelectorAll("#hx-expSections [data-s]").forEach((c) => { sections[c.dataset.s] = c.checked; });
-  return { station: $("expStation").value, relay: $("expRelay").value, sections, notes: $("expNotes").value, now: core.nowStamp() };
+  return { station: $("expStation").value, relay: $("expRelay").value, sections, notes: $("expNotes").value, now: core.nowStamp(), plain: !!state.plain };
 }
 function exportName(fmt) {
   const m = state.model, o = exportOpts();
@@ -8038,7 +8249,7 @@ function makeSnapshot(o, name) {
   const scope = o.relay ? (m.relays.find((L) => L.key === o.relay) || {}).relay || o.relay : o.station || "";
   const data = { app: "sel-trip-history-snapshot", version: VERSION, name: SNAP ? SNAP.name : currentName(), scope, made: new Date().toISOString(),
     records: recs.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !DROP.has(k)))),
-    cfg: Object.assign({}, state.cfg), notes: pick(Object.assign({}, state.notes, state.sharedNotes)), reviews: pick(reviewsMap()), weather: pick(state.weather),
+    plain: !!state.plain, cfg: Object.assign({}, state.cfg), notes: pick(Object.assign({}, state.notes, state.sharedNotes)), reviews: pick(reviewsMap()), weather: pick(state.weather),
     worklog: state.worklog, overrides: state.overrides, customers: state.customers || {} };
   const empty = (html, id) => {
     const tag = `<script id="${id}" type="application/json">`, a = html.indexOf(tag);
@@ -8116,7 +8327,7 @@ async function load() {
 
 const ready = load().catch((e) => { console.error(e); toast("Couldn't open the history: " + (e.message || e)); });
 return {
-  ready, state, render: () => (state.model ? render() : undefined), refresh: () => (state.model ? rebuild(false) : undefined), go, openDrawer, rebuild, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h),
+  ready, state, render: () => (state.model ? render() : undefined), plainChanged: () => { if (state.model) { render(); if (state.drawer.id) renderDrawer(); } }, refresh: () => (state.model ? rebuild(false) : undefined), go, openDrawer, rebuild, lookupWeather, openInAnalyzer, pollWatch, startWatch: (h) => startWatch(h),
   addFiles: async (list, label) => { await ready; return addFiles(list, label); },
   currentName, histories: histList, switchTo, readData, mergeInto, createHistory,
 };
@@ -8131,6 +8342,10 @@ root0.SELHistoryUI = { mount };
 "use strict";
 // this page as it arrived (before anything is drawn), for the History tab's read-only snapshots
 const PAGE_SOURCE = "<!doctype html>\n" + document.documentElement.outerHTML;
+// a snapshot made on the History tab carries its data in the page
+const snapEl = document.getElementById("hx-snapshot");
+let SNAPSHOT = null;
+try { SNAPSHOT = snapEl ? JSON.parse(snapEl.textContent) : null; } catch (e) { SNAPSHOT = null; }
 const VERSION = "2.1.0";
 const REPO = "kefirman9000/sel-trip-analyzer";
 const HTML_ASSET = "SEL_Trip_Analyzer.html";
@@ -8184,7 +8399,8 @@ function refreshChoices(ch) {
   fillSelect($("vSort"), core.SORT_OPTIONS, view.sort);
   fillSelect($("vDetail"), core.DETAIL_OPTIONS, view.detail);
 }
-const currentOpts = () => ({ show: view.show, relay: view.relay, sort: view.sort, detail: view.detail,
+const plainOn = () => store.get("plain", SNAPSHOT ? !!SNAPSHOT.plain : false);
+const currentOpts = () => ({ plain: plainOn(), show: view.show, relay: view.relay, sort: view.sort, detail: view.detail,
                              hide_duplicates: $("vDups").checked, search: $("vSearch").value.trim(), notes: store.get("notes", {}),
                              weather: store.get("wxOn", true) ? store.get("wxResults", {}) : {}, reviews: reviewsOrNull() });
 /** Operation reviews (PRC-004), or null until the first one is saved (the summary then gets a review section). */
@@ -8202,6 +8418,15 @@ for (const [id, key] of [["vShow", "show"], ["vRelay", "relay"], ["vSort", "sort
     if (state.files.length) generate(false);
   });
 }
+// Plain English / engineering wording: the events table, the summary and the History tab
+$("plainSw").checked = plainOn();
+$("plainSw").addEventListener("change", () => {
+  if (!editsOk()) { $("plainSw").checked = !$("plainSw").checked; return; }
+  store.set("plain", $("plainSw").checked);
+  if (state.files.length) generate(false); else renderEvents();
+  if (hist) hist.plainChanged();
+  setStatus($("plainSw").checked ? "Plain English: everyday words, with the relay codes in the details and on hover" : "Engineering terms and relay codes");
+});
 $("vDups").addEventListener("change", () => {
   if (!editsOk()) { $("vDups").checked = !$("vDups").checked; return; }
   store.set("hideDups", $("vDups").checked);
@@ -8688,8 +8913,9 @@ function renderEvents() {
   $("evBadge").textContent = `${all.length}`;
   const th = (k, label) => `<th${k ? ` data-sort="${k}" class="sortable${evSort.key === k ? (evSort.dir > 0 ? " asc" : " desc") : ""}"` : ""}>${label}</th>`;
   const head = `<thead><tr>${th("", "#")}${th("time", "When")}${th("relay", "Relay")}${th("type", "Type")}${th("", "What happened")}${th("checks", "Check")}${th("weather", "Weather")}${th("", "Note")}${th("", "")}</tr></thead>`;
+  const plain = plainOn();
   const body = rows.map((it) => {
-    const e = it.e, id = it.id, cause = core.shortCause(e, it.s, it.a);
+    const e = it.e, id = it.id, cause = plain ? window.SELPlain.itemSentence(it) : core.shortCause(e, it.s, it.a);
     const runs = core.tripRuns(cause).map(([t, c]) => (c ? `<b class="${c}">${esc(t)}</b>` : esc(t))).join("");
     const chips = [];
     if (it.pair) chips.push(`<span class="chip2" title="${esc(it.pair.info.likely ? "Locations add up to the line length: likely the same fault" : "Same time and phases")}">↔ ${esc(core.relayKey(it.pair.other.e))}</span>`);
@@ -8707,7 +8933,7 @@ function renderEvents() {
       <td class="n">${num.get(it)}</td>
       <td class="when">${esc(e.date)}<br><span class="hint">${esc(e.time)}</span></td>
       <td class="relay"><b>${esc(core.relayKey(e))}</b>${e.terminal_id && e.terminal_id !== core.relayKey(e) ? `<br><span class="hint">${esc(e.terminal_id)}</span>` : ""}</td>
-      <td class="type">${esc(e.event_type || "?")}</td>
+      <td class="type"${plain ? ` title="${esc([e.event_type, e.targets].filter(Boolean).join(" · "))}"` : ""}>${esc(plain ? window.SELPlain.faultShort(core.eventCore(e.event_type), it.a.tripped) : e.event_type || "?")}</td>
       <td class="cause">${runs}${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}</td>
       <td class="chk">${nc ? `<span class="badge-w" title="${esc(it.a.checks.concat(it.a.gaps).join("\n"))}">${nc}</span>` : `<span class="okmark" title="Nothing to check">✓</span>`}</td>
       <td class="wx${stormy(it) ? " storm" : ""}" title="${esc(w ? w.text + "\n" + (w.hints || []).map((h) => h.text).join("\n") : "")}">${esc(wtxt) || '<span class="hint">-</span>'}</td>
@@ -8922,9 +9148,6 @@ function showPage(which, recId, focus) {
 // ---------------------------------------------------------------- Trip History link and hand-off
 // The History tab (the same screen as the standalone Trip History page), loaded the first time it's needed
 let hist = null;
-const snapEl = document.getElementById("hx-snapshot");
-let SNAPSHOT = null;
-try { SNAPSHOT = snapEl ? JSON.parse(snapEl.textContent) : null; } catch (e) { SNAPSHOT = null; }
 const histSamples = () => { try { return JSON.parse($("history-samples").textContent || "[]"); } catch (e) { return []; } };
 function ensureHistory() {
   if (!hist) {
