@@ -1,9 +1,13 @@
 name: Build and release
 
-# Publish a GitHub release tagged like v1.0.1 (matching VERSION in
-# sel_trip_analyzer.py). This builds SEL_Trip_Analyzer.exe and attaches it to
-# that release; installed copies pick it up via "Check for updates".
+# Two ways to release (the tag must match VERSION in sel_trip_analyzer.py):
+#  - push a tag like v2.1.0: this builds everything and publishes the release,
+#    with the notes from docs/releases/v2.1.0.md (if that file exists);
+#  - or publish a release on GitHub by hand: this builds and attaches the files.
+# Installed copies pick the new version up via "Check for updates".
 on:
+  push:
+    tags: ["v*"]
   release:
     types: [published]
   workflow_dispatch:
@@ -56,8 +60,37 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "exe self-test exited with $($p.ExitCode)" }
           Write-Host "exe self-test passed"
 
-      - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Release notes for a pushed tag
+        id: notes
+        if: github.event_name == 'push'
+        shell: python
+        run: |
+          import os
+          tag = os.environ["GITHUB_REF_NAME"]
+          path = f"docs/releases/{tag}.md"
+          if not os.path.exists(path):
+              path = "release-notes.md"
+              open(path, "w", encoding="utf-8").write(f"Release {tag}.")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"path={path}\n")
+
+      - name: Publish release (pushed tag)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.path }}
+          make_latest: "true"
+          fail_on_unmatched_files: true
+          files: |
+            dist/SEL_Trip_Analyzer.exe
+            dist/SEL_Trip_Analyzer.html
+            dist/SEL_Trip_History.html
+            SEL_sample_files.zip
+            SEL_history_samples.zip
+
+      - name: Attach files (release published on GitHub)
+        if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
