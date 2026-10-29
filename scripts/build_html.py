@@ -54,7 +54,7 @@ def main():
     scripts = {"CORE_JS": core}
     for key, name in [("ANALYSIS_JS", "analysis.js"), ("REFERENCE_JS", "reference.js"), ("DOCX_JS", "docx.js"),
                       ("WAVE_JS", "wave_ui.js"), ("WEATHER_JS", "weather.js"),
-                      ("HISTORY_JS", "history.js"), ("HISTORY_UI_JS", "history_ui.js"), ("HISTORY_CSS", "history_ui.css")]:
+                      ("PLAIN_JS", "plain.js"), ("HISTORY_JS", "history.js"), ("HISTORY_UI_JS", "history_ui.js"), ("HISTORY_CSS", "history_ui.css")]:
         path = os.path.join(ROOT, "web", name)
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:

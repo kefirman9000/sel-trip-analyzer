@@ -50,6 +50,19 @@ Nothing to install, no account, and **your files never leave your computer**.
 | **Organize** | Filter (trips, needs review, faults, one relay), sort, search, and choose how much detail to show. |
 | **Export** | Word (with waveform pictures), PDF, Excel spreadsheet or text, choosing exactly what to include. Files are named after the relay and dates. |
 
+## Plain English or engineering terms
+
+The **Plain English** switch (top right) rewords everything for people who
+don't read relay codes: *AG T · INST ZONE1 A G* becomes *"Tripped: phase A
+touched ground about 42% of the way along the line; Zone 1 distance protection
+opened the breaker."* It applies to the events table, the summary (each event
+gets a *Plain English* line, and the quick summary is written in sentences),
+the History tab, the event details and every export, including snapshots, which
+open the way they were made. The relay's own codes stay in the details and on
+hover, and the analysis (*Probable cause*, *CHECK* lines) keeps its technical
+wording, since it's the evidence. The switch is remembered and shared by the
+Analyzer and the History page.
+
 ## Get started
 
 1. **[Open it online](https://kefirman9000.github.io/sel-trip-analyzer/)**, or

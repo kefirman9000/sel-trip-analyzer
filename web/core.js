@@ -1090,6 +1090,10 @@ function shortCause(rec, settings, a) {
   return (a.tripped ? "TRIP - " : "No trip - ") + parts.join(" ") + (n ? `  [${n} to check]` : "");
 }
 
+// plain-English wording (plain.js), when the page or Node has it
+let plainText = null;
+function usePlain(p) { plainText = p; }
+
 // ---- dates (mirrors datetime.strptime for the formats used)
 function daysIn(y, m) { return [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]; }
 function parseDate(d) {
@@ -1422,7 +1426,8 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
     shown.forEach((it, idx) => {
       const e = it.e;
       const when = strip(`${e.date} ${e.time}`) || "date n/a";
-      out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${e.event_type || "?"} | ${shortCause(e, it.s, it.a)}`);
+      if (opts.plain && plainText) out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${plainText.faultShort(eventCore(e.event_type), it.a.tripped)} | ${plainText.itemSentence(it)}`);
+      else out.push(`${String(idx + 1).padStart(2)}. ${when} | ${relayKey(e)} | ${e.event_type || "?"} | ${shortCause(e, it.s, it.a)}`);
     });
     out.push("");
     out.push(...relationSections(view, number));
@@ -1442,6 +1447,7 @@ function buildReport(events, rdb, errors, nFiles, comments, opts) {
       shown.forEach((it, idx) => {
         const n = idx + 1, e = it.e, s = it.s, a = it.a, lbl = it.label;
         out.push(`Event ${n} of ${shown.length}  (${e.kind === "history" ? "history row" : "event report"})`);
+        if (opts.plain && plainText) out.push(`  Plain English: ${plainText.itemSentence(it).replace(/\s+\[\d+ to check\]$/, "")}`);
         out.push(`  Source file : ${e.source}`);
         const relay = [e.relay_id, e.terminal_id].filter(Boolean).join(" / ");
         if (relay) out.push(`  Relay       : ${relay}`);
@@ -1731,7 +1737,7 @@ function filterReportText(text, inc) {
 /** Split a cause string so TRIP / No trip / CHECK prefixes and [n to check] can be coloured. */
 function tripRuns(text) {
   let runs = [[text, null]];
-  for (const [word, color] of [["Relay TRIPPED", "trip"], ["TRIP", "trip"], ["No trip recorded", "ok"], ["No trip", "ok"], ["CHECK:", "warn"]]) {
+  for (const [word, color] of [["Relay TRIPPED", "trip"], ["Tripped:", "trip"], ["TRIP", "trip"], ["No trip recorded", "ok"], ["No trip", "ok"], ["CHECK:", "warn"]]) {
     if (text.startsWith(word)) { runs = [[word, color], [text.slice(word.length), null]]; break; }
   }
   const lastText = runs[runs.length - 1][0];
@@ -1828,7 +1834,7 @@ function reviewCsv(events, rdb, reviews) {
 }
 
 const api = {
-  loadFiles, buildReport, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
+  loadFiles, buildReport, usePlain, reportCsv, viewChoices, prepareView, eventId, relayKey, shortCause, equationHits, CSV_COLUMNS, filterReportText, SHOW_OPTIONS, SORT_OPTIONS, DETAIL_OPTIONS, parseReportText, tripRuns, analyzeEvent, matchSettings, parseCev, parseText,
   parseRdb, readText, extOf, ALL_EXTS, EVENT_EXTS, SETTINGS_EXTS, COMTRADE_EXTS, ARCHIVE_EXTS, SETTINGS_TEXT_EXTS, unzip, settingsFromText, nowStamp, eventDatetime, eventCore,
   interpretEventType, interpretTargets, extractSettings, splitWS, strip, splitlines, csvLine, latin1, FAULT_TYPES, fx, fc, pyTitle, elementClass,
   newRec, useComtradeReader, BREAKER_NAMES, TRIP_NAMES, MISOP_CATEGORIES, MISOP_CAUSES, REVIEW_OUTCOMES, REVIEW_COLUMNS, REVIEW_DAYS, CAP_DAYS, reviewDue, suggestReview, reviewRows, reviewLine, reviewCsv, addDays,
