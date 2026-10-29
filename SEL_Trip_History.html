@@ -6112,7 +6112,7 @@ function toggleTheme() {
 document.getElementById("themeBtn").onclick = toggleTheme;
 document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "d") { e.preventDefault(); toggleTheme(); } });
 const app = window.SELHistoryUI.mount(document.getElementById("history"), {
-  version: "2.1.0", repo: "kefirman9000/sel-trip-analyzer", printRoot: document.getElementById("print-root"),
+  version: "2.2.0", repo: "kefirman9000/sel-trip-analyzer", printRoot: document.getElementById("print-root"),
   samples: () => JSON.parse(document.getElementById("sample-data").textContent || "[]"),
   pageSource: PAGE_SOURCE,
   snapshot: (() => { const el = document.getElementById("hx-snapshot"); try { return el ? JSON.parse(el.textContent) : null; } catch (e) { return null; } })(),
