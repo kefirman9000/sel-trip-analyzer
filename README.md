@@ -486,3 +486,15 @@ Developers: [DEVELOPING.md](DEVELOPING.md)
 ## Support SEL Trip Analyzer
 
 SEL Trip Analyzer is free. If it has helped you figure out a trip faster, you can support its development on **[GitHub Sponsors](https://github.com/sponsors/kefirman9000)**. It helps keep new relay formats and fixes coming. Starring the repo and reporting problems help too.
+
+## License and disclaimer
+
+Copyright © 2026 kefirman9000. All rights reserved. SEL Trip Analyzer is free to use; see [LICENSE](LICENSE) for what is and isn't allowed.
+
+- **This is an analysis aid, not a substitute for a qualified engineer.** Results can be incomplete or wrong. Always verify findings against the original records, relay settings and your utility's procedures before acting on them. Never use it as the sole basis for operating, protection or safety decisions.
+
+SEL Trip Analyzer is provided **as is**, without warranty of any kind. Use it at your own risk; the author is not liable for any damage, data loss or other loss arising from its use.
+
+SEL Trip Analyzer is an independent project and is not affiliated with, endorsed by or sponsored by any of the companies or products named here. Microsoft and Windows are trademarks of Microsoft Corporation.
+
+Found a security problem? Please report it privately; see [SECURITY.md](SECURITY.md).
