@@ -482,3 +482,7 @@ ungrounded or resonant-grounded).
 [Releases and what's new](https://github.com/kefirman9000/sel-trip-analyzer/releases) ·
 [Report a problem or suggest something](https://github.com/kefirman9000/sel-trip-analyzer/issues/new) ·
 Developers: [DEVELOPING.md](DEVELOPING.md)
+
+## Support SEL Trip Analyzer
+
+SEL Trip Analyzer is free. If it has helped you figure out a trip faster, you can support its development on **[GitHub Sponsors](https://github.com/sponsors/kefirman9000)**. It helps keep new relay formats and fixes coming. Starring the repo and reporting problems help too.
